@@ -26,6 +26,16 @@ def _load_nifly(cfg: Config):
     return pynifly
 
 
+def sphere_of(points: np.ndarray) -> tuple[np.ndarray, float]:
+    """Центр и радиус сферы, охватывающей облако точек: середина охвата и наибольшее
+    расстояние до неё. Для пустого облака — ноль в начале координат."""
+    pts = np.asarray(points, dtype=np.float32).reshape(-1, 3)
+    if pts.shape[0] == 0:
+        return np.zeros(3, dtype=np.float32), 0.0
+    centre = 0.5 * (pts.min(axis=0) + pts.max(axis=0))
+    return centre, float(np.linalg.norm(pts - centre, axis=1).max())
+
+
 class Bone:
     """Кость скелета в том виде, в каком её знает меш: имя и вершины, которые на ней висят."""
 
@@ -76,11 +86,21 @@ class Shape:
         return int(self.tris.shape[0])
 
     def bounds(self, indices=None) -> tuple[np.ndarray, np.ndarray]:
-        """Охват облака вершин: минимум и максимум по каждой оси."""
-        v = self.verts if indices is None else self.verts[np.asarray(indices, dtype=np.int32)]
+        """Охват облака вершин: минимум и максимум по каждой оси. Номера вершин за пределами
+        части отбрасываются: файл морфов мог быть собран под другой меш."""
+        if indices is None:
+            v = self.verts
+        else:
+            idx = np.asarray(indices, dtype=np.int32)
+            v = self.verts[idx[(idx >= 0) & (idx < self.vertex_count)]]
         if v.size == 0:
             return np.zeros(3, np.float32), np.zeros(3, np.float32)
         return v.min(axis=0), v.max(axis=0)
+
+    def sphere(self, indices=None) -> tuple[np.ndarray, float]:
+        """Центр и радиус охвата части целиком или её подмножества вершин."""
+        v = self.verts if indices is None else self.verts[np.asarray(indices, dtype=np.int32)]
+        return sphere_of(v)
 
     def bone(self, name: str) -> Bone | None:
         return self.bones.get(name)
@@ -88,6 +108,17 @@ class Shape:
     def bones_containing(self, needle: str) -> list[Bone]:
         low = needle.lower()
         return [b for n, b in self.bones.items() if low in n.lower()]
+
+    def bone_vertices(self, needle: str, exact: bool = False) -> np.ndarray:
+        """Номера вершин, которые держат кости с таким именем: подстрока без учёта
+        регистра, либо точное имя. По подстроке «Finger» соберутся все пальцы."""
+        low = needle.lower()
+        acc: set[int] = set()
+        for name, bone in self.bones.items():
+            if (name == needle) if exact else (low in name.lower()):
+                acc.update(bone.weights.keys())
+        idx = np.fromiter(sorted(acc), dtype=np.int32, count=len(acc))
+        return idx[idx < self.vertex_count]
 
     def dominant_bone(self) -> np.ndarray:
         """Для каждой вершины — номер кости, которая держит её сильнее прочих.
@@ -169,6 +200,18 @@ class BodyModel:
                 lo = np.minimum(lo, a)
                 hi = np.maximum(hi, b)
         return lo, hi
+
+    def bone_points(self, needle: str, exact: bool = False,
+                    shape: str | None = None) -> np.ndarray:
+        """Вершины всех частей (или одной), которые держат кости с таким именем."""
+        names = [shape] if shape else self.shape_names()
+        chunks = []
+        for n in names:
+            s = self.shape(n)
+            idx = s.bone_vertices(needle, exact)
+            if idx.size:
+                chunks.append(s.verts[idx])
+        return np.vstack(chunks) if chunks else np.zeros((0, 3), dtype=np.float32)
 
     def __repr__(self) -> str:
         return "BodyModel(%r, частей=%d, вершин=%d)" % (

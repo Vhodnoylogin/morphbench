@@ -6,7 +6,8 @@
 отсюда.** Если что-то можно сделать кнопкой и нельзя — вызовом, значит фасад неполон.
 
 Ничего про изображение здесь нет. Самое «графическое», что фасад умеет, — отдать облако вершин
-с применёнными значениями ползунков и хранить числовое состояние показа.
+с применёнными значениями ползунков, признак раскраски числом и хранить числовое состояние
+показа, включая наведение камеры на часть тела.
 """
 from __future__ import annotations
 
@@ -16,7 +17,7 @@ import numpy as np
 
 from .analysis import Analyzer
 from .config import Config
-from .model import BodyModel
+from .model import BodyModel, sphere_of
 from .morphs import MorphSet
 from .view import ViewState
 
@@ -49,9 +50,35 @@ class MorphBench:
             guess = path.with_name(stem + ".tri")
             tri = guess if guess.is_file() else None
         self.morph_set = MorphSet.from_file(tri, self.cfg) if tri else None
-        self.analyzer = Analyzer(self.model, self.morph_set) if self.morph_set else None
+        self.analyzer = self._analyzer() if self.morph_set else None
         self._sliders.clear()
+        self.view.focus_all()
         return self.summary()
+
+    def attach(self, model: BodyModel, morph_set: MorphSet | None = None) -> dict:
+        """Открыть уже построенные объекты вместо файлов: так проверки собирают крошечное
+        тело в памяти и спрашивают фасад о нём точно так же, как о настоящем."""
+        self.model = model
+        self.morph_set = morph_set
+        self.analyzer = self._analyzer() if morph_set is not None else None
+        self._sliders.clear()
+        self.view.focus_all()
+        return self.summary()
+
+    def _analyzer(self) -> Analyzer:
+        """Разборщик получает все пороги из настроек: единственное место, где они заданы."""
+        cfg = self.cfg
+        return Analyzer(self.model, self.morph_set,
+                        contact_radius=float(cfg["contactRadius"]),
+                        min_contact=float(cfg["minContact"]),
+                        strain_threshold=float(cfg["strainThreshold"]),
+                        bone_share_min=float(cfg["boneShareMin"]),
+                        left_behind_min=float(cfg["leftBehindMin"]),
+                        bone_min_vertices=int(cfg["boneMinVertices"]))
+
+    def base_shape(self) -> str:
+        """Имя базовой части - кожи, за которой следуют оболочки, - из настроек."""
+        return str(self.cfg["baseShape"])
 
     def is_open(self) -> bool:
         return self.model is not None
@@ -107,9 +134,27 @@ class MorphBench:
         return [{"bone": k, "vertices": v}
                 for k, v in sorted(acc.items(), key=lambda kv: -kv[1])]
 
+    def shape_bone_names(self, shape: str) -> list[str]:
+        """Имена костей части в том порядке, в каком их нумерует признак `bone`."""
+        self._require()
+        return self.model.shape(shape).bone_order()
+
     def morphs(self) -> list[str]:
         self._require_morphs()
         return self.morph_set.names()
+
+    def morph_deltas(self, shape: str, morph: str) -> dict | None:
+        """Смещения одного морфа на одной части: номера вершин и векторы сдвига.
+        None, если морф этой части не касается."""
+        self._require_morphs()
+        m = self.morph_set.get(shape, morph)
+        if m is None:
+            return None
+        return {"indices": m.indices, "offsets": m.offsets}
+
+    def presets(self) -> dict:
+        """Ракурсы из настроек: имя -> [поворот, подъём]."""
+        return {k: list(v) for k, v in self.cfg["views"].items()}
 
     # ---- разборы ----------------------------------------------------------------------
     def morph_stats(self, morph: str | None = None, shape: str | None = None) -> list[dict]:
@@ -124,22 +169,28 @@ class MorphBench:
         self._require_morphs()
         return self.analyzer.declared_but_absent(expected)
 
-    def strain(self, amount: float = 1.0, threshold: float = 0.25,
+    def strain(self, amount: float = 1.0, threshold: float | None = None,
                morph: str | None = None) -> list[dict]:
+        """Порог None - strainThreshold из настроек."""
         self._require_morphs()
         return [s.as_dict() for s in self.analyzer.strain_report(amount, threshold, morph)]
 
-    def layers(self, morph: str, base: str = "body") -> list[dict]:
+    def layers(self, morph: str, base: str | None = None,
+               only_adjacent: bool = False) -> list[dict]:
+        """Следуют ли оболочки за базовой частью (None - baseShape из настроек).
+        `only_adjacent` оставляет лишь те, что лежат над сдвигаемой кожей и потому
+        обязаны следовать."""
         self._require_morphs()
-        return [s.as_dict() for s in self.analyzer.layers(morph, base)]
+        base = self.base_shape() if base is None else base
+        return [s.as_dict() for s in self.analyzer.layers(morph, base, only_adjacent)]
 
-    def morph_bones(self, shape: str, morph: str) -> list[dict]:
+    def morph_bones(self, shape: str, morph: str, min_share: float | None = None) -> list[dict]:
         self._require_morphs()
         return [{"bone": n, "share": round(v, 3)}
-                for n, v in self.analyzer.morph_bones(shape, morph)]
+                for n, v in self.analyzer.morph_bones(shape, morph, min_share)]
 
     def bones_left_behind(self, shape: str, morph: str,
-                          min_share: float = 0.35) -> list[dict]:
+                          min_share: float | None = None) -> list[dict]:
         self._require_morphs()
         return [{"bone": n, "leftBehind": round(v, 3)}
                 for n, v in self.analyzer.bones_left_behind(shape, morph, min_share)]
@@ -185,6 +236,30 @@ class MorphBench:
         self._require()
         return [n for n in self.model.shape_names() if self.view.is_visible(n)]
 
+    # ---- признаки раскраски: числа, а не цвета ----------------------------------------
+    def bone_key(self, shape_name: str) -> np.ndarray:
+        """Номер главной кости каждой вершины; -1 у вершин без привязки."""
+        self._require()
+        return self.model.shape(shape_name).dominant_bone()
+
+    def morph_key(self, shape_name: str, morph: str) -> np.ndarray:
+        """Величина сдвига каждой вершины этим морфом; ноль там, где он не трогает."""
+        self._require()
+        shape = self.model.shape(shape_name)
+        out = np.zeros(shape.vertex_count, dtype=np.float32)
+        m = self.morph_set.get(shape_name, morph) if self.morph_set else None
+        if m is not None and not m.is_empty:
+            keep = m.indices < shape.vertex_count
+            out[m.indices[keep]] = np.linalg.norm(m.offsets[keep], axis=1)
+        return out
+
+    def strain_key(self, shape_name: str, morph: str) -> np.ndarray:
+        """Наибольшее растяжение рёбер у каждой вершины от этого морфа."""
+        self._require()
+        if self.analyzer is None:
+            return np.zeros(self.model.shape(shape_name).vertex_count, dtype=np.float32)
+        return self.analyzer.vertex_strain(shape_name, morph)
+
     def vertex_colour_key(self, shape_name: str) -> np.ndarray | None:
         """Признак, по которому слой показа красит вершины, — числом, а не цветом.
 
@@ -193,35 +268,15 @@ class MorphBench:
         """
         self._require()
         mode = self.view.colouring
-        shape = self.model.shape(shape_name)
         if mode == "shade":
             return None
         if mode == "bone":
-            return shape.dominant_bone()
+            return self.bone_key(shape_name)
         if self.morph_set is None or not self.view.highlight_morph:
-            return np.zeros(shape.vertex_count, dtype=np.float32)
-        morph = self.morph_set.get(shape_name, self.view.highlight_morph)
+            return np.zeros(self.model.shape(shape_name).vertex_count, dtype=np.float32)
         if mode == "morph":
-            out = np.zeros(shape.vertex_count, dtype=np.float32)
-            if morph is not None and not morph.is_empty:
-                keep = morph.indices < shape.vertex_count
-                out[morph.indices[keep]] = np.linalg.norm(morph.offsets[keep], axis=1)
-            return out
-        # strain
-        out = np.zeros(shape.vertex_count, dtype=np.float32)
-        if morph is None or morph.is_empty:
-            return out
-        edges = Analyzer._edges(shape.tris)
-        a, b = shape.verts[edges[:, 0]], shape.verts[edges[:, 1]]
-        before = np.linalg.norm(a - b, axis=1)
-        moved = morph.apply(shape.verts, 1.0)
-        after = np.linalg.norm(moved[edges[:, 0]] - moved[edges[:, 1]], axis=1)
-        ok = before > 1e-5
-        s = np.zeros_like(before)
-        s[ok] = np.abs(after[ok] / before[ok] - 1.0)
-        np.maximum.at(out, edges[:, 0], s)
-        np.maximum.at(out, edges[:, 1], s)
-        return out
+            return self.morph_key(shape_name, self.view.highlight_morph)
+        return self.strain_key(shape_name, self.view.highlight_morph)
 
     # ---- состояние показа: те же методы, что нажмёт будущая кнопка --------------------
     def orbit(self, d_yaw: float, d_pitch: float) -> dict:
@@ -233,8 +288,23 @@ class MorphBench:
     def preset(self, name: str) -> dict:
         return self.view.preset(name).as_dict()
 
+    def preset_name(self) -> str | None:
+        """Имя ракурса из настроек, совпадающего с камерой, либо None."""
+        return self.view.preset_name()
+
     def zoom(self, factor: float) -> dict:
         return self.view.set_zoom(factor).as_dict()
+
+    def resize(self, width: int, height: int) -> dict:
+        """Размер кадра в пикселях - тоже состояние показа, а не дело слоя."""
+        return self.view.resize(width, height).as_dict()
+
+    def pan(self, dx: float, dy: float) -> dict:
+        """Сдвинуть кадр вдоль осей экрана - вправо и вверх - в единицах модели."""
+        return self.view.set_pan(dx, dy).as_dict()
+
+    def pan_by(self, dx: float, dy: float) -> dict:
+        return self.view.pan_by(dx, dy).as_dict()
 
     def colour_by(self, mode: str, morph: str | None = None) -> dict:
         return self.view.colour_by(mode, morph).as_dict()
@@ -246,7 +316,89 @@ class MorphBench:
         return self.view.show_all().as_dict()
 
     def hide(self, name: str) -> dict:
+        """Спрятать одну часть. Состояние «видно всё» ядро хранит как None, и ViewState имён
+        частей не знает, поэтому перечень видимых разворачивается здесь."""
+        self._require()
+        if self.view.visible is None:
+            self.view.only(self.model.shape_names())
         return self.view.hide(name).as_dict()
+
+    def show(self, name: str) -> dict:
+        """Показать одну часть, не трогая остальные."""
+        self._require()
+        return self.view.show(name).as_dict()
 
     def view_state(self) -> dict:
         return self.view.as_dict()
+
+    # ---- наведение камеры: смотреть на часть тела, а не на модель целиком -------------
+    def focus_bone(self, needle: str, shape: str | None = None) -> dict:
+        """Смотреть на кость: точное имя либо подстрока без учёта регистра («Finger» —
+        все пальцы). Охват берётся по вершинам, которые эти кости держат."""
+        self._require()
+        pts = self.model.bone_points(needle, exact=True, shape=shape)
+        if pts.shape[0] == 0:
+            pts = self.model.bone_points(needle, exact=False, shape=shape)
+        if pts.shape[0] == 0:
+            raise KeyError("ни одна кость не подходит под %r" % needle)
+        centre, radius = sphere_of(pts)
+        return self.view.focus_on(centre, radius, "bone:" + needle).as_dict()
+
+    def focus_morph(self, morph: str) -> dict:
+        """Смотреть на область, которую двигает ползунок, во всех частях меша."""
+        self._require_morphs()
+        chunks = []
+        for shape_name, m in self.morph_set.for_morph(morph).items():
+            if m.is_empty or shape_name not in self.model.shapes:
+                continue
+            s = self.model.shape(shape_name)
+            chunks.append(s.verts[m.indices[m.indices < s.vertex_count]])
+        if not chunks:
+            raise KeyError("морф %r не двигает ни одной вершины меша" % morph)
+        centre, radius = sphere_of(np.vstack(chunks))
+        return self.view.focus_on(centre, radius, "morph:" + morph).as_dict()
+
+    def focus_shape(self, name: str) -> dict:
+        """Смотреть на одну часть меша целиком."""
+        self._require()
+        centre, radius = self.model.shape(name).sphere()
+        return self.view.focus_on(centre, radius, "shape:" + name).as_dict()
+
+    def focus_all(self) -> dict:
+        """Снова охватывать модель целиком."""
+        return self.view.focus_all().as_dict()
+
+    def focus_targets(self, precise: bool = False) -> dict:
+        """Все цели наведения числами — центр и радиус каждой кости, морфа и части.
+        Слою показа этого хватает, чтобы навести камеру, не обращаясь к ядру. Цели без
+        единой вершины не перечисляются - на них и focus_* навестись не может.
+        `precise` отдаёт числа без округления: так кадр страницы совпадает с PNG."""
+        self._require()
+
+        def entry(name, pts):
+            centre, radius = sphere_of(pts)
+            if precise:
+                return {"name": name, "centre": [float(x) for x in centre],
+                        "radius": float(radius)}
+            return {"name": name, "centre": [round(float(x), 2) for x in centre],
+                    "radius": round(radius, 2)}
+
+        bones = []
+        for b in self.model.bone_names():
+            pts = self.model.bone_points(b, exact=True)
+            if pts.shape[0]:
+                bones.append(entry(b, pts))
+        morphs = []
+        if self.morph_set is not None:
+            for morph in self.morph_set.names():
+                chunks = []
+                for shape_name, m in self.morph_set.for_morph(morph).items():
+                    if m.is_empty or shape_name not in self.model.shapes:
+                        continue
+                    s = self.model.shape(shape_name)
+                    chunks.append(s.verts[m.indices[m.indices < s.vertex_count]])
+                if chunks:
+                    morphs.append(entry(morph, np.vstack(chunks)))
+        shapes = [entry(n, self.model.shape(n).verts) for n in self.model.shape_names()
+                  if self.model.shape(n).vertex_count]
+        return {"bones": bones, "morphs": morphs, "shapes": shapes}

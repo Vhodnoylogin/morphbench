@@ -95,10 +95,10 @@ class MorphSet:
             raise FileNotFoundError("нет файла морфов: %s" % path)
         tri_dir = cfg.pynifly_root() / "tri"
         with open(path, "rb") as f:
-            head = f.read(4)
+            head = f.read(8)
 
         by_shape: dict[str, dict[str, Morph]] = {}
-        if head in (b"PIRT", b"\0IRT"):
+        if head[:4] in (b"PIRT", b"\0IRT"):
             kind = "TRIP"
             trip = _module("_mb_tripfile", tri_dir / "tripfile.py").TripFile
             raw = trip.from_filepath(str(path)).shapes
@@ -112,17 +112,31 @@ class MorphSet:
                         idx = np.zeros(0, dtype=np.int32)
                         off = np.zeros((0, 3), dtype=np.float32)
                     slot[morph_name] = Morph(morph_name, shape_name, idx, off)
-        else:
+        elif head[:5] == b"FRTRI":
             kind = "FRTRI"
             trifile = _module("_mb_trifile", tri_dir / "trifile.py").TriFile
             t = trifile.from_filepath(str(path))
             shape_name = path.stem
             slot = by_shape.setdefault(shape_name, {})
-            for morph_name, offsets in t.morphs.items():
-                arr = np.asarray(offsets, dtype=np.float32).reshape(-1, 3)
-                keep = np.linalg.norm(arr, axis=1) > 1e-4
+            # TriFile отдаёт морфы АБСОЛЮТНЫМИ координатами вершин, а базу кладёт под именем
+            # Basis. Смещение - разность с базой; Basis ползунком не является.
+            base = np.asarray(t.morphs.get("Basis", t.vertices), dtype=np.float32).reshape(-1, 3)
+            morphs = dict(t.morphs)
+            for name, verts in (getattr(t, "modmorphs", None) or {}).items():
+                # Частичный морф с именем обычного не затирает его, а идёт рядом.
+                morphs[name if name not in morphs else name + " (mod)"] = verts
+            epsilon = float(cfg["frtriEpsilon"])
+            for morph_name, verts in morphs.items():
+                if morph_name == "Basis":
+                    continue
+                arr = np.asarray(verts, dtype=np.float32).reshape(-1, 3)
+                n = min(arr.shape[0], base.shape[0])
+                delta = arr[:n] - base[:n]
+                keep = np.linalg.norm(delta, axis=1) > epsilon
                 idx = np.nonzero(keep)[0].astype(np.int32)
-                slot[morph_name] = Morph(morph_name, shape_name, idx, arr[keep])
+                slot[morph_name] = Morph(morph_name, shape_name, idx, delta[keep])
+        else:
+            raise ValueError("не файл морфов TRIP или FRTRI: %s (заголовок %r)" % (path, head))
         return cls(path, kind, by_shape)
 
     def names(self) -> list[str]:

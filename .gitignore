@@ -15,3 +15,6 @@ build.local.json
 session.jsonl
 *.wav
 *.bak-*
+
+# Настройки создаются при первом запуске и у каждой машины свои.
+morphbench.json

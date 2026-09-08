@@ -29,6 +29,10 @@ class ViewState:
         self.pan = np.zeros(2, dtype=np.float32)
         self.visible: set[str] | None = None      # None - видно всё
         self.colouring = "shade"
+        # Слой капсул поверх тела: числом, потому что состояние показа - дело ядра,
+        # а рисование - дело слоя показа.
+        self.colliders = False
+        self.bumper = False
         self.highlight_morph: str | None = None
         self.width = int(cfg["imageWidth"])
         self.height = int(cfg["imageHeight"])

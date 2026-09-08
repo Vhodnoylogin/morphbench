@@ -18,6 +18,7 @@ import numpy as np
 
 from .analysis import Analyzer
 from .catalog import Catalog
+from .colliders import ColliderSet
 from .config import Config
 from .environment import Environment
 from .model import BodyModel, sphere_of, vertex_normals
@@ -31,6 +32,7 @@ class MorphBench:
     def __init__(self, config: Config | None = None):
         self.cfg = config or Config()
         self.model: BodyModel | None = None
+        self.rig: ColliderSet | None = None
         self.morph_set: MorphSet | None = None
         self.analyzer: Analyzer | None = None
         self.view = ViewState(self.cfg)
@@ -260,6 +262,169 @@ class MorphBench:
     def reset_sliders(self) -> dict:
         self._sliders.clear()
         return {}
+
+    # ---- колайдеры --------------------------------------------------------------------
+    def open_skeleton(self, path) -> dict:
+        """Открыть скелет и прочитать его физические тела.
+
+        Скелет — отдельный файл от меша, и открывается он отдельно: капсулы можно смотреть
+        и без тела. Тело нужно только посадке и подгонке, и они берут его сами.
+        """
+        self.rig = ColliderSet.from_nif(path, self.cfg)
+        return self.rig.summary()
+
+    def has_skeleton(self) -> bool:
+        return self.rig is not None
+
+    def _require_rig(self) -> None:
+        if self.rig is None:
+            raise RuntimeError("сначала откройте скелет: open_skeleton(<путь к skeleton.nif>)")
+
+    def collider_bones(self, needle: str | None = None) -> list[str]:
+        """Кости, несущие физическое тело; с подстрокой — только подходящие."""
+        self._require_rig()
+        return self.rig.find(needle) if needle else self.rig.bone_names()
+
+    def colliders(self, needle: str | None = None) -> list[dict]:
+        """Капсулы числами: где стоят в мировых координатах, какие и чем являются движку."""
+        self._require_rig()
+        out = []
+        for bone in self.collider_bones(needle):
+            body = self.rig.body(bone)
+            caps = [c.transformed(self.rig.matrix(bone)) for c in body.capsules]
+            out.append({"bone": bone, "kind": body.kind, "physics": body.physics,
+                        "capsules": [c.as_dict() for c in caps]})
+        return out
+
+    def collider_mesh(self, needle: str | None = None, segments: int | None = None):
+        """Треугольники капсул для слоя показа — в тех же координатах, что и тело."""
+        self._require_rig()
+        seg = int(self.cfg["colliderSegments"] if segments is None else segments)
+        return self.rig.mesh(self.collider_bones(needle), seg, self.view.bumper)
+
+    def show_colliders(self, on: bool = True, bumper: bool | None = None) -> dict:
+        """Включить слой капсул поверх тела. Числовое состояние — рисует слой показа.
+
+        Бампер по умолчанию выключен отдельно: он вчетверо больше любой части тела
+        и, включённый, закрывает собой ровно то, ради чего слой и смотрят.
+        """
+        self.view.colliders = bool(on)
+        if bumper is not None:
+            self.view.bumper = bool(bumper)
+        return {"colliders": self.view.colliders, "bumper": self.view.bumper}
+
+    def skin_points(self, bone: str, min_weight: float | None = None,
+                    shapes=None, dominant: bool = True) -> np.ndarray:
+        """Вершины кожи, которые держит эта кость, — с применёнными ползунками.
+
+        Берутся только те части меша, что сейчас видимы: капсула должна садиться по тому,
+        что видно. Скрыв шерсть, подгоняешь по коже; показав — по силуэту вместе с ней.
+
+        `dominant` отдаёт вершину той кости, которая держит её сильнее всех, и это
+        умолчание. Иначе цепочки — хвост, пальцы — расплываются: соседние звенья делят
+        одни и те же вершины, каждое звено видит почти весь хвост и раздувается на него
+        целиком. Порог веса при этом остаётся нижней границей: вершина, которую не держит
+        толком никто, не достаётся никому.
+        """
+        self._require()
+        thr = float(self.cfg["colliderMinWeight"] if min_weight is None else min_weight)
+        names = list(shapes) if shapes else self.visible_shapes()
+        chunks = []
+        for name in names:
+            shape = self.model.shape(name)
+            b = shape.bones.get(bone)
+            if b is None:
+                continue
+            if dominant:
+                order = list(shape.bones)
+                mine = order.index(bone)
+                best = shape.dominant_bone()
+                idx = [i for i, w in b.weights.items()
+                       if i < shape.vertex_count and best[i] == mine and w >= thr]
+            else:
+                idx = [i for i, w in b.weights.items()
+                       if w >= thr and i < shape.vertex_count]
+            if idx:
+                chunks.append(self.deformed(name)[np.asarray(idx, dtype=np.int32)])
+        return np.vstack(chunks) if chunks else np.zeros((0, 3), dtype=np.float32)
+
+    def collider_clearance(self, needle: str | None = None,
+                           min_weight: float | None = None) -> list[dict]:
+        """Насколько капсулы расходятся с кожей при нынешних ползунках.
+
+        `worst` — самая дальняя точка кожи снаружи капсулы: сквозь неё рука пройдёт,
+        ничего не задев. `outside` — доля кожи, оставшаяся снаружи.
+        """
+        self._require()
+        self._require_rig()
+        out = []
+        for bone in self.collider_bones(needle):
+            pts = self.skin_points(bone, min_weight)
+            if pts.shape[0]:
+                out.append(self.rig.clearance(bone, pts))
+        return out
+
+    def collider_fit(self, needle: str | None = None, percentile: float | None = None,
+                     min_weight: float | None = None, apply: bool = True) -> list[dict]:
+        """Посадить капсулы по коже при нынешних ползунках.
+
+        Это то, ради чего верстак и трогает колайдеры: тело мы деформируем сами и знаем
+        каждую вершину, поэтому подгонку можно посчитать точно и заранее, а не угадывать
+        её в игре. Кость с несколькими капсулами заменяется одной севшей: связку по
+        силуэту руками собирают, а не выводят из облака.
+        """
+        self._require()
+        self._require_rig()
+        pct = float(self.cfg["colliderFitPercentile"] if percentile is None else percentile)
+        out = []
+        for bone in self.collider_bones(needle):
+            pts = self.skin_points(bone, min_weight)
+            fitted = self.rig.fit(bone, pts, pct)
+            if fitted is None:
+                out.append({"bone": bone, "points": int(pts.shape[0]), "fitted": False})
+                continue
+            before = self.rig.body(bone).capsules[0]
+            row = {"bone": bone, "points": int(pts.shape[0]), "fitted": True,
+                   "was": before.as_dict(), "now": fitted.as_dict()}
+            if apply:
+                self.rig.body(bone).capsules = [fitted]
+            out.append(row)
+        return out
+
+    def collider_set(self, bone: str, index: int = 0, p1=None, p2=None,
+                     radius: float | None = None) -> dict:
+        """Правка одной капсулы числами: концы и радиус в системе своей кости."""
+        self._require_rig()
+        caps = self.rig.body(bone).capsules
+        if not 0 <= index < len(caps):
+            raise IndexError("у кости %r капсул %d, а спрошена %d"
+                             % (bone, len(caps), index))
+        cap = caps[index]
+        if p1 is not None:
+            cap.p1 = np.asarray(p1, dtype=np.float32).reshape(3)
+        if p2 is not None:
+            cap.p2 = np.asarray(p2, dtype=np.float32).reshape(3)
+        if radius is not None:
+            cap.radius = float(radius)
+        return cap.as_dict()
+
+    def collider_save(self, path) -> str:
+        """Записать нынешние капсулы в новый файл скелета.
+
+        Всегда в НОВЫЙ файл: скелет, который мы читали, принадлежит чужому моду, и править
+        его на месте нельзя. Правки едут отдельным модом-надстройкой.
+        """
+        self._require_rig()
+        return str(self.rig.save_as(path))
+
+    def collider_ppb(self, needle: str | None = None) -> list[str]:
+        """Те же капсулы строками настроек Precision Physic Bodies.
+
+        Нужны, чтобы примерить посадку живьём: PPB перечитывает свой файл раз в секунду,
+        и капсула переезжает в игре без перезапуска.
+        """
+        self._require_rig()
+        return self.rig.ppb_lines(self.collider_bones(needle))
 
     # ---- геометрия для слоёв показа ---------------------------------------------------
     def deformed(self, shape_name: str) -> np.ndarray:

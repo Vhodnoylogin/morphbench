@@ -18,3 +18,6 @@ session.jsonl
 
 # Настройки создаются при первом запуске и у каждой машины свои.
 morphbench.json
+
+# Точка входа для MO2: продукт сборки, собирается из launcher/morphbench.cs командой launcher/build.cmd.
+/morphbench.exe

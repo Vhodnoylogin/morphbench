@@ -15,7 +15,7 @@ import numpy as np
 from .config import Config
 
 
-def _load_nifly(cfg: Config):
+def load_nifly(cfg: Config):
     """Обвязка PyNifly грузится один раз за жизнь процесса: она тянет за собой NiflyDLL."""
     root = cfg.pynifly_root()
     if str(root) not in sys.path:
@@ -94,6 +94,8 @@ class Shape:
         self.uvs = uvs
         self.bones = bones
         self.textures = textures or []
+        # Главная кость каждой вершины считается один раз: части меша не меняются.
+        self._dominant: np.ndarray | None = None
 
     @property
     def vertex_count(self) -> int:
@@ -144,15 +146,36 @@ class Shape:
         Это ответ на вопрос «к чему привязана точка»: именно по нему видно, что ладонь
         и пальцы — разные хозяева, и где между ними проходит граница.
         """
-        n = self.vertex_count
-        best = np.full(n, -1, dtype=np.int32)
-        best_w = np.zeros(n, dtype=np.float32)
-        for i, bone in enumerate(self.bones.values()):
-            w = bone.mask(n)
-            take = w > best_w
-            best[take] = i
-            best_w[take] = w[take]
-        return best
+        if self._dominant is None:
+            n = self.vertex_count
+            best = np.full(n, -1, dtype=np.int32)
+            best_w = np.zeros(n, dtype=np.float32)
+            for i, bone in enumerate(self.bones.values()):
+                w = bone.mask(n)
+                take = w > best_w
+                best[take] = i
+                best_w[take] = w[take]
+            self._dominant = best
+        return self._dominant
+
+    def owned_vertices(self, bone_name: str, min_weight: float = 0.0,
+                       dominant: bool = True) -> np.ndarray:
+        """Номера вершин, которые принадлежат кости с точным именем.
+
+        `dominant` отдаёт вершину той кости, которая держит её сильнее всех, - это
+        умолчание. Иначе цепочки - хвост, пальцы - расплываются: соседние звенья делят
+        одни и те же вершины, каждое видит почти весь хвост и раздувается на него целиком.
+        Порог веса при этом остаётся нижней границей: вершина, которую не держит толком
+        никто, не достаётся никому.
+        """
+        bone = self.bones.get(bone_name)
+        if bone is None:
+            return np.zeros(0, dtype=np.int32)
+        weight = bone.mask(self.vertex_count)
+        take = (weight >= float(min_weight)) & (weight > 0.0)
+        if dominant:
+            take &= self.dominant_bone() == list(self.bones).index(bone_name)
+        return np.nonzero(take)[0].astype(np.int32)
 
     def bone_order(self) -> list[str]:
         return list(self.bones.keys())
@@ -172,7 +195,7 @@ class BodyModel:
     @classmethod
     def from_nif(cls, path, cfg: Config | None = None) -> "BodyModel":
         cfg = cfg or Config()
-        pynifly = _load_nifly(cfg)
+        pynifly = load_nifly(cfg)
         path = Path(path)
         if not path.is_file():
             raise FileNotFoundError("нет файла меша: %s" % path)

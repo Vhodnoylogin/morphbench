@@ -207,6 +207,16 @@ class ViewState:
                 "worldDirection": [r(x) for x in self.light_world_dir],
                 "ambient": r(self.ambient), "diffuse": r(self.diffuse), "fill": r(self.fill)}
 
+    # ---- слой капсул ------------------------------------------------------------------
+    def show_colliders(self, on: bool = True, bumper: bool | None = None) -> dict:
+        """Слой капсул столкновений поверх тела. Бампер - цилиндр перемещения - отдельно
+        и по умолчанию выключен: он вчетверо больше любой части тела и закрыл бы собой
+        ровно то, ради чего слой и смотрят. None - не менять."""
+        self.colliders = bool(on)
+        if bumper is not None:
+            self.bumper = bool(bumper)
+        return {"colliders": self.colliders, "bumper": self.bumper}
+
     # ---- слои -------------------------------------------------------------------------
     def show_all(self) -> "ViewState":
         self.visible = None
@@ -267,6 +277,7 @@ class ViewState:
                 "colouring": self.colouring,
                 "highlightMorph": self.highlight_morph,
                 "visible": None if self.visible is None else sorted(self.visible),
+                "colliders": self.colliders, "bumper": self.bumper,
                 "width": self.width, "height": self.height,
                 "light": self.light_state(precise),
                 "focus": None if self.focus_centre is None else {

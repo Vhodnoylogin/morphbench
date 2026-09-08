@@ -36,6 +36,17 @@ class ViewState:
         self.focus_centre: np.ndarray | None = None
         self.focus_radius: float | None = None
         self.focus_name: str | None = None
+        # Свет: за камерой (направление в осях камеры - вправо, вверх, к зрителю) либо
+        # отдельно (направление в мировых координатах); силы рассеянной, направленной
+        # и встречной подсветки.
+        self.light_follow = bool(cfg["lightFollowCamera"])
+        self.light_camera_dir = np.asarray(cfg["lightCameraDirection"], dtype=np.float32).reshape(3)
+        self.light_world_dir = np.asarray(cfg["lightDirection"], dtype=np.float32).reshape(3)
+        self.ambient = float(cfg["ambient"])
+        self.diffuse = float(cfg["diffuse"])
+        self.fill = float(cfg["fill"])
+        # Полуразмах последнего кадра: по нему масштаб к точке переводит доли кадра в единицы.
+        self.frame_half: float | None = None
 
     # ---- камера -----------------------------------------------------------------------
     def orbit(self, d_yaw: float, d_pitch: float) -> "ViewState":
@@ -66,6 +77,23 @@ class ViewState:
 
     def set_zoom(self, factor: float) -> "ViewState":
         self.zoom = max(0.05, float(factor))
+        return self
+
+    def zoom_at(self, factor: float, fx: float, fy: float) -> "ViewState":
+        """Масштаб к точке: новый масштаб `factor` при том, что точка сцены под курсором
+        остаётся на месте. `fx`, `fy` - положение курсора от центра кадра в долях половины
+        меньшей стороны холста: вправо и вверх, -1..1. Нужен полуразмах последнего кадра -
+        его оставляет framing(); без него точка неизвестна, и масштаб идёт от центра."""
+        old = self.zoom
+        new = max(0.05, float(factor))
+        if self.frame_half is not None and old > 0.0 and new != old:
+            fill = float(self.cfg["frameFill"])
+            u = float(fx) * self.frame_half / (fill * old)
+            v = float(fy) * self.frame_half / (fill * old)
+            k = 1.0 - old / new
+            self.pan = np.array([float(self.pan[0]) - u * k, float(self.pan[1]) - v * k],
+                                dtype=np.float32)
+        self.zoom = new
         return self
 
     def resize(self, width: int, height: int) -> "ViewState":
@@ -110,7 +138,70 @@ class ViewState:
         if self.pan[0] != 0.0 or self.pan[1] != 0.0:
             right, up, _ = self.basis()
             c = c - right * self.pan[0] - up * self.pan[1]
+        self.frame_half = float(half)
         return c, half
+
+    # ---- свет --------------------------------------------------------------------------
+    def light_follow_camera(self, on: bool) -> "ViewState":
+        """Свет за камерой: источник едет вместе с ракурсом, что видно - то и освещено."""
+        self.light_follow = bool(on)
+        return self
+
+    def light_direction(self, x: float, y: float, z: float) -> "ViewState":
+        """Направление НА источник. За камерой - в осях камеры (вправо, вверх, к зрителю),
+        отдельно - в мировых координатах. Нулевой вектор отвергается."""
+        v = np.asarray([x, y, z], dtype=np.float32)
+        if not np.all(np.isfinite(v)) or float(np.linalg.norm(v)) < 1e-6:
+            raise ValueError("направление света должно быть конечным и ненулевым")
+        if self.light_follow:
+            self.light_camera_dir = v
+        else:
+            self.light_world_dir = v
+        return self
+
+    def light_power(self, ambient: float | None = None, diffuse: float | None = None,
+                    fill: float | None = None) -> "ViewState":
+        """Силы света: рассеянная, направленная, встречная подсветка. None - не менять."""
+        for name, value in (("ambient", ambient), ("diffuse", diffuse), ("fill", fill)):
+            if value is None:
+                continue
+            value = float(value)
+            if not math.isfinite(value):
+                raise ValueError("сила света должна быть конечным числом")
+            setattr(self, name, max(0.0, value))
+        return self
+
+    def light_reset(self) -> "ViewState":
+        """Свет как в настройках: режим, оба направления и силы."""
+        cfg = self.cfg
+        self.light_follow = bool(cfg["lightFollowCamera"])
+        self.light_camera_dir = np.asarray(cfg["lightCameraDirection"], dtype=np.float32).reshape(3)
+        self.light_world_dir = np.asarray(cfg["lightDirection"], dtype=np.float32).reshape(3)
+        self.ambient, self.diffuse, self.fill = (float(cfg["ambient"]), float(cfg["diffuse"]),
+                                                 float(cfg["fill"]))
+        return self
+
+    def light_vector(self) -> np.ndarray:
+        """Единичный вектор на источник в мировых координатах - то, что нужно рисующему."""
+        if self.light_follow:
+            right, up, forward = self.basis()
+            d = self.light_camera_dir
+            v = right * d[0] + up * d[1] - forward * d[2]
+        else:
+            v = self.light_world_dir
+        n = float(np.linalg.norm(v))
+        return (v / n).astype(np.float32) if n > 1e-6 else np.array([0.0, 0.0, 1.0], np.float32)
+
+    def light_state(self, precise: bool = False) -> dict:
+        """Свет числами: режим, направление текущего режима и оба направления отдельно,
+        силы. `precise` - без округления, для слоёв, которые считают по этим числам."""
+        r = (lambda x: float(x)) if precise else (lambda x: round(float(x), 3))
+        d = self.light_camera_dir if self.light_follow else self.light_world_dir
+        return {"follow": self.light_follow,
+                "direction": [r(x) for x in d],
+                "cameraDirection": [r(x) for x in self.light_camera_dir],
+                "worldDirection": [r(x) for x in self.light_world_dir],
+                "ambient": r(self.ambient), "diffuse": r(self.diffuse), "fill": r(self.fill)}
 
     # ---- слои -------------------------------------------------------------------------
     def show_all(self) -> "ViewState":
@@ -161,16 +252,20 @@ class ViewState:
         up = np.cross(right, forward)
         return np.stack([right, up, forward])
 
-    def as_dict(self) -> dict:
-        return {"yaw": round(self.yaw, 1), "pitch": round(self.pitch, 1),
+    def as_dict(self, precise: bool = False) -> dict:
+        """Состояние показа словарём из чисел. По умолчанию числа округлены для глаза
+        и командной строки; `precise` отдаёт их как есть - слою, который по ним считает."""
+        r = (lambda x, n: float(x)) if precise else (lambda x, n: round(float(x), n))
+        return {"yaw": r(self.yaw, 1), "pitch": r(self.pitch, 1),
                 "preset": self.preset_name(),
-                "zoom": round(self.zoom, 3),
-                "pan": [round(float(x), 2) for x in self.pan],
+                "zoom": r(self.zoom, 3),
+                "pan": [r(x, 2) for x in self.pan],
                 "colouring": self.colouring,
                 "highlightMorph": self.highlight_morph,
                 "visible": None if self.visible is None else sorted(self.visible),
                 "width": self.width, "height": self.height,
+                "light": self.light_state(precise),
                 "focus": None if self.focus_centre is None else {
                     "name": self.focus_name,
-                    "centre": [round(float(x), 2) for x in self.focus_centre],
-                    "radius": round(float(self.focus_radius), 2)}}
+                    "centre": [r(x, 2) for x in self.focus_centre],
+                    "radius": r(self.focus_radius, 2)}}

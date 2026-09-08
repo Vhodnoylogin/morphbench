@@ -11,13 +11,16 @@
 """
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 import numpy as np
 
 from .analysis import Analyzer
+from .catalog import Catalog
 from .config import Config
-from .model import BodyModel, sphere_of
+from .environment import Environment
+from .model import BodyModel, sphere_of, vertex_normals
 from .morphs import MorphSet
 from .view import ViewState
 
@@ -31,7 +34,47 @@ class MorphBench:
         self.morph_set: MorphSet | None = None
         self.analyzer: Analyzer | None = None
         self.view = ViewState(self.cfg)
+        self.env = Environment(self.cfg)
         self._sliders: dict[str, float] = {}
+        self._catalogs: dict[tuple[str, bool], Catalog] = {}
+
+    # ---- окружение и обзор мешей ------------------------------------------------------
+    def environment(self) -> dict:
+        """Под MO2 ли мы, какие игры установлены и какой корень обзора по умолчанию."""
+        return self.env.describe()
+
+    def _catalog_root(self, root) -> Path:
+        if root is None:
+            root = self.env.data_root()
+            if root is None:
+                raise ValueError("корень обзора не задан: вне MO2 назовите папку "
+                                 "или ключ catalogRoot в настройках")
+        root = Path(os.path.normpath(os.path.abspath(str(root))))
+        if not self.env.allows(root):
+            raise PermissionError("под MO2 обзор ограничен папкой Data игры: %s"
+                                  % self.env.data_root())
+        return root
+
+    def catalog(self, root=None, with_morphs: bool = True, rescan: bool = False) -> list[dict]:
+        """Меши под корнем с подобранными файлами морфов. Корень None - умолчание
+        окружения: под MO2 это Data игры. Обход делается один раз на корень."""
+        root = self._catalog_root(root)
+        key = (os.path.normcase(str(root)), bool(with_morphs))
+        cat = self._catalogs.get(key)
+        if cat is None or rescan:
+            cat = Catalog(root, self.cfg["catalogSubdirs"], with_morphs)
+            self._catalogs[key] = cat
+        return cat.as_dicts()
+
+    def open_entry(self, key, root=None, with_morphs: bool = True) -> dict:
+        """Открыть меш из обзора по номеру в списке или по имени (пути от корня)."""
+        root = self._catalog_root(root)
+        self.catalog(root, with_morphs)
+        entry = self._catalogs[(os.path.normcase(str(root)), bool(with_morphs))].get(key)
+        summary = self.open(entry.nif, entry.tri)
+        summary["entry"] = entry.name          # какую запись обзора открыли
+        summary["root"] = str(root)
+        return summary
 
     # ---- открытие ---------------------------------------------------------------------
     def open(self, nif, tri=None) -> dict:
@@ -236,6 +279,26 @@ class MorphBench:
         self._require()
         return [n for n in self.model.shape_names() if self.view.is_visible(n)]
 
+    def vertex_normals(self, shape_name: str) -> np.ndarray:
+        """Нормали вершин части с применёнными ползунками - для мягкого затенения."""
+        self._require()
+        return vertex_normals(self.deformed(shape_name), self.model.shape(shape_name).tris)
+
+    def framing(self) -> tuple[np.ndarray, float]:
+        """Центр и полуразмах кадра: охват видимых частей с применёнными ползунками в осях
+        камеры, затем наведение и панорама. Считает ядро; слои показа лишь ставят по нему
+        камеру, и масштаб к точке знает, какой кадр был на экране."""
+        self._require()
+        chunks = [self.deformed(n) for n in self.visible_shapes()
+                  if self.model.shape(n).triangle_count]
+        if not chunks:
+            raise RuntimeError("нечего показывать: все части меша скрыты")
+        verts = np.vstack(chunks)
+        basis = self.view.basis()
+        whole = 0.5 * (verts.min(axis=0) + verts.max(axis=0))
+        half = float(np.abs(((verts - whole) @ basis.T)[:, :2]).max())
+        return self.view.framing(whole, half)
+
     # ---- признаки раскраски: числа, а не цвета ----------------------------------------
     def bone_key(self, shape_name: str) -> np.ndarray:
         """Номер главной кости каждой вершины; -1 у вершин без привязки."""
@@ -299,6 +362,32 @@ class MorphBench:
         """Размер кадра в пикселях - тоже состояние показа, а не дело слоя."""
         return self.view.resize(width, height).as_dict()
 
+    def zoom_at(self, factor: float, fx: float, fy: float) -> dict:
+        """Масштаб к точке под курсором: `fx`, `fy` - её положение от центра кадра в долях
+        половины меньшей стороны холста (вправо, вверх). Кадр пересчитывается здесь же,
+        чтобы точка бралась с того кадра, который на экране."""
+        self.framing()
+        return self.view.zoom_at(factor, fx, fy).as_dict()
+
+    # ---- свет: тоже состояние показа ----------------------------------------------------
+    def light_follow_camera(self, on: bool) -> dict:
+        return self.view.light_follow_camera(on).as_dict()
+
+    def light_direction(self, x: float, y: float, z: float) -> dict:
+        return self.view.light_direction(x, y, z).as_dict()
+
+    def light_power(self, ambient: float | None = None, diffuse: float | None = None,
+                    fill: float | None = None) -> dict:
+        return self.view.light_power(ambient, diffuse, fill).as_dict()
+
+    def light_reset(self) -> dict:
+        """Свет как в настройках."""
+        return self.view.light_reset().as_dict()
+
+    def light_vector(self) -> list[float]:
+        """Единичный вектор на источник в мировых координатах для текущего ракурса."""
+        return [float(x) for x in self.view.light_vector()]
+
     def pan(self, dx: float, dy: float) -> dict:
         """Сдвинуть кадр вдоль осей экрана - вправо и вверх - в единицах модели."""
         return self.view.set_pan(dx, dy).as_dict()
@@ -328,8 +417,10 @@ class MorphBench:
         self._require()
         return self.view.show(name).as_dict()
 
-    def view_state(self) -> dict:
-        return self.view.as_dict()
+    def view_state(self, precise: bool = False) -> dict:
+        """Состояние показа; `precise` - числа без округления, для слоя, который по ним
+        строит кадр и должен совпасть с растеризатором до последнего знака."""
+        return self.view.as_dict(precise)
 
     # ---- наведение камеры: смотреть на часть тела, а не на модель целиком -------------
     def focus_bone(self, needle: str, shape: str | None = None) -> dict:

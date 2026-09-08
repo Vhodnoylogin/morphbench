@@ -26,6 +26,24 @@ def _load_nifly(cfg: Config):
     return pynifly
 
 
+def vertex_normals(verts: np.ndarray, tris: np.ndarray) -> np.ndarray:
+    """Нормаль в каждой вершине: сумма нормалей прилегающих треугольников, взвешенных
+    их площадью, приведённая к единичной длине. Вершины без треугольников смотрят вверх."""
+    v = np.asarray(verts, dtype=np.float32).reshape(-1, 3)
+    out = np.zeros_like(v)
+    if tris is not None and len(tris):
+        t = np.asarray(tris, dtype=np.int32).reshape(-1, 3)
+        a, b, c = v[t[:, 0]], v[t[:, 1]], v[t[:, 2]]
+        face = np.cross(b - a, c - a)          # длина - удвоенная площадь: вес сам собой
+        for k in range(3):
+            np.add.at(out, t[:, k], face)
+    n = np.linalg.norm(out, axis=1, keepdims=True)
+    flat = n[:, 0] < 1e-12
+    out = out / np.maximum(n, 1e-12)
+    out[flat] = np.array([0.0, 0.0, 1.0], dtype=np.float32)
+    return out.astype(np.float32)
+
+
 def sphere_of(points: np.ndarray) -> tuple[np.ndarray, float]:
     """Центр и радиус сферы, охватывающей облако точек: середина охвата и наибольшее
     расстояние до неё. Для пустого облака — ноль в начале координат."""

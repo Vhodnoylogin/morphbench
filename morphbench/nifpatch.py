@@ -5,12 +5,12 @@
 блоков. Заголовок перечисляет длины всех блоков подряд, поэтому смещение любого из них
 получается сложением, без понимания содержимого.
 
-Ради чего: `setBlock` из PyNifly на форме капсулы отвечает «NYI Unimplemented function SET
-of type 19», а посаженную капсулу в скелет записать надо. Блок формы-капсулы имеет
-ПОСТОЯННЫЙ размер, и меняются в нём только вещественные числа, поэтому файл копируется
-байт в байт, а значения правятся на своих местах: ни длины блоков, ни таблица строк,
-ни ссылки не сдвигаются. Как только PyNifly научится писать капсулы, этот модуль
-становится лишним целиком.
+Ради чего: шар охвата части меша через сеттер PyNifly пишется без ошибки и молча
+не меняется. Шар - поле постоянного размера внутри блока части, поэтому файл копируется
+байт в байт, а числа правятся на своих местах: ни длины блоков, ни таблица строк,
+ни ссылки не сдвигаются. Капсулы столкновений так больше не правятся: их пишет PyNifly
+новой формой тела (см. `colliders.ColliderSet.save_as`). Как только PyNifly научится
+писать и шар, этот модуль становится лишним целиком.
 """
 from __future__ import annotations
 
@@ -20,12 +20,6 @@ from pathlib import Path
 
 class NifPatch:
     """Копия файла NIF в памяти со смещениями блоков; правит числа на месте."""
-
-    #: Блок формы-капсулы: материал (4), общий радиус (4), восемь неиспользуемых байтов,
-    #: затем первый конец с радиусом (16) и второй конец с радиусом (16).
-    CAPSULE_BLOCK = 48
-    CAPSULE_RADIUS = 4
-    CAPSULE_POINTS = 16
 
     #: Часть меша: имя (4), число доп. данных (4) и их ссылки, контроллер (4), флаги (4),
     #: перенос (12), поворот (36), масштаб (4), коллизия (4) - и затем центр (12) и радиус (4)
@@ -91,21 +85,6 @@ class NifPatch:
     def has_block(self, block: int) -> bool:
         return block in self.offsets
 
-    # ---- правка -----------------------------------------------------------------------
-    def write_capsule(self, block: int, p1, p2, radius: float) -> None:
-        """Концы и радиус капсулы в её блок. Числа - в единицах Havok, как лежат в файле."""
-        if block not in self.offsets:
-            raise KeyError("в файле нет блока %d (всего %d)" % (block, self.block_count))
-        if self.sizes[block] != self.CAPSULE_BLOCK:
-            raise ValueError("блок %d не похож на капсулу: длина %d, а не %d"
-                             % (block, self.sizes[block], self.CAPSULE_BLOCK))
-        off = self.offsets[block]
-        r = float(radius)
-        struct.pack_into("<f", self.raw, off + self.CAPSULE_RADIUS, r)
-        struct.pack_into("<3ff3ff", self.raw, off + self.CAPSULE_POINTS,
-                         float(p1[0]), float(p1[1]), float(p1[2]), r,
-                         float(p2[0]), float(p2[1]), float(p2[2]), r)
-
     # ---- шар охвата части -----------------------------------------------------------
     def _bounds_offset(self, block: int) -> int:
         if block not in self.offsets:
@@ -130,14 +109,6 @@ class NifPatch:
         off = self._bounds_offset(block)
         struct.pack_into("<4f", self.raw, off, float(centre[0]), float(centre[1]),
                          float(centre[2]), float(radius))
-
-    def read_capsule(self, block: int) -> tuple[tuple[float, float, float],
-                                               tuple[float, float, float], float]:
-        """Обратное чтение - для проверки того, что записано."""
-        off = self.offsets[block]
-        x1, y1, z1, r, x2, y2, z2, _ = struct.unpack_from("<3ff3ff", self.raw,
-                                                          off + self.CAPSULE_POINTS)
-        return (x1, y1, z1), (x2, y2, z2), r
 
     def save(self, path) -> Path:
         path = Path(path)

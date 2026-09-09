@@ -16,9 +16,12 @@
 
 Три класса: `Capsule` - отрезок с толщиной, `CollisionBody` - кость с её капсулами и тем,
 чем она является для движка, `ColliderSet` - все тела скелета вместе с положением костей.
-Чтение - PyNifly, запись - `NifPatch`, потому что PyNifly капсулы писать не умеет.
-Ни строчки про изображение и ни строчки про чужие файлы настроек: строки для других
-программ складывает слой показа.
+Чтение и запись - PyNifly: править капсулу на месте он не умеет (`setBlock` NYI), зато
+умеет поставить телу новую форму - одну капсулу или связку `bhkListShape`, - и круговой
+оборот скелета через него без потерь (490 блоков, шарниры и контроллеры на месте,
+проверено 10.09). Поэтому изменённое тело получает новую форму, остальное переписывается
+как было. Ни строчки про изображение и ни строчки про чужие файлы настроек: строки
+для других программ складывает слой показа.
 """
 from __future__ import annotations
 
@@ -29,7 +32,6 @@ import numpy as np
 from .config import Config
 from .environment import file_exists
 from .model import load_nifly
-from .nifpatch import NifPatch
 
 #: Havok меряет длины в своих единицах; игра - в своих. Это свойство формата NIF,
 #: а не настройка: изменить его нельзя, им можно только пользоваться.
@@ -51,15 +53,18 @@ class Capsule:
     не записывали.
     """
 
-    __slots__ = ("bone", "index", "p1", "p2", "radius", "block")
+    __slots__ = ("bone", "index", "p1", "p2", "radius", "block", "material")
 
-    def __init__(self, bone: str, index: int, p1, p2, radius: float, block: int = -1):
+    def __init__(self, bone: str, index: int, p1, p2, radius: float, block: int = -1,
+                 material: int = 0):
         self.bone = bone
         self.index = int(index)
         self.p1 = np.asarray(p1, dtype=np.float32).reshape(3)
         self.p2 = np.asarray(p2, dtype=np.float32).reshape(3)
         self.radius = float(radius)
         self.block = int(block)
+        # Материал Havok - число из файла; новая капсула наследует его у прежней.
+        self.material = int(material)
 
     # ---- посадка по облаку --------------------------------------------------------------
     @classmethod
@@ -127,7 +132,7 @@ class Capsule:
         scale = float(np.cbrt(abs(np.linalg.det(matrix[:3, :3])))) or 1.0
         return Capsule(self.bone, self.index,
                        _apply(matrix, self.p1), _apply(matrix, self.p2),
-                       self.radius * scale, self.block)
+                       self.radius * scale, self.block, self.material)
 
     def distance_to(self, points: np.ndarray) -> np.ndarray:
         """Расстояние от каждой точки до поверхности капсулы: минус - точка внутри.
@@ -200,6 +205,55 @@ class Capsule:
             self.bone, self.index, self.length, self.radius)
 
 
+SPLIT_METHODS = ("axis", "kmeans")
+
+
+def principal_axis(points: np.ndarray) -> np.ndarray:
+    pts = np.asarray(points, dtype=np.float32).reshape(-1, 3)
+    rel = pts - pts.mean(axis=0)
+    _, _, vh = np.linalg.svd(rel, full_matrices=False)
+    return vh[0] / max(float(np.linalg.norm(vh[0])), 1e-6)
+
+
+def split_points(points: np.ndarray, count: int, method: str = "kmeans",
+                 iterations: int = 30) -> list[np.ndarray]:
+    """Разбить облако на `count` кусков; ответ - списки номеров точек.
+
+    `axis` - ломтики равной численности вдоль главного направления облака: годится
+    конечностям, у которых оно есть. `kmeans` - сгустки по близости, начатые из точек,
+    равномерно расставленных вдоль той же оси: у головы главного направления нет, зато
+    есть череп, морда и челюсти, и они находятся сами. Пустые куски отбрасываются.
+    """
+    pts = np.asarray(points, dtype=np.float32).reshape(-1, 3)
+    n = max(1, int(count))
+    if method not in SPLIT_METHODS:
+        raise ValueError("способ разбиения бывает %s" % ", ".join(SPLIT_METHODS))
+    if pts.shape[0] == 0:
+        return []
+    if n == 1:
+        return [np.arange(pts.shape[0], dtype=np.int32)]
+    axis = principal_axis(pts)
+    t = (pts - pts.mean(axis=0)) @ axis
+    order = np.argsort(t, kind="stable")
+    if method == "axis":
+        return [np.sort(chunk.astype(np.int32)) for chunk in np.array_split(order, n) if chunk.size]
+    # k-means: начальные центры - середины ломтиков вдоль оси, дальше по близости.
+    centres = np.stack([pts[chunk].mean(axis=0) for chunk in np.array_split(order, n) if chunk.size])
+    labels = np.zeros(pts.shape[0], dtype=np.int32)
+    for _ in range(max(1, int(iterations))):
+        d = ((pts[:, None, :] - centres[None, :, :]) ** 2).sum(axis=2)
+        new = np.argmin(d, axis=1).astype(np.int32)
+        if np.array_equal(new, labels) and _:
+            break
+        labels = new
+        for k in range(centres.shape[0]):
+            mine = labels == k
+            if mine.any():
+                centres[k] = pts[mine].mean(axis=0)
+    return [np.nonzero(labels == k)[0].astype(np.int32)
+            for k in range(centres.shape[0]) if (labels == k).any()]
+
+
 class CollisionBody:
     """Одно физическое тело: кость, её капсулы и то, чем это тело является для движка."""
 
@@ -209,26 +263,45 @@ class CollisionBody:
         self.capsules = capsules
         self.physics = physics
         self.kind = kind
-        # Блоки капсул, которые посадка заменила одной: при записи в них ложатся те же
-        # числа, что и в севшую, - иначе в файле остались бы старые капсулы связки,
-        # которых на экране уже нет.
-        self.spare_blocks: list[int] = []
+        # Каким тело прочитано из файла: по этому снимку видно, менялось ли оно,
+        # и запись переписывает форму только у изменённых тел.
+        self.original = self._snapshot()
+
+    def _snapshot(self) -> list[tuple]:
+        return [(c.p1.copy(), c.p2.copy(), float(c.radius)) for c in self.capsules]
+
+    @property
+    def changed(self) -> bool:
+        now = self._snapshot()
+        if len(now) != len(self.original):
+            return True
+        return any(not (np.allclose(a[0], b[0]) and np.allclose(a[1], b[1]) and abs(a[2] - b[2]) < 1e-6)
+                   for a, b in zip(now, self.original))
+
+    @property
+    def material(self) -> int:
+        """Материал Havok прежней формы - его наследуют новые капсулы."""
+        return self.capsules[0].material if self.capsules else 0
 
     @property
     def is_bundle(self) -> bool:
         """Связка: одно тело, набранное из нескольких капсул. Так делают форму по силуэту."""
         return len(self.capsules) > 1
 
-    def refit(self, capsule: Capsule) -> Capsule:
-        """Заменить все капсулы тела одной севшей. Севшая наследует блок первой,
-        остальные блоки запоминаются, чтобы при записи получить те же числа."""
-        old = self.capsules
-        capsule.block = old[0].block if old else -1
-        capsule.index = 0
-        self.spare_blocks = [c.block for c in old[1:] if c.block >= 0] + [
-            b for b in self.spare_blocks if b != capsule.block]
-        self.capsules = [capsule]
-        return capsule
+    def refit(self, capsules) -> list[Capsule]:
+        """Заменить форму тела: одной севшей капсулой либо связкой. Новые капсулы получают
+        номера по порядку, материал прежней формы и не знают блока - его даст запись."""
+        if isinstance(capsules, Capsule):
+            capsules = [capsules]
+        material = self.material
+        out = []
+        for i, cap in enumerate(capsules):
+            cap.bone, cap.index, cap.block = self.bone, i, -1
+            if not cap.material:
+                cap.material = material
+            out.append(cap)
+        self.capsules = out
+        return out
 
     def as_dict(self) -> dict:
         return {
@@ -319,14 +392,15 @@ class ColliderSet:
         kind = type(shape).__name__
         pr = getattr(shape, "properties", None)
         block = getattr(shape, "id", -1)
+        material = int(getattr(pr, "bhkMaterial", 0) or 0)
         if kind == "bhkCapsuleShape":
             return [Capsule(bone, index,
                             np.asarray(list(pr.point1), np.float32) * HAVOK_SCALE,
                             np.asarray(list(pr.point2), np.float32) * HAVOK_SCALE,
-                            float(pr.radius1) * HAVOK_SCALE, block)]
+                            float(pr.radius1) * HAVOK_SCALE, block, material)]
         if kind == "bhkSphereShape":
             z = np.zeros(3, dtype=np.float32)
-            return [Capsule(bone, index, z, z, float(pr.bhkRadius) * HAVOK_SCALE, block)]
+            return [Capsule(bone, index, z, z, float(pr.bhkRadius) * HAVOK_SCALE, block, material)]
         if kind == "bhkListShape":
             out: list[Capsule] = []
             for child in shape.children:
@@ -498,33 +572,83 @@ class ColliderSet:
         local = np.hstack([pts, np.ones((pts.shape[0], 1), np.float32)]) @ inv.T
         return Capsule.fit(local[:, :3], bone, 0, percentile)
 
-    def apply_fit(self, bone: str, capsule: Capsule) -> Capsule:
-        """Заменить капсулы кости одной севшей. Связка по силуэту собирается руками,
-        из облака она не выводится, поэтому и она заменяется одной."""
-        return self.body(bone).refit(capsule)
+    def _local(self, bone: str, points) -> np.ndarray:
+        pts = np.asarray(points, dtype=np.float32).reshape(-1, 3)
+        inv = np.linalg.inv(self.matrix(bone))
+        return (np.hstack([pts, np.ones((pts.shape[0], 1), np.float32)]) @ inv.T)[:, :3]
+
+    def fit_bundle(self, bone: str, points, count: int, method: str = "kmeans",
+                   percentile: float = 90.0, min_points: int = 12) -> list[Capsule]:
+        """Связка: облако кожи режется на `count` кусков (`split_points`), и по каждому
+        садится своя капсула. У головы и лап нет главного направления - одной капсулой
+        они не накрываются, - а по кускам накрываются. Границы между капсулами не
+        вылизываются: для удара безразлично, в какую именно капсулу попало, важно лишь,
+        чтобы снаружи не осталось кожи. Куски меньше `min_points` пропускаются."""
+        pts = np.asarray(points, dtype=np.float32).reshape(-1, 3)
+        if pts.shape[0] < 4:
+            return []
+        local = self._local(bone, pts)
+        out = []
+        for chunk in split_points(local, count, method):
+            if chunk.size < max(4, int(min_points)):
+                continue
+            cap = Capsule.fit(local[chunk], bone, len(out), percentile)
+            if cap is not None:
+                out.append(cap)
+        return out
+
+    def apply_fit(self, bone: str, capsules) -> list[Capsule]:
+        """Заменить форму кости одной севшей капсулой либо связкой из нескольких."""
+        return self.body(bone).refit(capsules)
 
     # ---- запись -----------------------------------------------------------------------
-    def save_as(self, path) -> Path:
-        """Записать нынешние капсулы в новый файл скелета.
+    def changed_bodies(self) -> list[str]:
+        return [name for name, body in self.bodies.items() if body.changed]
 
-        Всегда в новый: прочитанный скелет принадлежит чужому моду, и трогать его нельзя.
-        Правки едут отдельным модом-надстройкой. Байты правит `NifPatch`; здесь только
-        перевод в единицы Havok и обход капсул, знающих свой блок.
+    def save_as(self, path, cfg: Config | None = None) -> Path:
+        """Записать нынешние капсулы в новый файл скелета - через PyNifly.
+
+        Всегда в новый: прочитанный скелет принадлежит чужому моду, и трогать его нельзя;
+        правки едут отдельным модом-надстройкой. Скелет открывается заново, и у каждого
+        изменённого тела форма заменяется на новую: одна капсула - капсулой, несколько -
+        связкой `bhkListShape` с капсулой на каждую. Тело, его шарниры и контроллеры
+        остаются теми же блоками, прежняя форма уходит из файла. Неизменённые тела
+        не трогаются вовсе.
         """
-        patch = NifPatch(self.path)
-        written = 0
-        for body in self.bodies.values():
-            for cap in body.capsules:
-                blocks = [cap.block] + (body.spare_blocks if cap.index == 0 else [])
-                for block in blocks:
-                    if block < 0 or not patch.has_block(block):
-                        continue
-                    patch.write_capsule(block, cap.p1 / HAVOK_SCALE, cap.p2 / HAVOK_SCALE,
-                                        cap.radius / HAVOK_SCALE)
-                    written += 1
-        if not written:
-            raise RuntimeError("нечего записывать: ни одна капсула не знает своего блока")
-        return patch.save(path)
+        path = Path(path)
+        changed = self.changed_bodies()
+        if not changed:
+            raise ValueError("нечего записывать: ни одно тело не менялось")
+        pynifly = load_nifly(cfg or Config())
+        from pyn.nifdefs import bhkCapsuleShapeProps, bhkListShapeProps  # noqa: WPS433
+        nif = pynifly.NifFile(str(self.path))
+        for bone in changed:
+            body = self.bodies[bone]
+            node = nif.nodes[bone]
+            target = node.collision_object.body
+            caps = body.capsules
+            if len(caps) == 1:
+                target.add_shape(self._capsule_props(bhkCapsuleShapeProps, caps[0]))
+            else:
+                lst = target.add_shape(bhkListShapeProps())
+                lst.properties.bhkMaterial = body.material
+                for cap in caps:
+                    lst.add_shape(self._capsule_props(bhkCapsuleShapeProps, cap))
+        path.parent.mkdir(parents=True, exist_ok=True)
+        nif.filepath = str(path)
+        nif.save()
+        return path
+
+    @staticmethod
+    def _capsule_props(props_class, cap: Capsule):
+        """Капсула в буфер PyNifly: единицы Havok, все три радиуса одинаковы."""
+        props = props_class()
+        props.bhkMaterial = int(cap.material)
+        r = float(cap.radius) / HAVOK_SCALE
+        props.bhkRadius = props.radius1 = props.radius2 = r
+        props.point1 = tuple(float(x) / HAVOK_SCALE for x in cap.p1)
+        props.point2 = tuple(float(x) / HAVOK_SCALE for x in cap.p2)
+        return props
 
     # ---- вывод ------------------------------------------------------------------------
     def summary(self) -> dict:

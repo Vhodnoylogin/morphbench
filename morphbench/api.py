@@ -18,6 +18,7 @@ import numpy as np
 
 from .analysis import Analyzer
 from .bounds import Reach, Sphere
+from .chains import find_chains
 from .catalog import Catalog
 from .colliders import ColliderSet
 from .config import Config
@@ -285,6 +286,82 @@ class MorphBench:
         self._sliders.clear()
         return {}
 
+    # ---- цепочки для качающейся физики ------------------------------------------------
+    def bone_counts(self, shapes=None) -> dict[str, dict[str, int]]:
+        """Сколько вершин каких частей держит каждая кость по-настоящему (как главная)."""
+        self._require()
+        out: dict[str, dict[str, int]] = {}
+        for name in (list(shapes) if shapes else self.model.shape_names()):
+            shape = self.model.shape(name)
+            dom = shape.dominant_bone()
+            bones = list(shape.bones)
+            for i, bone in enumerate(bones):
+                n = int((dom == i).sum())
+                out.setdefault(bone, {})
+                if n:
+                    out[bone][name] = n
+        if self.rig is not None:
+            for bone in self.rig.matrices:
+                out.setdefault(bone, {})
+        return out
+
+    def chains(self, engine: str | None = None, shapes=None) -> list[dict]:
+        """Цепочки костей с номерами: по звену - сколько вершин каких частей, где обрыв,
+        годится ли цепочка, чтобы её качали, и кому она отдана (`chainEngines`).
+        `engine` оставляет только цепочки этого движка."""
+        self._require()
+        parents = self.rig.parents if self.rig is not None else None
+        engines = dict(self.cfg.get("chainEngines") or {})
+        min_vertices = int(self.cfg["boneMinVertices"])
+        rows = [c.as_dict(min_vertices) for c in find_chains(self.bone_counts(shapes), parents, engines)]
+        if engine:
+            rows = [r for r in rows if r["engine"] == str(engine).lower()]
+        return rows
+
+    def assign_chains(self, engines: dict | None = None) -> dict:
+        """Кому отдана цепочка - на этот запуск, поверх `chainEngines` из настроек:
+        подстрока ствола -> «smp» или «cbpc». Названное здесь сверяется первым, файл
+        настроек не трогается. Возвращает действующее назначение."""
+        if engines:
+            merged = {}
+            for needle, engine in engines.items():
+                eng = str(engine).strip().lower()
+                if eng not in ("smp", "cbpc"):
+                    raise ValueError("цепочка %r: движок %r, а ожидался smp или cbpc" % (needle, engine))
+                merged[str(needle)] = eng
+            for needle, eng in (self.cfg.get("chainEngines") or {}).items():
+                merged.setdefault(str(needle), eng)
+            self.cfg.set("chainEngines", merged)
+        return dict(self.cfg.get("chainEngines") or {})
+
+    def chain_capsules(self, engine: str | None = None, percentile: float | None = None,
+                       min_weight: float | None = None, shapes=None) -> list[dict]:
+        """Цепочки (`chains`) с опорой в дереве костей и капсулой по коже каждого звена -
+        в системе этой кости, как их ждут настройки качающей физики.
+
+        Звено цепочки своего тела в скелете обычно не имеет, поэтому капсула садится
+        по `skin_points` звена тем же способом, что и `fit`, и никуда не применяется:
+        это замер, а не правка скелета. Звено, на котором кожи нет, капсулы не получает.
+        """
+        self._require()
+        self._require_rig()
+        pct = float(self.cfg["colliderFitPercentile"] if percentile is None else percentile)
+        # Одни и те же части и для счёта вершин, и для точек: по чему садиться, решает
+        # состав видимых частей, как у `fit`.
+        shapes = list(shapes) if shapes else self.visible_shapes()
+        out = []
+        for row in self.chains(engine, shapes):
+            links = []
+            for link in row["links"]:
+                pts = self.skin_points(link["bone"], min_weight, shapes)
+                cap = self.rig.fit(link["bone"], pts, pct)
+                links.append({**link, "points": int(pts.shape[0]),
+                              "capsule": None if cap is None else cap.as_dict()})
+            first = links[0]["bone"] if links else None
+            out.append({**row, "parent": self.rig.parents.get(first) if first else None,
+                        "links": links})
+        return out
+
     # ---- шары охвата ------------------------------------------------------------------
     def reach(self, shape_name: str) -> Reach:
         """Во что может превратиться часть: покой и все морфы в пределах ползунков."""
@@ -500,7 +577,8 @@ class MorphBench:
         return out
 
     def collider_fit(self, needle: str | None = None, percentile: float | None = None,
-                     min_weight: float | None = None, apply: bool = True) -> list[dict]:
+                     min_weight: float | None = None, apply: bool = True,
+                     bundle: int = 1, split: str | None = None) -> list[dict]:
         """Посадить капсулы по коже при нынешних ползунках.
 
         Ради этого верстак и трогает колайдеры: тело мы деформируем сами и знаем каждую
@@ -510,16 +588,25 @@ class MorphBench:
         self._require()
         self._require_rig()
         pct = float(self.cfg["colliderFitPercentile"] if percentile is None else percentile)
+        count = max(1, int(bundle))
+        method = str(split or self.cfg["bundleSplit"])
+        min_points = int(self.cfg["bundleMinPoints"])
         out = []
         for bone in self.collider_bones(needle):
             pts = self.covered_skin_points(bone, min_weight)
-            fitted = self.rig.fit(bone, pts, pct)
-            if fitted is None:
+            if count == 1:
+                one = self.rig.fit(bone, pts, pct)
+                fitted = [] if one is None else [one]
+            else:
+                fitted = self.rig.fit_bundle(bone, pts, count, method, pct, min_points)
+            if not fitted:
                 out.append({"bone": bone, "points": int(pts.shape[0]), "fitted": False})
                 continue
-            before = self.rig.body(bone).capsules[0]
+            before = self.rig.body(bone).capsules
             row = {"bone": bone, "points": int(pts.shape[0]), "fitted": True,
-                   "was": before.as_dict(), "now": fitted.as_dict()}
+                   "was": before[0].as_dict(), "wasCount": len(before),
+                   "now": fitted[0].as_dict(), "count": len(fitted),
+                   "capsules": [c.as_dict() for c in fitted]}
             if apply:
                 self.rig.apply_fit(bone, fitted)
             out.append(row)
@@ -549,7 +636,7 @@ class MorphBench:
         его на месте нельзя. Правки едут отдельным модом-надстройкой.
         """
         self._require_rig()
-        return str(self.rig.save_as(path))
+        return str(self.rig.save_as(path, self.cfg))
 
     # ---- геометрия для слоёв показа ---------------------------------------------------
     def deformed(self, shape_name: str) -> np.ndarray:

@@ -328,10 +328,40 @@ class MorphBench:
         self._require_rig()
         return self.rig.local_capsules(self.collider_bones(needle))
 
-    def collider_mesh(self, needle: str | None = None, segments: int | None = None):
-        """Треугольники капсул тел для слоя показа - в тех же координатах, что и тело."""
+    def visible_collider_bones(self, needle: str | None = None) -> list[str]:
+        """Кости с телом, чьи вершины есть хотя бы в одной видимой части меша.
+
+        Капсула висит на кости, а не на части, но смотрят на неё вместе с кожей: скрыл
+        голову - капсула головы не нужна, скрыл всё - не нужна ни одна. Без открытого меша
+        или при выключенном `collidersFollowParts` - все кости.
+        """
+        bones = self.collider_bones(needle)
+        if self.model is None or not bool(self.cfg["collidersFollowParts"]):
+            return bones
+        held: set[str] = set()
+        for name in self.visible_shapes():
+            held.update(self.held_bones(name))
+        return [b for b in bones if b in held]
+
+    def held_bones(self, shape_name: str) -> list[str]:
+        """Кости, для которых часть - главная хотя бы на `boneMinVertices` вершинах."""
+        self._require()
+        return self.model.shape(shape_name).held_bones(int(self.cfg["boneMinVertices"]))
+
+    def collider_meshes(self, needle: str | None = None, segments: int | None = None) -> list[dict]:
+        """Треугольники капсул по костям: имя кости, вершины, треугольники - для слоя,
+        который скрывает и показывает их вместе с частями меша, не спрашивая ядро заново."""
         self._require_rig()
-        return self.rig.mesh(self.collider_bones(needle), self._segments(segments))
+        seg = self._segments(segments)
+        return [{"bone": bone, "verts": v, "tris": t}
+                for bone in self.collider_bones(needle)
+                for v, t in [self.rig.mesh([bone], seg)] if t.shape[0]]
+
+    def collider_mesh(self, needle: str | None = None, segments: int | None = None):
+        """Треугольники капсул тел для слоя показа - в тех же координатах, что и тело;
+        только кости, чьи вершины видны (`visible_collider_bones`)."""
+        self._require_rig()
+        return self.rig.mesh(self.visible_collider_bones(needle), self._segments(segments))
 
     def bumper_mesh(self, segments: int | None = None):
         """Треугольники цилиндра перемещения - отдельно: слой показа кладёт его только

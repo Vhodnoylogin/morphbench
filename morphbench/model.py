@@ -181,6 +181,15 @@ class Shape:
     def bone_order(self) -> list[str]:
         return list(self.bones.keys())
 
+    def held_bones(self, min_vertices: int = 1) -> list[str]:
+        """Кости, которым эта часть принадлежит по-настоящему: главные хотя бы для
+        `min_vertices` её вершин. Кость с крошечным весом на краю части сюда не попадает:
+        кость головы держит по чуть-чуть и кожу шеи, но кожа - не голова."""
+        counts = np.bincount(self.dominant_bone()[self.dominant_bone() >= 0],
+                             minlength=len(self.bones))
+        names = list(self.bones)
+        return [names[i] for i in range(len(names)) if counts[i] >= max(1, int(min_vertices))]
+
     def __repr__(self) -> str:
         return "Shape(%r, вершин=%d, треугольников=%d, костей=%d)" % (
             self.name, self.vertex_count, self.triangle_count, len(self.bones))

@@ -392,6 +392,20 @@ class MorphBench:
                 chunks.append(self.deformed(name)[idx])
         return np.vstack(chunks) if chunks else np.zeros((0, 3), dtype=np.float32)
 
+    def covered_skin_points(self, bone: str, min_weight: float | None = None,
+                            shapes=None) -> np.ndarray:
+        """Кожа, за которую отвечает тело этой кости, - вместе с костями без своих тел.
+
+        Тел меньше, чем костей: у пальцев, крутящих костей и у таза тела нет, и их кожу
+        обязано накрывать ближайшее тело выше по дереву. Спрашивать одну кость мало -
+        стопа тогда садится без пальцев, а таз без ягодиц.
+        """
+        self._require_rig()
+        chunks = [self.skin_points(b, min_weight, shapes)
+                  for b in self.rig.covered_bones(bone)]
+        chunks = [c for c in chunks if c.shape[0]]
+        return np.vstack(chunks) if chunks else np.zeros((0, 3), dtype=np.float32)
+
     def collider_clearance(self, needle: str | None = None,
                            min_weight: float | None = None) -> list[dict]:
         """Насколько капсулы расходятся с кожей при нынешних ползунках.
@@ -403,7 +417,7 @@ class MorphBench:
         self._require_rig()
         out = []
         for bone in self.collider_bones(needle):
-            pts = self.skin_points(bone, min_weight)
+            pts = self.covered_skin_points(bone, min_weight)
             if pts.shape[0]:
                 out.append(self.rig.clearance(bone, pts))
         return out
@@ -421,7 +435,7 @@ class MorphBench:
         pct = float(self.cfg["colliderFitPercentile"] if percentile is None else percentile)
         out = []
         for bone in self.collider_bones(needle):
-            pts = self.skin_points(bone, min_weight)
+            pts = self.covered_skin_points(bone, min_weight)
             fitted = self.rig.fit(bone, pts, pct)
             if fitted is None:
                 out.append({"bone": bone, "points": int(pts.shape[0]), "fitted": False})

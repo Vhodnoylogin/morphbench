@@ -255,11 +255,15 @@ class ColliderSet:
 
     def __init__(self, path, bodies: dict[str, CollisionBody],
                  matrices: dict[str, np.ndarray],
-                 bumper: CollisionBody | None = None):
+                 bumper: CollisionBody | None = None,
+                 parents: dict[str, str] | None = None):
         self.path = Path(path)
         self.bodies = bodies
         self.matrices = matrices
         self.bumper = bumper
+        # Дерево костей: кто чей родитель. Нужно, чтобы понять, чью кожу обязано
+        # накрывать каждое тело, - см. covered_bones.
+        self.parents = dict(parents or {})
 
     # ---- чтение: PyNifly и только он ----------------------------------------------------
     @classmethod
@@ -274,7 +278,11 @@ class ColliderSet:
         bodies: dict[str, CollisionBody] = {}
         matrices: dict[str, np.ndarray] = {}
         bumper: CollisionBody | None = None
+        parents: dict[str, str] = {}
         for name, node in nif.nodes.items():
+            up = getattr(node, "parent", None)
+            if up is not None and getattr(up, "name", None):
+                parents[name] = up.name
             try:
                 matrices[name] = cls._matrix(node.global_transform)
             except Exception:                       # узел без преобразования - не кость
@@ -292,7 +300,7 @@ class ColliderSet:
                 bumper = entry
             else:
                 bodies[name] = entry
-        return cls(path, bodies, matrices, bumper)
+        return cls(path, bodies, matrices, bumper, parents)
 
     @staticmethod
     def _matrix(buf) -> np.ndarray:
@@ -378,6 +386,28 @@ class ColliderSet:
         """Кости с телом, чьё имя содержит подстроку: «Thigh» найдёт оба бедра."""
         low = needle.lower()
         return [n for n in self.bodies if low in n.lower()]
+
+    def covered_bones(self, bone: str) -> list[str]:
+        """Кости, чью кожу обязано накрывать тело этой кости.
+
+        Тел меньше, чем костей: у пальцев, крутящих костей предплечья и у таза своего
+        тела нет вовсе. Их кожа не исчезает - её столкновения считает ближайшее тело
+        ВЫШЕ по дереву. Значит, и садиться это тело должно по коже всех своих потомков,
+        у которых собственного тела нет.
+
+        Без этого правила подгонка промахивается системно: стопа садится без пальцев,
+        таз - без ягодиц, плечо - без своей же кожи, отданной крутящим костям.
+        """
+        out = [bone]
+        stack = [bone]
+        while stack:
+            top = stack.pop()
+            for child, up in self.parents.items():
+                if up != top or child in self.bodies or child == bone:
+                    continue
+                out.append(child)
+                stack.append(child)
+        return out
 
     def capsule_count(self) -> int:
         return sum(len(b.capsules) for b in self.bodies.values())

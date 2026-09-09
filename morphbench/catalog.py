@@ -11,6 +11,8 @@ import numbers
 import os
 from pathlib import Path
 
+from .environment import dir_exists
+
 
 class CatalogEntry:
     """Один меш: путь, подобранный файл морфов и его формат."""
@@ -48,7 +50,7 @@ class Catalog:
 
     def __init__(self, root, subdirs=None, with_morphs: bool = True):
         self.root = Path(root)
-        if not self.root.is_dir():
+        if not dir_exists(self.root):
             raise FileNotFoundError("нет папки для обзора: %s" % self.root)
         self.subdirs = [str(s) for s in (subdirs or [])]
         self.with_morphs = bool(with_morphs)
@@ -57,7 +59,7 @@ class Catalog:
     # ---- обход ------------------------------------------------------------------------
     def _walk_roots(self) -> list[Path]:
         """Где искать: названные подпапки корня, если они есть, иначе весь корень."""
-        found = [self.root / s for s in self.subdirs if (self.root / s).is_dir()]
+        found = [self.root / s for s in self.subdirs if dir_exists(self.root / s)]
         return found or [self.root]
 
     @staticmethod

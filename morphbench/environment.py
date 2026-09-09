@@ -25,6 +25,21 @@ _GAME_KEYS = (
 _USVFS = ("usvfs_x64.dll", "usvfs_x86.dll")
 
 
+def dir_exists(path) -> bool:
+    """Есть ли папка - так, чтобы это работало и под usvfs.
+
+    Под подменой MO2 виртуальная папка (например, `Data\\meshes`, собранная из модов) не
+    отвечает на `is_dir()`: проверка атрибутов идёт мимо подмены и говорит «нет». Зато
+    чтение списка каталога подмена обслуживает. Поэтому папка есть, если её можно перечислить.
+    """
+    import os
+    try:
+        os.listdir(path)
+        return True
+    except OSError:
+        return os.path.isdir(path)
+
+
 def _canonical(path) -> str:
     """Абсолютный путь в одном написании: без «..», в одном регистре, без хвостовой косой."""
     import os
@@ -83,7 +98,7 @@ class Environment:
             return None
         candidates = [Path(g["root"]) / "Data" for g in self.game_roots()]
         for data in candidates:
-            if (data / "meshes").is_dir():
+            if dir_exists(data / "meshes"):
                 return data
         return candidates[0] if candidates else None
 
@@ -103,7 +118,26 @@ class Environment:
             return False
         return True
 
+    def candidates(self) -> list[dict]:
+        """Что видно в Data каждой игры глазами ЭТОГО процесса: есть ли папка meshes и первые
+        имена в Data. Под usvfs это и есть проверка, действует ли подмена: настоящая Data
+        Skyrim держит меши в архивах, россыпные папки появляются только сквозь VFS."""
+        import os
+        out = []
+        for g in self.game_roots():
+            data = Path(g["root"]) / "Data"
+            try:
+                names = sorted(os.listdir(data), key=str.lower)
+            except OSError:
+                names = []
+            out.append({"game": g["game"], "data": str(data),
+                        "meshes": dir_exists(data / "meshes"),
+                        "meshesIsDir": (data / "meshes").is_dir(),
+                        "entries": len(names), "sample": names[:12]})
+        return out
+
     def describe(self) -> dict:
         data = self.data_root()
         return {"insideMo2": self.inside_mo2(), "dataRoot": None if data is None else str(data),
-                "games": self.game_roots(), "catalogRoot": str(self.cfg.get("catalogRoot", "") or "")}
+                "games": self.game_roots(), "catalogRoot": str(self.cfg.get("catalogRoot", "") or ""),
+                "candidates": self.candidates()}

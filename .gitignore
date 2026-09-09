@@ -21,3 +21,5 @@ morphbench.json
 
 # Точка входа для MO2: продукт сборки, собирается из launcher/morphbench.cs командой launcher/build.cmd.
 /morphbench.exe
+# Что окно запуска помнит между запусками - у каждой машины своё.
+/morphbench.launcher.json

@@ -243,6 +243,49 @@ class MorphBench:
         self._require_morphs()
         return [s.as_dict() for s in self.analyzer.strain_report(amount, threshold, morph)]
 
+    def strain_set(self, values: dict | None = None, threshold: float | None = None) -> list[dict]:
+        """Растяжение рёбер при НАБОРЕ ползунков, а не от одного морфа.
+
+        `values` - {морф: величина}; None - нынешние ползунки (`sliders()`). Строки те же,
+        что у `strain`, с полем `sliders` вместо `morph`; порог None - из настроек.
+        Пустой набор - отказ: мерить нечего, и молчать об этом нельзя.
+        """
+        self._require_morphs()
+        values = self.sliders() if values is None else dict(values)
+        values = {str(k): float(v) for k, v in values.items() if float(v) != 0.0}
+        if not values:
+            raise ValueError("набор пуст: задайте хотя бы один ползунок")
+        have = set(self.morph_set.names())
+        for name in values:
+            if name not in have:
+                raise KeyError("нет ползунка %r" % name)
+        return [s.as_dict() for s in self.analyzer.strain_set(values, threshold)]
+
+    def strain_pairs(self, amount: float = 1.0, threshold: float | None = None,
+                     top: int | None = 10, by: str = "max") -> list[dict]:
+        """Перебор пар ползунков: худшие `top` с `gain` - на сколько пара рвёт сильнее
+        худшего из двух одиночных. `by` - "max" (по наибольшему растяжению) или "gain"
+        (по прибавке: что даёт именно сочетание). `top` None или 0 - все."""
+        self._require_morphs()
+        rows = self.analyzer.strain_pairs(amount, threshold, top, by)
+        for row in rows:
+            for key in ("maxStrain", "maxA", "maxB", "gain"):
+                row[key] = round(row[key], 3)
+        return rows
+
+    def budget(self, threshold: float | None = None) -> list[dict]:
+        """Бюджет амплитуд: на какой величине каждый ползунок переходит порог растяжения.
+        Пределы поиска - `sliderRange`, точность - `budgetResolution` из настроек;
+        `limit` None - в пределах не рвёт."""
+        self._require_morphs()
+        lo, hi = (float(x) for x in self.cfg["sliderRange"])
+        rows = self.analyzer.budget(threshold, lo, hi, float(self.cfg["budgetResolution"]))
+        for row in rows:
+            row["maxAt"] = round(row["maxAt"], 3)
+            if row["limit"] is not None:
+                row["limit"] = round(row["limit"], 3)
+        return rows
+
     def layers(self, morph: str, base: str | None = None,
                only_adjacent: bool = False) -> list[dict]:
         """Следуют ли оболочки за базовой частью (None - baseShape из настроек).

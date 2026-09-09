@@ -19,8 +19,17 @@
 вершины ищется ближайшая вершина базовой части, и если ту вершину морф двигает — оболочка
 над ней смежна с морфом. Это тот же приём, которым сборщик переносит сдвиг на оболочки
 (усреднение по ближайшим вершинам кожи), и тот же, что у Automorph в BodySlide.
+
+**Что делает сочетание.** Дефект бывает свойством пары, а не одного ползунка: грудь и грудная
+клетка поодиночке тянут шов терпимо, а вместе рвут. Поэтому растяжение меряется и при наборе
+значений (смещения складываются, как при последовательном применении морфов), перебираются
+все пары, и для каждого ползунка ищется величина, на которой он переходит порог, - бюджет
+амплитуды. Рёбра и их длины в покое считаются один раз на часть: перебор из сотен пар
+обходится одним сложением смещений и одним промером рёбер на пару.
 """
 from __future__ import annotations
+
+import itertools
 
 import numpy as np
 
@@ -63,10 +72,10 @@ class StrainStat:
     """
 
     __slots__ = ("shape", "morph", "edges", "max_strain", "p99_strain",
-                 "over_threshold", "threshold", "worst_bounds")
+                 "over_threshold", "threshold", "worst_bounds", "sliders")
 
     def __init__(self, shape, morph, edges, max_strain, p99_strain,
-                 over_threshold, threshold, worst_bounds):
+                 over_threshold, threshold, worst_bounds, sliders: dict | None = None):
         self.shape = shape
         self.morph = morph
         self.edges = edges
@@ -75,11 +84,15 @@ class StrainStat:
         self.over_threshold = over_threshold
         self.threshold = threshold
         self.worst_bounds = worst_bounds
+        # Итог по НАБОРУ ползунков {морф: величина}: тогда имени морфа нет, есть набор.
+        self.sliders = sliders
 
     def as_dict(self) -> dict:
         lo, hi = (self.worst_bounds if self.worst_bounds is not None else (None, None))
+        who = ({"sliders": {k: round(float(v), 3) for k, v in self.sliders.items()}}
+               if self.sliders is not None else {"morph": self.morph})
         return {
-            "shape": self.shape, "morph": self.morph, "edges": self.edges,
+            "shape": self.shape, **who, "edges": self.edges,
             "maxStrain": round(self.max_strain, 3), "p99Strain": round(self.p99_strain, 3),
             "overThreshold": self.over_threshold, "threshold": self.threshold,
             "worstBounds": None if lo is None else {
@@ -221,6 +234,9 @@ class Analyzer:
         self.left_behind_min = float(left_behind_min)
         self.bone_min_vertices = int(bone_min_vertices)
         self._edge_cache: dict[str, np.ndarray] = {}
+        # Рёбра, их векторы и длины в покое - один раз на часть: перебор пар меряет
+        # сотни наборов, и пересчитывать «до» на каждый было бы работой в горячем пути.
+        self._baseline: dict[str, tuple[np.ndarray, np.ndarray, np.ndarray] | None] = {}
         self._prox: dict[tuple[str, str], Proximity] = {}
 
     # ---- ползунки ---------------------------------------------------------------------
@@ -326,6 +342,193 @@ class Analyzer:
                 if st is not None:
                     out.append(st)
         out.sort(key=lambda s: -s.max_strain)
+        return out
+
+    # ---- разрывы от набора ползунков --------------------------------------------------
+    def edge_lengths(self, shape_name: str):
+        """Рёбра части, их векторы и длины в покое: (рёбра, векторы, длины). Считаются
+        один раз на часть. None - части нет в меше или у неё нет рёбер."""
+        if shape_name not in self._baseline:
+            shape = self.model.shapes.get(shape_name)
+            if shape is None:
+                return None
+            edges = self.edges(shape_name)
+            if edges.shape[0] == 0:
+                self._baseline[shape_name] = None
+            else:
+                span = shape.verts[edges[:, 1]] - shape.verts[edges[:, 0]]
+                self._baseline[shape_name] = (edges, span, np.linalg.norm(span, axis=1))
+        return self._baseline[shape_name]
+
+    def displacement(self, shape_name: str, values: dict) -> np.ndarray | None:
+        """Суммарное смещение каждой вершины части при наборе {морф: величина} - то же,
+        что последовательное Morph.apply, только без копий облака. None - ни один морф
+        набора эту часть не двигает (нет, пуст или величина ноль)."""
+        shape = self.model.shapes.get(shape_name)
+        if shape is None:
+            return None
+        disp = None
+        for name, amount in values.items():
+            m = self.morphs.get(shape_name, name)
+            if m is None or m.is_empty or float(amount) == 0.0:
+                continue
+            if disp is None:
+                disp = np.zeros((shape.vertex_count, 3), dtype=np.float32)
+            keep = m.indices < shape.vertex_count
+            disp[m.indices[keep]] += m.offsets[keep] * np.float32(amount)
+        return disp
+
+    def edge_strain_set(self, shape_name: str,
+                        values: dict) -> tuple[np.ndarray, np.ndarray] | None:
+        """Растяжение каждого ребра при наборе {морф: величина}, |после / до - 1|.
+        Смещения складываются; ребро меряется до и после. Возвращает (рёбра, растяжение);
+        None - части нет, рёбер нет или набор её не двигает."""
+        base = self.edge_lengths(shape_name)
+        if base is None:
+            return None
+        disp = self.displacement(shape_name, values)
+        if disp is None:
+            return None
+        edges, span, before = base
+        after = np.linalg.norm(span + disp[edges[:, 1]] - disp[edges[:, 0]], axis=1)
+        ok = before > 1e-5
+        strain = np.zeros_like(before)
+        strain[ok] = np.abs(after[ok] / before[ok] - 1.0)
+        return edges, strain
+
+    def _stat(self, shape_name: str, edges: np.ndarray, strain: np.ndarray,
+              threshold: float, sliders: dict) -> StrainStat:
+        shape = self.model.shape(shape_name)
+        worst = strain > threshold
+        worst_bounds = None
+        if worst.any():
+            pts = np.vstack([shape.verts[edges[worst, 0]], shape.verts[edges[worst, 1]]])
+            worst_bounds = (pts.min(axis=0), pts.max(axis=0))
+        return StrainStat(shape_name, None, int(edges.shape[0]), float(strain.max()),
+                          float(np.percentile(strain, 99)), int(worst.sum()), threshold,
+                          worst_bounds, sliders)
+
+    @staticmethod
+    def _values(values: dict) -> dict[str, float]:
+        """Набор без нулей: ноль - это не ползунок, а его отсутствие."""
+        return {str(k): float(v) for k, v in values.items() if float(v) != 0.0}
+
+    def strain_set(self, values: dict, threshold: float | None = None) -> list[StrainStat]:
+        """Растяжение рёбер каждой части при наборе {морф: величина}.
+
+        Строки те же, что у strain_report, только вместо имени морфа - набор; части,
+        которых набор не двигает, не перечисляются. По убыванию наибольшего растяжения.
+        """
+        threshold = self.strain_threshold if threshold is None else float(threshold)
+        values = self._values(values)
+        out = []
+        if not values:
+            return out
+        for shape_name in self.model.shape_names():
+            es = self.edge_strain_set(shape_name, values)
+            if es is None:
+                continue
+            edges, strain = es
+            out.append(self._stat(shape_name, edges, strain, threshold, values))
+        out.sort(key=lambda s: -s.max_strain)
+        return out
+
+    def strain_extent(self, values: dict,
+                      threshold: float | None = None) -> tuple[float, int, str | None]:
+        """Итог набора по всем частям разом: наибольшее растяжение, число рёбер сверх
+        порога и часть, где растяжение наибольшее (None - набор ничего не двигает)."""
+        threshold = self.strain_threshold if threshold is None else float(threshold)
+        best, over, where = 0.0, 0, None
+        for shape_name in self.model.shape_names():
+            es = self.edge_strain_set(shape_name, values)
+            if es is None:
+                continue
+            _, strain = es
+            over += int((strain > threshold).sum())
+            mx = float(strain.max())
+            if where is None or mx > best:
+                best, where = mx, shape_name
+        return best, over, where
+
+    def active_morphs(self) -> list[str]:
+        """Ползунки, двигающие хоть одну вершину хоть одной части меша, - те, что имеет
+        смысл перебирать. Пустые и те, чьих частей в меше нет, не в счёт."""
+        names = []
+        for name in self.morphs.names():
+            for shape_name, m in self.morphs.for_morph(name).items():
+                if shape_name in self.model.shapes and not m.is_empty:
+                    names.append(name)
+                    break
+        return names
+
+    def strain_pairs(self, amount: float = 1.0, threshold: float | None = None,
+                     top: int | None = 10, by: str = "max") -> list[dict]:
+        """Перебор пар: какие два ползунка вместе рвут сильнее, чем каждый поодиночке.
+
+        Все сочетания по два из непустых морфов при одной величине `amount`. У пары -
+        наибольшее растяжение и число рёбер сверх порога по всем частям, часть, где оно
+        наибольшее, растяжение каждого поодиночке и `gain`: на сколько пара хуже худшего
+        из двух одиночных. Порядок `by`: "max" - по наибольшему растяжению (тогда верх
+        занимают все пары с самым рвущим одиночкой), "gain" - по прибавке, то есть по
+        тому, что даёт именно сочетание. `top` - сколько худших вернуть, None или 0 - все.
+        Каждая пара - одно сложение смещений и один промер рёбер против длин в покое,
+        посчитанных один раз.
+        """
+        if by not in ("max", "gain"):
+            raise ValueError("порядок пар: max или gain, а не %r" % by)
+        threshold = self.strain_threshold if threshold is None else float(threshold)
+        amount = float(amount)
+        names = self.active_morphs()
+        singles = {n: self.strain_extent({n: amount}, threshold) for n in names}
+        rows = []
+        for a, b in itertools.combinations(names, 2):
+            mx, over, where = self.strain_extent({a: amount, b: amount}, threshold)
+            rows.append({"a": a, "b": b, "amount": amount, "maxStrain": mx,
+                         "overThreshold": over, "shape": where,
+                         "maxA": singles[a][0], "maxB": singles[b][0],
+                         "gain": mx - max(singles[a][0], singles[b][0]),
+                         "threshold": threshold})
+        if by == "gain":
+            rows.sort(key=lambda r: (-r["gain"], -r["maxStrain"], r["a"], r["b"]))
+        else:
+            rows.sort(key=lambda r: (-r["maxStrain"], r["a"], r["b"]))
+        return rows[:top] if top else rows
+
+    def budget(self, threshold: float | None = None, low: float = 0.0, high: float = 1.0,
+               resolution: float = 0.005) -> list[dict]:
+        """Бюджет амплитуд: величина, на которой каждый непустой ползунок переходит порог
+        наибольшим растяжением рёбер по всем частям.
+
+        Двоичный поиск по величине в пределах [low, high] до точности `resolution`.
+        Если и на `high` порог не перейдён, `limit` - None: в пределах ползунок не рвёт.
+        `maxAt` - растяжение на верхнем пределе, `shape` - часть, где рвётся первой
+        (а если не рвёт - где растяжение наибольшее на верхнем пределе). Рвущие идут
+        первыми, по возрастанию предела; не рвущие - следом, по убыванию `maxAt`.
+        """
+        threshold = self.strain_threshold if threshold is None else float(threshold)
+        low, high, resolution = float(low), float(high), float(resolution)
+        out = []
+        for name in self.active_morphs():
+            top_max, _, top_shape = self.strain_extent({name: high}, threshold)
+            row = {"morph": name, "limit": None, "maxAt": top_max, "shape": top_shape,
+                   "threshold": threshold, "high": high}
+            if top_max > threshold:
+                a, b, where = low, high, top_shape
+                low_max, _, low_shape = self.strain_extent({name: low}, threshold)
+                if low_max > threshold:
+                    b, where = a, low_shape        # рвёт уже на нижнем пределе
+                while b - a > resolution:
+                    mid = 0.5 * (a + b)
+                    mx, _, shape = self.strain_extent({name: mid}, threshold)
+                    if mx > threshold:
+                        b, where = mid, shape
+                    else:
+                        a = mid
+                row["limit"] = 0.5 * (a + b)
+                row["shape"] = where
+            out.append(row)
+        out.sort(key=lambda r: (r["limit"] is None,
+                                r["limit"] if r["limit"] is not None else -r["maxAt"]))
         return out
 
     # ---- слои -------------------------------------------------------------------------

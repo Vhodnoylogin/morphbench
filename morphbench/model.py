@@ -13,6 +13,7 @@ from pathlib import Path
 import numpy as np
 
 from .config import Config
+from .environment import file_exists
 
 
 def load_nifly(cfg: Config):
@@ -197,7 +198,7 @@ class BodyModel:
         cfg = cfg or Config()
         pynifly = load_nifly(cfg)
         path = Path(path)
-        if not path.is_file():
+        if not file_exists(path):
             raise FileNotFoundError("нет файла меша: %s" % path)
         nif = pynifly.NifFile(str(path))
         shapes: dict[str, Shape] = {}

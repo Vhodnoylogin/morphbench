@@ -27,6 +27,7 @@ from pathlib import Path
 import numpy as np
 
 from .config import Config
+from .environment import file_exists
 from .model import load_nifly
 from .nifpatch import NifPatch
 
@@ -266,7 +267,7 @@ class ColliderSet:
         cfg = cfg or Config()
         pynifly = load_nifly(cfg)
         path = Path(path)
-        if not path.is_file():
+        if not file_exists(path):
             raise FileNotFoundError("нет файла скелета: %s" % path)
         nif = pynifly.NifFile(str(path))
         names = cls._enum_names()

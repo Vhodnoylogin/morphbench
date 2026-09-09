@@ -40,6 +40,16 @@ def dir_exists(path) -> bool:
         return os.path.isdir(path)
 
 
+def file_exists(path) -> bool:
+    """Есть ли файл - так, чтобы это работало и под usvfs: виртуальный файл на проверку
+    атрибутов отвечает «нет», а открыться даёт. Поэтому файл есть, если его можно открыть."""
+    try:
+        with open(path, "rb"):
+            return True
+    except OSError:
+        return False
+
+
 def _canonical(path) -> str:
     """Абсолютный путь в одном написании: без «..», в одном регистре, без хвостовой косой."""
     import os

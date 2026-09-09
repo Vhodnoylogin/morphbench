@@ -24,3 +24,4 @@ morphbench.json
 # Что окно запуска помнит между запусками - у каждой машины своё.
 /morphbench.launcher.json
 /morphbench.diag.json
+/morphbench.diag.png

@@ -11,6 +11,7 @@ from pathlib import Path
 import numpy as np
 
 from .config import Config
+from .environment import file_exists
 
 
 def _module(name: str, path: Path):
@@ -91,7 +92,7 @@ class MorphSet:
     def from_file(cls, path, cfg: Config | None = None) -> "MorphSet":
         cfg = cfg or Config()
         path = Path(path)
-        if not path.is_file():
+        if not file_exists(path):
             raise FileNotFoundError("нет файла морфов: %s" % path)
         tri_dir = cfg.pynifly_root() / "tri"
         with open(path, "rb") as f:

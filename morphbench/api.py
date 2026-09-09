@@ -20,7 +20,7 @@ from .analysis import Analyzer
 from .catalog import Catalog
 from .colliders import ColliderSet
 from .config import Config
-from .environment import Environment
+from .environment import Environment, file_exists
 from .model import BodyModel, sphere_of, vertex_normals
 from .morphs import MorphSet
 from .view import ViewState
@@ -96,7 +96,7 @@ class MorphBench:
                     stem = stem[: -len(suffix)]
                     break
             guess = path.with_name(stem + ".tri")
-            tri = guess if guess.is_file() else None
+            tri = guess if file_exists(guess) else None
         self.morph_set = MorphSet.from_file(tri, self.cfg) if tri else None
         self.analyzer = self._analyzer() if self.morph_set else None
         if skeleton is None:

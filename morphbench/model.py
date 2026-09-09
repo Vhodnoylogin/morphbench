@@ -12,6 +12,7 @@ from pathlib import Path
 
 import numpy as np
 
+from .bounds import Sphere
 from .config import Config
 from .environment import file_exists
 
@@ -95,6 +96,9 @@ class Shape:
         self.uvs = uvs
         self.bones = bones
         self.textures = textures or []
+        # Как часть записана в файле: шар охвата и номер блока - для проверки и правки.
+        self.bound: Sphere | None = None
+        self.block: int = -1
         # Главная кость каждой вершины считается один раз: части меша не меняются.
         self._dominant: np.ndarray | None = None
 
@@ -220,7 +224,12 @@ class BodyModel:
             raw = s.bone_weights or {}
             bones = {name: Bone(name, dict(pairs)) for name, pairs in raw.items()}
             textures = [t for t in (s.textures.values() if hasattr(s, "textures") else []) if t]
-            shapes[s.name] = Shape(s.name, verts, tris, normals, uvs, bones, textures)
+            shape = Shape(s.name, verts, tris, normals, uvs, bones, textures)
+            pr = getattr(s, "properties", None)
+            if pr is not None and hasattr(pr, "boundingSphereRadius"):
+                shape.bound = Sphere(list(pr.boundingSphereCenter), float(pr.boundingSphereRadius))
+            shape.block = int(getattr(s, "id", -1))
+            shapes[s.name] = shape
         return cls(path, shapes)
 
     @property

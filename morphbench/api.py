@@ -17,6 +17,7 @@ from pathlib import Path
 import numpy as np
 
 from .analysis import Analyzer
+from .bounds import Reach, Sphere
 from .catalog import Catalog
 from .colliders import ColliderSet
 from .config import Config
@@ -283,6 +284,82 @@ class MorphBench:
     def reset_sliders(self) -> dict:
         self._sliders.clear()
         return {}
+
+    # ---- шары охвата ------------------------------------------------------------------
+    def reach(self, shape_name: str) -> Reach:
+        """Во что может превратиться часть: покой и все морфы в пределах ползунков."""
+        self._require()
+        shape = self.model.shape(shape_name)
+        deltas = {}
+        if self.morph_set is not None:
+            for name in self.morph_set.names():
+                m = self.morph_set.get(shape_name, name)
+                if m is not None and not m.is_empty:
+                    deltas[name] = m.apply(np.zeros_like(shape.verts), 1.0)
+        lo, hi = (float(x) for x in self.cfg["sliderRange"])
+        return Reach(shape.verts, deltas, lo, hi)
+
+    def bounds(self, shape: str | None = None, margin: float | None = None) -> list[dict]:
+        """Шары охвата: какой записан в файле, куда тянется геометрия и какой нужен.
+
+        `reach` - как далеко от центра ФАЙЛОВОГО шара уходит часть при худшем наборе
+        ползунков; `excess` - на сколько это дальше радиуса (доля); `state` - какое
+        состояние виновато. `needed` - наименьший шар, накрывающий всё, с запасом
+        `boundsMargin`. `ok` - перебор в пределах `boundsTolerance`.
+        """
+        self._require()
+        margin = float(self.cfg["boundsMargin"] if margin is None else margin)
+        tol = float(self.cfg["boundsTolerance"])
+        names = [shape] if shape else self.model.shape_names()
+        out = []
+        for name in names:
+            sh = self.model.shape(name)
+            reach = self.reach(name)
+            needed = reach.needed(margin, start=None if sh.bound is None else sh.bound.centre)
+            row = {"shape": name, "block": sh.block, "vertices": sh.vertex_count,
+                   "morphs": len(reach.deltas), "needed": needed.as_dict()}
+            if sh.bound is None:
+                row.update({"file": None, "reach": None, "excess": None, "state": None,
+                            "single": None, "singleReach": None, "ok": None})
+            else:
+                state, far = reach.farthest(sh.bound)
+                single, single_far = reach.farthest(sh.bound, single=True)
+                excess = far / sh.bound.radius - 1.0 if sh.bound.radius > 1e-6 else float("inf")
+                row.update({"file": sh.bound.as_dict(), "reach": round(far, 3),
+                            "excess": round(excess, 4), "state": state,
+                            "single": single if reach.deltas else None,
+                            "singleReach": round(single_far, 3) if reach.deltas else None,
+                            "ok": excess <= tol})
+            out.append(row)
+        return out
+
+    def bounds_write(self, path, shape: str | None = None, margin: float | None = None) -> dict:
+        """Записать нужные шары в НОВЫЙ файл меша - правкой чисел на месте, как капсулы.
+
+        Прочитанный меш принадлежит чужому моду, и трогать его нельзя; правки едут отдельным
+        модом. Перед записью каждый шар сверяется с тем, что прочитал PyNifly: если байты
+        на этом месте не совпали с ним, раскладка блока не та, и ничего не пишется.
+        """
+        self._require()
+        from .nifpatch import NifPatch
+        patch = NifPatch(self.model.path)
+        rows = self.bounds(shape, margin)
+        written = []
+        for row in rows:
+            sh = self.model.shape(row["shape"])
+            if sh.block < 0 or sh.bound is None:
+                continue
+            centre, radius = patch.read_bounds(sh.block)
+            if abs(radius - sh.bound.radius) > 1e-4 or any(
+                    abs(a - b) > 1e-4 for a, b in zip(centre, sh.bound.centre)):
+                raise RuntimeError("блок %d части %r: шар в файле (%s, %.3f) не совпал с тем, "
+                                   "что прочитал PyNifly - раскладка неизвестна, не пишу"
+                                   % (sh.block, sh.name, centre, radius))
+            need = row["needed"]
+            patch.write_bounds(sh.block, need["centre"], need["radius"])
+            written.append(row["shape"])
+        out = patch.save(path)
+        return {"saved": str(out), "shapes": written, "rows": rows}
 
     # ---- колайдеры --------------------------------------------------------------------
     def open_skeleton(self, path) -> dict:

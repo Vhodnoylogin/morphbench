@@ -361,6 +361,13 @@ class MorphBench:
             rows = [r for r in rows if r["engine"] == str(engine).lower()]
         return rows
 
+    def skeleton_bones(self) -> list[str]:
+        """Кости, которые есть в скелете (открыт скелет) либо в привязках меша."""
+        if self.rig is not None:
+            return sorted(self.rig.matrices)
+        self._require()
+        return self.model.bone_names()
+
     def assign_chains(self, engines: dict | None = None) -> dict:
         """Кому отдана цепочка - на этот запуск, поверх `chainEngines` из настроек:
         подстрока ствола -> «smp» или «cbpc». Названное здесь сверяется первым, файл

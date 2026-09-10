@@ -25,3 +25,8 @@ morphbench.json
 /morphbench.launcher.json
 /morphbench.diag.json
 /morphbench.diag.png
+
+# Значок - продукт make-icon.py, а не исходник.
+launcher/morphbench.ico
+launcher/morphbench.png
+morphbench.exe

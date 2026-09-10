@@ -50,6 +50,12 @@ def file_exists(path) -> bool:
         return False
 
 
+def same_file(a, b) -> bool:
+    """Один ли это файл - по нормализованному пути, без resolve(): под usvfs настоящий
+    путь виртуального файла уводит в папку мода."""
+    return _canonical(a) == _canonical(b)
+
+
 def _canonical(path) -> str:
     """Абсолютный путь в одном написании: без «..», в одном регистре, без хвостовой косой."""
     import os

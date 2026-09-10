@@ -512,20 +512,40 @@ class Analyzer:
             top_max, _, top_shape = self.strain_extent({name: high}, threshold)
             row = {"morph": name, "limit": None, "maxAt": top_max, "shape": top_shape,
                    "threshold": threshold, "high": high}
-            if top_max > threshold:
-                a, b, where = low, high, top_shape
-                low_max, _, low_shape = self.strain_extent({name: low}, threshold)
-                if low_max > threshold:
-                    b, where = a, low_shape        # рвёт уже на нижнем пределе
-                while b - a > resolution:
+            # Предел ищется от нуля наружу по каждой стороне диапазона отдельно: нулевая
+            # величина не рвёт, а растяжение по величине не обязано быть монотонным -
+            # схлопывающийся морф рвёт посередине и отпускает на пределе. Диапазон
+            # проходится шагами, и делится пополам первый отрезок, где порог перейдён.
+            for end, key in ((high, "limit"), (low, "limitLow")):
+                if (end > 0.0) == (key == "limitLow") or end == 0.0:
+                    continue
+                steps = max(4, int(round(abs(end) / max(resolution * 8.0, 1e-6))))
+                steps = min(steps, 64)
+                a, a_max = 0.0, 0.0
+                found = None
+                for i in range(1, steps + 1):
+                    x = end * i / steps
+                    mx, _, shape = self.strain_extent({name: x}, threshold)
+                    row["maxAt"] = max(row["maxAt"], mx)
+                    if mx > threshold:
+                        found = (a, x, shape)
+                        break
+                    a = x
+                if found is None:
+                    continue
+                a, b, where = found
+                while abs(b - a) > resolution:
                     mid = 0.5 * (a + b)
                     mx, _, shape = self.strain_extent({name: mid}, threshold)
                     if mx > threshold:
                         b, where = mid, shape
                     else:
                         a = mid
-                row["limit"] = 0.5 * (a + b)
-                row["shape"] = where
+                row[key] = 0.5 * (a + b)
+                if key == "limit":
+                    row["shape"] = where
+                elif row["limit"] is None:
+                    row["shape"] = where
             out.append(row)
         out.sort(key=lambda r: (r["limit"] is None,
                                 r["limit"] if r["limit"] is not None else -r["maxAt"]))

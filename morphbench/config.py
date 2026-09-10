@@ -144,6 +144,9 @@ DEFAULTS = {
     "cbpcCollisionOffset": 100.0,
     "boundsMargin": 1.01,
     "boundsTolerance": 0.01,
+    # Сколько ползунков на одну вершину ещё перебираются по углам точно (2^N наборов);
+    # вершины с большим числом меряются прикидкой по направлению.
+    "boundsCornerCap": 12,
     # Файл скелета, который подбирается рядом с мешем сам, - в той же папке.
     "skeletonFile": "skeleton.nif",
     "colliderMinWeight": 0.5,

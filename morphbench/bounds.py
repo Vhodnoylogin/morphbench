@@ -111,12 +111,66 @@ class Reach:
     def cloud(self, centre) -> np.ndarray:
         return np.vstack(list(self.states(centre).values()))
 
+    def reach_exact(self, centre, cap: int = 12) -> tuple[float, str, int]:
+        """Самое дальнее от центра положение любой вершины при ЛЮБОМ наборе ползунков -
+        и какой набор его даёт.
+
+        Расстояние |rest + Σ x_i d_i - c| выпукло по x, значит наибольшее - в углу куба
+        значений, где каждый ползунок стоит на своём пределе. Углов 2^N, но на одну вершину
+        действует лишь k её ползунков, и перебираются 2^k углов по вершинам с одинаковым
+        набором - на теле это сотни групп по 3-6 ползунков. Вершины, которых трогает больше
+        `cap` ползунков, меряются прикидкой по направлению («худший набор»), и их число
+        возвращается третьим: пока оно ноль, ответ точный.
+        """
+        c = np.asarray(centre, dtype=np.float32).reshape(3)
+        names = list(self.deltas)
+        if not names:
+            return Sphere(c, 0.0).reach(self.rest), "rest", 0
+        n = self.rest.shape[0]
+        stack = np.stack([self.deltas[k] for k in names], axis=1)            # (n, m, 3)
+        touch = np.linalg.norm(stack, axis=2) > 0.0                            # (n, m)
+        best, best_state, over = float(np.linalg.norm(self.rest - c, axis=1).max()), "rest", 0
+        lo, hi = self.low, self.high
+        keys, inverse = np.unique(touch, axis=0, return_inverse=True)
+        inverse = np.asarray(inverse).reshape(-1)
+        for g, key in enumerate(keys):
+            idx = np.nonzero(inverse == g)[0]
+            cols = np.nonzero(key)[0]
+            k = int(cols.size)
+            if k == 0:
+                continue
+            if k > int(cap):
+                over += int(idx.size)
+                worst = self.states(c)["worst"][idx]
+                r = float(np.linalg.norm(worst - c, axis=1).max())
+                if r > best:
+                    best, best_state = r, "worst"
+                continue
+            corners = np.array([[hi if (i >> j) & 1 else lo for j in range(k)]
+                                for i in range(1 << k)], dtype=np.float32)    # (2^k, k)
+            for start in range(0, idx.size, 512):
+                rows = idx[start:start + 512]
+                d = stack[rows][:, cols, :]                                    # (v, k, 3)
+                pos = (self.rest[rows] - c)[None, :, :] + np.einsum("ck,vkd->cvd", corners, d)
+                dist = np.linalg.norm(pos, axis=2)                             # (2^k, v)
+                ci, vi = np.unravel_index(int(np.argmax(dist)), dist.shape)
+                r = float(dist[ci, vi])
+                if r > best:
+                    best = r
+                    best_state = ",".join("%s=%g" % (names[cols[j]], corners[ci, j])
+                                          for j in range(k) if corners[ci, j] != 0.0) or "rest"
+        return best, best_state, over
+
     def farthest(self, sphere: Sphere, single: bool = False) -> tuple[str, float]:
         """Какое состояние уходит дальше всех от центра шара и на сколько.
-        `single` - только среди одиночных ползунков: что виновато само по себе."""
+        Без `single` - точный перебор углов (`reach_exact`); `single` - только среди
+        одиночных ползунков: что виновато само по себе."""
+        if not single:
+            r, state, _ = self.reach_exact(sphere.centre)
+            return state, r
         best, reach = "rest", 0.0
         for name, pts in self.states(sphere.centre).items():
-            if single and (name in ("rest", "worst") or name.startswith("all=")):
+            if name in ("rest", "worst") or name.startswith("all="):
                 continue
             r = sphere.reach(pts)
             if r > reach:
@@ -135,9 +189,10 @@ class Reach:
         centre = enclosing_sphere(first, iterations, start).centre
         cloud = self.cloud(centre)
         sphere = enclosing_sphere(cloud, iterations, centre)
+        # Радиус - не по прикидочному облаку, а точный: по углам куба ползунков.
+        exact, _, _ = self.reach_exact(sphere.centre)
         if start is not None:
-            alt = Sphere(start, 0.0)
-            alt_r = alt.reach(cloud)
-            if alt_r < sphere.radius:
-                sphere = Sphere(start, alt_r)
-        return Sphere(sphere.centre, sphere.reach(cloud) * max(1.0, float(margin)))
+            alt, _, _ = self.reach_exact(start)
+            if alt < exact:
+                sphere, exact = Sphere(start, alt), alt
+        return Sphere(sphere.centre, exact * max(1.0, float(margin)))

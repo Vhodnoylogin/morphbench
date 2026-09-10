@@ -30,7 +30,7 @@ from pathlib import Path
 import numpy as np
 
 from .config import Config
-from .environment import file_exists
+from .environment import file_exists, same_file
 from .model import load_nifly
 
 #: Havok меряет длины в своих единицах; игра - в своих. Это свойство формата NIF,
@@ -616,6 +616,8 @@ class ColliderSet:
         не трогаются вовсе.
         """
         path = Path(path)
+        if same_file(path, self.path):
+            raise ValueError("записывать поверх исходного скелета нельзя: назовите новый файл")
         changed = self.changed_bodies()
         if not changed:
             raise ValueError("нечего записывать: ни одно тело не менялось")

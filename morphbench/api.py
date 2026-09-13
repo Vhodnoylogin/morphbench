@@ -22,6 +22,7 @@ from .chains import find_chains
 from .catalog import Catalog
 from .colliders import ColliderSet
 from .config import Config
+from .i18n import t
 from .environment import Environment, file_exists
 from .model import BodyModel, sphere_of, vertex_normals
 from .morphs import MorphSet
@@ -51,8 +52,7 @@ class MorphBench:
         if root is None:
             root = self.env.data_root()
             if root is None:
-                raise ValueError("корень обзора не задан: вне MO2 назовите папку "
-                                 "или ключ catalogRoot в настройках")
+                raise ValueError(t("catalog.rootNotSet"))
         root = Path(os.path.normpath(os.path.abspath(str(root))))
         if not self.env.allows(root):
             raise PermissionError("под MO2 обзор ограничен папкой Data игры: %s"

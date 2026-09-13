@@ -1,20 +1,22 @@
-"""Журнал: что писать решает уровень, куда писать - приёмники, и отказ одного приёмника
-не уносит ни запись, ни программу.
+"""The journal: the level decides what is written, the sinks decide where, and one sink
+failing takes down neither the record nor the program.
 
-Три вопроса здесь намеренно разделены, потому что их смешение уже стоило нам отказа.
-Сервер писал строку журнала прямо в трубу к окну запуска; окно снимали, труба закрывалась,
-запись падала - а падала она внутри отправки ответа, до заголовков, и клиент получал обрыв
-связи без единого слова. То есть отказ журнала уносил с собой каждый обслуживаемый запрос.
+These three questions are deliberately kept apart, because mixing them has already cost us
+an outage. The server wrote its log line straight into the pipe held by the launcher window;
+the window was killed, the pipe closed, the write failed - and it failed inside sending the
+response, before the headers, so the client got a dropped connection without a word. A
+failing journal was taking every served request down with it.
 
-- **Что писать** - уровень записи против порога приёмника. Пороги разные у разных
-  приёмников: в окно идёт крупное, в файл - подробное.
-- **Куда писать** - набор приёмников. «Журнал» и «труба, в которую мы сейчас пишем» -
-  разные понятия; приёмники подключаются и выбывают независимо друг от друга.
-- **Что при отказе** - выбывает один приёмник, а не журнал. Остальные получают запись,
-  и первыми получают известие о выбывшем. Ни один путь отсюда наружу не бросает.
+- **What to write** - the level of the record against the threshold of the sink. Thresholds
+  differ on purpose: the window gets the coarse stuff, the file gets the detail.
+- **Where to write** - a set of sinks. "The journal" and "the pipe we happen to write to"
+  are different things; sinks are attached and drop out independently of each other.
+- **What on failure** - one sink drops out, not the journal. The rest get the record, and
+  first of all they get word of the sink that died. Nothing here ever raises.
 
-Визуала здесь нет: приёмник знает, куда положить готовую строку, и ничего не решает
-о её виде. Слои показа могут подставить свой приёмник (`ListSink` - для проверок).
+There is no presentation in this module: a sink knows where to put a finished line and
+decides nothing about how it looks. Presenters may plug in their own (`ListSink` is the one
+the tests use).
 """
 from __future__ import annotations
 
@@ -22,19 +24,20 @@ import sys
 import threading
 from pathlib import Path
 
+from .i18n import t
+
 LEVELS = {"debug": 10, "info": 20, "warn": 30, "error": 40}
 _NAMES = {v: k for k, v in LEVELS.items()}
 
 
 def level_of(level) -> int:
-    """Уровень числом: имя из `LEVELS` либо уже число. Неизвестное имя - отказ сразу,
-    а не молча пропущенные записи."""
+    """A level as a number: a name from `LEVELS`, or a number already. An unknown name is
+    refused at once rather than silently swallowing records."""
     if isinstance(level, (int, float)):
         return int(level)
     key = str(level).strip().lower()
     if key not in LEVELS:
-        raise ValueError("неизвестный уровень журнала %r; известны: %s"
-                         % (level, ", ".join(LEVELS)))
+        raise ValueError(t("journal.badLevel", level=level, known=", ".join(LEVELS)))
     return LEVELS[key]
 
 
@@ -44,17 +47,17 @@ def level_name(level) -> str:
 
 
 class Sink:
-    """Приёмник записей: порог и место. Отказ снимает с обслуживания его одного.
+    """A sink: a threshold and a place. Failure takes this one sink out of service.
 
-    Наследник переопределяет `emit`; ловить отказы ему не нужно - это делает журнал,
-    он же помечает приёмник выбывшим.
+    A subclass overrides `emit`; it need not catch anything - the journal does that and
+    marks the sink as dropped out.
     """
 
     __slots__ = ("level", "failure")
 
     def __init__(self, level="info"):
         self.level = level_of(level)
-        self.failure: str | None = None      # почему выбыл; None - жив
+        self.failure: str | None = None      # why it dropped out; None while alive
 
     @property
     def alive(self) -> bool:
@@ -71,15 +74,16 @@ class Sink:
 
     def __repr__(self) -> str:
         return "%s(%s%s)" % (type(self).__name__, level_name(self.level),
-                             "" if self.alive else ", выбыл: %s" % self.failure)
+                             "" if self.alive else ", down: %s" % self.failure)
 
 
 class StreamSink(Sink):
-    """Поток: труба к окну запуска или консоль.
+    """A stream: the pipe back to the launcher window, or a console.
 
-    Консоль на этой машине живёт в cp1251 и падает на кириллице, поэтому неудача
-    кодировки - не отказ приёмника, а повод написать ту же строку заменами. Отказ самой
-    трубы (окно снято) - настоящий отказ, и разбирается он журналом.
+    A console on a legacy code page chokes on anything but its own alphabet, so an encoding
+    failure is not a failure of the sink - it is a reason to write the same line with
+    replacements. A broken pipe (the window is gone) is a real failure, and the journal
+    handles it.
     """
 
     __slots__ = ("stream",)
@@ -89,13 +93,13 @@ class StreamSink(Sink):
         self.stream = stream
 
     def _target(self):
-        # sys.stderr берётся при записи, а не при создании: проверки подменяют его на время.
+        # sys.stderr is taken at write time, not at construction: tests replace it.
         return self.stream if self.stream is not None else sys.stderr
 
     def emit(self, line: str) -> None:
         target = self._target()
         if target is None:
-            raise OSError("потока нет")
+            raise OSError(t("journal.noStream"))
         try:
             target.write(line + "\n")
         except UnicodeEncodeError:
@@ -104,8 +108,8 @@ class StreamSink(Sink):
 
 
 class FileSink(Sink):
-    """Файл рядом с программой. Открывается при первой записи и держится открытым:
-    сервер живёт часами, и открывать файл на каждую строку незачем."""
+    """A file next to the settings. Opened on the first write and kept open: the server
+    runs for hours, and reopening the file for every line buys nothing."""
 
     __slots__ = ("path", "_handle")
 
@@ -131,7 +135,8 @@ class FileSink(Sink):
 
 
 class ListSink(Sink):
-    """Приёмник в память: для проверок и для тех слоёв показа, что рисуют журнал сами."""
+    """A sink into memory: for the tests, and for presenters that draw the journal
+    themselves."""
 
     __slots__ = ("lines", "limit")
 
@@ -147,17 +152,17 @@ class ListSink(Sink):
 
 
 class Journal:
-    """Набор приёмников и одна точка записи.
+    """A set of sinks and a single point of writing.
 
-    `log` не бросает никогда - ни при отказе приёмника, ни при отсутствии приёмников
-    вовсе. Выбывший приёмник больше не зовётся, а остальные получают об этом одну
-    строку уровня `error`: молчание о потере приёмника - та же потеря сведений.
+    `log` never raises - not when a sink fails, not when there are no sinks at all. A sink
+    that dropped out is not called again, and the surviving ones get one line about it:
+    keeping quiet about a lost sink is the same loss of information all over again.
     """
 
     def __init__(self, sinks=(), prefix: str = ""):
         self.sinks: list[Sink] = list(sinks)
         self.prefix = str(prefix)
-        self._lock = threading.Lock()        # сервер обслуживает запросы в нескольких нитях
+        self._lock = threading.Lock()        # the server serves requests on several threads
 
     def add(self, sink: Sink) -> Sink:
         with self._lock:
@@ -174,8 +179,8 @@ class Journal:
         return [s for s in self.sinks if s.alive]
 
     def line(self, level, text: str) -> str:
-        """Готовая строка: уровень, имя источника и текст. Времени здесь нет намеренно -
-        его ставит приёмник, которому оно нужно (файл), а окну оно только мешает."""
+        """A finished line: level, source name, text. No timestamp on purpose - the sink
+        that needs one (the file) adds it, and in the window it is only in the way."""
         head = "%-5s" % level_name(level)
         return "%s %s%s" % (head, self.prefix and self.prefix + ": ", text)
 
@@ -188,18 +193,19 @@ class Journal:
             for sink in targets:
                 try:
                     sink.emit(line)
-                except Exception as e:       # noqa: BLE001 - любой отказ приёмника
+                except Exception as e:       # noqa: BLE001 - any failure of a sink
                     sink.failure = repr(e)
                     failed.append(sink)
             for sink in failed:
-                note = self.line(LEVELS["error"], "приёмник %s выбыл: %s"
-                                 % (type(sink).__name__, sink.failure))
+                note = self.line(LEVELS["error"],
+                                 t("journal.sinkDown", sink=type(sink).__name__,
+                                   error=sink.failure))
                 for other in self.sinks:
                     if other is sink or not other.accepts(LEVELS["error"]):
                         continue
                     try:
                         other.emit(note)
-                    except Exception as e:   # noqa: BLE001 - и этот выбыл, тем же порядком
+                    except Exception as e:   # noqa: BLE001 - this one is down too, same way
                         other.failure = repr(e)
 
     def debug(self, text: str) -> None:
@@ -218,16 +224,17 @@ class Journal:
         for sink in self.sinks:
             try:
                 sink.close()
-            except Exception:                # noqa: BLE001 - закрытие тоже не бросает
+            except Exception:                # noqa: BLE001 - closing does not raise either
                 pass
 
 
 def from_config(cfg, prefix: str = "", stream=None) -> Journal:
-    """Журнал по настройкам: поток с порогом `logLevel` и, если `logFile` не пуст,
-    файл с порогом `logFileLevel`. Относительное имя файла - рядом с `morphbench.json`.
+    """A journal from the settings: a stream at the `logLevel` threshold and, when `logFile`
+    is not empty, a file at the `logFileLevel` one. A relative file name lands next to
+    `morphbench.json`.
 
-    Неверный уровень в настройках не должен лишать программу журнала целиком: приёмник
-    с непонятным порогом заводится по умолчанию, а о подмене говорится первой же строкой.
+    A bad level in the settings must not cost the program its journal altogether: the sink
+    is created at its default threshold and the substitution is announced in the first line.
     """
     journal = Journal(prefix=prefix)
     notes = []
@@ -248,5 +255,5 @@ def from_config(cfg, prefix: str = "", stream=None) -> Journal:
             path = (Path(base).parent if base else Path.cwd()) / path
         journal.add(FileSink(path, threshold("logFileLevel", "debug")))
     for note in notes:
-        journal.error("настройки журнала: %s" % note)
+        journal.error(t("journal.configProblem", problem=note))
     return journal

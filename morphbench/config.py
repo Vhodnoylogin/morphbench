@@ -12,10 +12,14 @@ import json
 import os
 from pathlib import Path
 
+from .i18n import t, use
+
 _ROOT = Path(__file__).resolve().parent.parent
 _FILE = _ROOT / "morphbench.json"
 
 DEFAULTS = {
+    # Язык сообщений: auto - язык системы, иначе код языка из папки locale (en, ru).
+    "language": "auto",
     # Пусто - значит искать самому в каталоге аддонов Blender.
     "pynifly": "",
     # Растеризатор.
@@ -189,6 +193,9 @@ class Config:
             # Файл старше программы: дописать новые ключи, чтобы было видно, что настраивается.
             self.path.write_text(json.dumps(self._values, indent=2, ensure_ascii=False),
                                  encoding="utf-8")
+        # Язык сообщений применяется здесь: настройки читает всякий, кто вообще что-то
+        # делает, и это самая ранняя точка, где язык уже известен.
+        use(self._values.get("language", "auto"))
 
     def __getitem__(self, key: str):
         return self._values[key]
@@ -207,12 +214,16 @@ class Config:
             p = Path(self._values["pynifly"])
             if p.is_dir():
                 return p
-            raise FileNotFoundError("в morphbench.json указан несуществующий путь pynifly: %s" % p)
+            raise FileNotFoundError(t("config.pyniflyBadPath", path=p))
+        # Выпуск самодостаточен: аддон лежит внутри пакета и смотрится первым. В рабочей
+        # копии этой папки нет, и поиск идёт дальше - среди аддонов Blender.
+        inside = _ROOT / "vendor" / "io_scene_nifly"
+        if inside.is_dir():
+            return inside
         root = Path(os.environ.get("APPDATA", "")) / "Blender Foundation" / "Blender"
         if root.is_dir():
             for ver in sorted(root.iterdir(), reverse=True):
                 cand = ver / "scripts" / "addons" / "io_scene_nifly"
                 if cand.is_dir():
                     return cand
-        raise FileNotFoundError(
-            "не найден аддон PyNifly; укажите его папку ключом pynifly в %s" % self.path)
+        raise FileNotFoundError(t("config.pyniflyMissing", config=self.path))

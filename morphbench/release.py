@@ -81,6 +81,11 @@ CONTENT = [
     "morphbench.exe",
     "LICENSE",
     "README.md",
+    "README.ru.md",
+    # The manifest travels with the archive: whoever unpacks it may hand the folder to an
+    # assistant, and it is the file that tells one what must not be "simplified".
+    "CLAUDE.md",
+    "CLAUDE.ru.md",
     "dependencies.json",
     "morphbench/*.py",
     "presenters/*.py",

@@ -32,6 +32,7 @@ from __future__ import annotations
 import itertools
 
 import numpy as np
+from .i18n import t
 
 
 class MorphStat:
@@ -475,7 +476,7 @@ class Analyzer:
         посчитанных один раз.
         """
         if by not in ("max", "gain"):
-            raise ValueError("порядок пар: max или gain, а не %r" % by)
+            raise ValueError(t("core.pairOrder", value=by))
         threshold = self.strain_threshold if threshold is None else float(threshold)
         amount = float(amount)
         names = self.active_morphs()

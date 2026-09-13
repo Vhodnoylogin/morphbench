@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import struct
 from pathlib import Path
+from .i18n import t
 
 
 class NifPatch:
@@ -88,12 +89,11 @@ class NifPatch:
     # ---- шар охвата части -----------------------------------------------------------
     def _bounds_offset(self, block: int) -> int:
         if block not in self.offsets:
-            raise KeyError("в файле нет блока %d (всего %d)" % (block, self.block_count))
+            raise KeyError(t("model.noBlock", block=block, count=self.block_count))
         if self.types[block] not in self.SHAPE_TYPES:
-            raise ValueError("блок %d - %s, а не часть меша" % (block, self.types[block]))
+            raise ValueError(t("model.notAShape", block=block, kind=self.types[block]))
         if self.bs_version < 100:
-            raise ValueError("файл версии Bethesda %d: раскладка части известна от 100 (SSE)"
-                             % self.bs_version)
+            raise ValueError(t("model.oldBethesda", version=self.bs_version))
         off = self.offsets[block]
         extra = struct.unpack_from("<I", self.raw, off + 4)[0]
         return off + self.SHAPE_HEAD + 4 * extra

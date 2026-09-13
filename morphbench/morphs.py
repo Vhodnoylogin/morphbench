@@ -12,6 +12,7 @@ import numpy as np
 
 from .config import Config
 from .environment import file_exists
+from .i18n import t
 
 
 def _module(name: str, path: Path):
@@ -93,7 +94,7 @@ class MorphSet:
         cfg = cfg or Config()
         path = Path(path)
         if not file_exists(path):
-            raise FileNotFoundError("нет файла морфов: %s" % path)
+            raise FileNotFoundError(t("model.noMorphFile", path=path))
         tri_dir = cfg.pynifly_root() / "tri"
         with open(path, "rb") as f:
             head = f.read(8)
@@ -116,13 +117,14 @@ class MorphSet:
         elif head[:5] == b"FRTRI":
             kind = "FRTRI"
             trifile = _module("_mb_trifile", tri_dir / "trifile.py").TriFile
-            t = trifile.from_filepath(str(path))
+            tri = trifile.from_filepath(str(path))
             shape_name = path.stem
             slot = by_shape.setdefault(shape_name, {})
             # TriFile отдаёт морфы АБСОЛЮТНЫМИ координатами вершин, а базу кладёт под именем
             # Basis. Смещение - разность с базой; Basis ползунком не является.
-            base = np.asarray(t.morphs.get("Basis", t.vertices), dtype=np.float32).reshape(-1, 3)
-            morphs = dict(t.morphs)
+            base = np.asarray(tri.morphs.get("Basis", tri.vertices),
+                              dtype=np.float32).reshape(-1, 3)
+            morphs = dict(tri.morphs)
             for name, verts in (getattr(t, "modmorphs", None) or {}).items():
                 # Частичный морф с именем обычного не затирает его, а идёт рядом.
                 morphs[name if name not in morphs else name + " (mod)"] = verts
@@ -137,7 +139,7 @@ class MorphSet:
                 idx = np.nonzero(keep)[0].astype(np.int32)
                 slot[morph_name] = Morph(morph_name, shape_name, idx, delta[keep])
         else:
-            raise ValueError("не файл морфов TRIP или FRTRI: %s (заголовок %r)" % (path, head))
+            raise ValueError(t("model.notTriFile", path=path, head=head))
         return cls(path, kind, by_shape)
 
     def names(self) -> list[str]:

@@ -15,6 +15,7 @@ import numpy as np
 from .bounds import Sphere
 from .config import Config
 from .environment import file_exists
+from .i18n import t
 
 
 def load_nifly(cfg: Config):
@@ -34,11 +35,11 @@ def vertex_normals(verts: np.ndarray, tris: np.ndarray) -> np.ndarray:
     v = np.asarray(verts, dtype=np.float32).reshape(-1, 3)
     out = np.zeros_like(v)
     if tris is not None and len(tris):
-        t = np.asarray(tris, dtype=np.int32).reshape(-1, 3)
-        a, b, c = v[t[:, 0]], v[t[:, 1]], v[t[:, 2]]
+        faces = np.asarray(tris, dtype=np.int32).reshape(-1, 3)
+        a, b, c = v[faces[:, 0]], v[faces[:, 1]], v[faces[:, 2]]
         face = np.cross(b - a, c - a)          # длина - удвоенная площадь: вес сам собой
         for k in range(3):
-            np.add.at(out, t[:, k], face)
+            np.add.at(out, faces[:, k], face)
     n = np.linalg.norm(out, axis=1, keepdims=True)
     flat = n[:, 0] < 1e-12
     out = out / np.maximum(n, 1e-12)
@@ -212,7 +213,7 @@ class BodyModel:
         pynifly = load_nifly(cfg)
         path = Path(path)
         if not file_exists(path):
-            raise FileNotFoundError("нет файла меша: %s" % path)
+            raise FileNotFoundError(t("model.noMeshFile", path=path))
         nif = pynifly.NifFile(str(path))
         shapes: dict[str, Shape] = {}
         for s in nif.shapes:
@@ -238,8 +239,8 @@ class BodyModel:
 
     def shape(self, name: str) -> Shape:
         if name not in self.shapes:
-            raise KeyError("в меше нет части %r; есть: %s"
-                           % (name, ", ".join(sorted(self.shapes))))
+            raise KeyError(t("model.noShape", name=name,
+                             have=", ".join(sorted(self.shapes))))
         return self.shapes[name]
 
     def shape_names(self) -> list[str]:

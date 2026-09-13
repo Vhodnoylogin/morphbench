@@ -13,6 +13,7 @@ from __future__ import annotations
 import math
 
 import numpy as np
+from .i18n import t
 
 
 class ViewState:
@@ -65,7 +66,7 @@ class ViewState:
     def preset(self, name: str) -> "ViewState":
         views = self.cfg["views"]
         if name not in views:
-            raise KeyError("нет ракурса %r; есть: %s" % (name, ", ".join(sorted(views))))
+            raise KeyError(t("view.noPreset", name=name, have=", ".join(sorted(views))))
         return self.look(*views[name])
 
     def preset_names(self) -> list[str]:
@@ -156,7 +157,7 @@ class ViewState:
         отдельно - в мировых координатах. Нулевой вектор отвергается."""
         v = np.asarray([x, y, z], dtype=np.float32)
         if not np.all(np.isfinite(v)) or float(np.linalg.norm(v)) < 1e-6:
-            raise ValueError("направление света должно быть конечным и ненулевым")
+            raise ValueError(t("view.zeroLight"))
         if self.light_follow:
             self.light_camera_dir = v
         else:
@@ -171,7 +172,7 @@ class ViewState:
                 continue
             value = float(value)
             if not math.isfinite(value):
-                raise ValueError("сила света должна быть конечным числом")
+                raise ValueError(t("view.badPower"))
             setattr(self, name, max(0.0, value))
         return self
 
@@ -243,7 +244,7 @@ class ViewState:
     # ---- раскраска --------------------------------------------------------------------
     def colour_by(self, mode: str, morph: str | None = None) -> "ViewState":
         if mode not in self.COLOURINGS:
-            raise ValueError("раскраска бывает %s" % ", ".join(self.COLOURINGS))
+            raise ValueError(t("view.badColouring", have=", ".join(self.COLOURINGS)))
         self.colouring = mode
         self.highlight_morph = morph
         return self

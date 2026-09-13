@@ -55,8 +55,7 @@ class MorphBench:
                 raise ValueError(t("catalog.rootNotSet"))
         root = Path(os.path.normpath(os.path.abspath(str(root))))
         if not self.env.allows(root):
-            raise PermissionError("под MO2 обзор ограничен папкой Data игры: %s"
-                                  % self.env.data_root())
+            raise PermissionError(t("core.outsideData", data=self.env.data_root()))
         return root
 
     def catalog(self, root=None, with_morphs: bool = True, rescan: bool = False) -> list[dict]:
@@ -151,12 +150,12 @@ class MorphBench:
 
     def _require(self) -> None:
         if self.model is None:
-            raise RuntimeError("сначала откройте меш: open(<путь к .nif>)")
+            raise RuntimeError(t("core.noMeshOpen"))
 
     def _require_morphs(self) -> None:
         self._require()
         if self.morph_set is None:
-            raise RuntimeError("к этому мешу не открыт файл морфов")
+            raise RuntimeError(t("core.noMorphFile"))
 
     def summary(self) -> dict:
         self._require()
@@ -254,11 +253,11 @@ class MorphBench:
         values = self.sliders() if values is None else dict(values)
         values = {str(k): float(v) for k, v in values.items() if float(v) != 0.0}
         if not values:
-            raise ValueError("набор пуст: задайте хотя бы один ползунок")
+            raise ValueError(t("core.emptySet"))
         have = set(self.morph_set.names())
         for name in values:
             if name not in have:
-                raise KeyError("нет ползунка %r" % name)
+                raise KeyError(t("core.noSlider", name=name))
         return [s.as_dict() for s in self.analyzer.strain_set(values, threshold)]
 
     def strain_pairs(self, amount: float = 1.0, threshold: float | None = None,
@@ -310,7 +309,7 @@ class MorphBench:
     def set_slider(self, name: str, value: float) -> dict:
         self._require_morphs()
         if name not in self.morph_set.names():
-            raise KeyError("нет ползунка %r" % name)
+            raise KeyError(t("core.noSlider", name=name))
         if value == 0.0:
             self._sliders.pop(name, None)
         else:
@@ -377,7 +376,7 @@ class MorphBench:
             for needle, engine in engines.items():
                 eng = str(engine).strip().lower()
                 if eng not in ("smp", "cbpc"):
-                    raise ValueError("цепочка %r: движок %r, а ожидался smp или cbpc" % (needle, engine))
+                    raise ValueError(t("core.badEngine", chain=needle, engine=engine))
                 merged[str(needle)] = eng
             for needle, eng in (self.cfg.get("chainEngines") or {}).items():
                 merged.setdefault(str(needle), eng)
@@ -483,11 +482,11 @@ class MorphBench:
         """
         self._require()
         if self.morph_set is None:
-            raise ValueError("морфы не открыты: без них нужный шар - шар покоя, писать нечего")
+            raise ValueError(t("core.boundsNeedMorphs"))
         from .environment import same_file
         from .nifpatch import NifPatch
         if same_file(path, self.model.path):
-            raise ValueError("записывать поверх исходного меша нельзя: назовите новый файл")
+            raise ValueError(t("core.noOverwriteMesh"))
         patch = NifPatch(self.model.path)
         rows, spheres = self._bounds(shape, margin)
         written, kept = [], []
@@ -498,9 +497,8 @@ class MorphBench:
             centre, radius = patch.read_bounds(sh.block)
             if abs(radius - sh.bound.radius) > 1e-4 or any(
                     abs(a - b) > 1e-4 for a, b in zip(centre, sh.bound.centre)):
-                raise RuntimeError("блок %d части %r: шар в файле (%s, %.3f) не совпал с тем, "
-                                   "что прочитал PyNifly - раскладка неизвестна, не пишу"
-                                   % (sh.block, sh.name, centre, radius))
+                raise RuntimeError(t("core.boundsMismatch", block=sh.block, shape=sh.name,
+                                     centre=centre, radius=radius))
             need = spheres[row["shape"]]
             if not shrink and (row["ok"] or need.radius <= sh.bound.radius):
                 kept.append(row["shape"])
@@ -527,7 +525,7 @@ class MorphBench:
 
     def _require_rig(self) -> None:
         if self.rig is None:
-            raise RuntimeError("сначала откройте скелет: open_skeleton(<путь к skeleton.nif>)")
+            raise RuntimeError(t("core.noSkeletonOpen"))
 
     def _segments(self, segments: int | None) -> int:
         return int(self.cfg["colliderSegments"] if segments is None else segments)
@@ -690,8 +688,7 @@ class MorphBench:
         self._require_rig()
         caps = self.rig.body(bone).capsules
         if not 0 <= index < len(caps):
-            raise IndexError("у кости %r капсул %d, а спрошена %d"
-                             % (bone, len(caps), index))
+            raise IndexError(t("core.capsuleIndex", bone=bone, count=len(caps), index=index))
         cap = caps[index]
         if p1 is not None:
             cap.p1 = np.asarray(p1, dtype=np.float32).reshape(3)
@@ -741,7 +738,7 @@ class MorphBench:
         chunks = [self.deformed(n) for n in self.visible_shapes()
                   if self.model.shape(n).triangle_count]
         if not chunks:
-            raise RuntimeError("нечего показывать: все части меша скрыты")
+            raise RuntimeError(t("core.allHidden"))
         verts = np.vstack(chunks)
         basis = self.view.basis()
         whole = 0.5 * (verts.min(axis=0) + verts.max(axis=0))
@@ -880,7 +877,7 @@ class MorphBench:
         if pts.shape[0] == 0:
             pts = self.model.bone_points(needle, exact=False, shape=shape)
         if pts.shape[0] == 0:
-            raise KeyError("ни одна кость не подходит под %r" % needle)
+            raise KeyError(t("core.noBoneMatches", needle=needle))
         centre, radius = sphere_of(pts)
         return self.view.focus_on(centre, radius, "bone:" + needle).as_dict()
 
@@ -894,7 +891,7 @@ class MorphBench:
             s = self.model.shape(shape_name)
             chunks.append(s.verts[m.indices[m.indices < s.vertex_count]])
         if not chunks:
-            raise KeyError("морф %r не двигает ни одной вершины меша" % morph)
+            raise KeyError(t("core.morphMovesNothing", morph=morph))
         centre, radius = sphere_of(np.vstack(chunks))
         return self.view.focus_on(centre, radius, "morph:" + morph).as_dict()
 

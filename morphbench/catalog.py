@@ -12,6 +12,7 @@ import os
 from pathlib import Path
 
 from .environment import dir_exists
+from .i18n import t
 
 
 class CatalogEntry:
@@ -51,7 +52,7 @@ class Catalog:
     def __init__(self, root, subdirs=None, with_morphs: bool = True):
         self.root = Path(root)
         if not dir_exists(self.root):
-            raise FileNotFoundError("нет папки для обзора: %s" % self.root)
+            raise FileNotFoundError(t("catalog.noFolder", path=self.root))
         self.subdirs = [str(s) for s in (subdirs or [])]
         self.with_morphs = bool(with_morphs)
         self._entries: list[CatalogEntry] | None = None
@@ -130,7 +131,7 @@ class Catalog:
             key = int(key)
             if 0 <= key < len(entries):
                 return entries[key]
-            raise KeyError("в обзоре нет записи с номером %d (всего %d)" % (key, len(entries)))
+            raise KeyError(t("catalog.noEntryNumber", index=key, count=len(entries)))
         want = str(key).replace("\\", "/").lower().lstrip("/")
         for e in entries:
             if e.name.lower() == want:
@@ -138,8 +139,8 @@ class Catalog:
         hits = self.find(str(key))
         if len(hits) == 1:
             return hits[0]
-        raise KeyError("в обзоре нет записи %r%s" % (
-            key, "" if not hits else "; похожих: %d" % len(hits)))
+        raise KeyError(t("catalog.noEntryName", name=key,
+                          near="" if not hits else t("catalog.similarCount", count=len(hits))))
 
     def as_dicts(self) -> list[dict]:
         return [dict(e.as_dict(), index=i) for i, e in enumerate(self.entries)]

@@ -32,6 +32,7 @@ import numpy as np
 from .config import Config
 from .environment import file_exists, same_file
 from .model import load_nifly
+from .i18n import t
 
 #: Havok меряет длины в своих единицах; игра - в своих. Это свойство формата NIF,
 #: а не настройка: изменить его нельзя, им можно только пользоваться.
@@ -96,12 +97,12 @@ class Capsule:
             centre = pts[keep].mean(axis=0)
             rel = pts[keep] - centre
         axis = cls._principal(rel)
-        t = rel @ axis
-        across = np.linalg.norm(rel - t[:, None] * axis[None, :], axis=1)
+        along = rel @ axis
+        across = np.linalg.norm(rel - along[:, None] * axis[None, :], axis=1)
         radius = float(np.percentile(across, float(percentile)))
         if radius <= 1e-4:
             return None
-        lo, hi = float(t.min()), float(t.max())
+        lo, hi = float(along.min()), float(along.max())
         # Отступ внутрь на радиус, но не до вырождения: у шара ось схлопывается в точку.
         half = max(0.0, (hi - lo) * 0.5 - radius)
         mid = centre + axis * ((hi + lo) * 0.5)
@@ -145,8 +146,8 @@ class Capsule:
         span = float(axis @ axis)
         if span < 1e-9:
             return np.linalg.norm(pts - self.p1, axis=1) - self.radius
-        t = np.clip(((pts - self.p1) @ axis) / span, 0.0, 1.0)
-        near = self.p1[None, :] + t[:, None] * axis[None, :]
+        along = np.clip(((pts - self.p1) @ axis) / span, 0.0, 1.0)
+        near = self.p1[None, :] + along[:, None] * axis[None, :]
         return np.linalg.norm(pts - near, axis=1) - self.radius
 
     # ---- треугольники для слоя показа -------------------------------------------------
@@ -227,14 +228,14 @@ def split_points(points: np.ndarray, count: int, method: str = "kmeans",
     pts = np.asarray(points, dtype=np.float32).reshape(-1, 3)
     n = max(1, int(count))
     if method not in SPLIT_METHODS:
-        raise ValueError("способ разбиения бывает %s" % ", ".join(SPLIT_METHODS))
+        raise ValueError(t("colliders.badSplit", have=", ".join(SPLIT_METHODS)))
     if pts.shape[0] == 0:
         return []
     if n == 1:
         return [np.arange(pts.shape[0], dtype=np.int32)]
     axis = principal_axis(pts)
-    t = (pts - pts.mean(axis=0)) @ axis
-    order = np.argsort(t, kind="stable")
+    along = (pts - pts.mean(axis=0)) @ axis
+    order = np.argsort(along, kind="stable")
     if method == "axis":
         return [np.sort(chunk.astype(np.int32)) for chunk in np.array_split(order, n) if chunk.size]
     # k-means: начальные центры - середины ломтиков вдоль оси, дальше по близости.
@@ -345,7 +346,7 @@ class ColliderSet:
         pynifly = load_nifly(cfg)
         path = Path(path)
         if not file_exists(path):
-            raise FileNotFoundError("нет файла скелета: %s" % path)
+            raise FileNotFoundError(t("colliders.noSkeletonFile", path=path))
         nif = pynifly.NifFile(str(path))
         names = cls._enum_names()
         bodies: dict[str, CollisionBody] = {}
@@ -452,8 +453,8 @@ class ColliderSet:
     def body(self, bone: str) -> CollisionBody:
         if bone not in self.bodies:
             near = [n for n in self.bodies if bone.lower() in n.lower()]
-            raise KeyError("нет тела на кости %r%s"
-                           % (bone, ("; похожи: " + ", ".join(near)) if near else ""))
+            raise KeyError(t("colliders.noBodyOnBone", bone=bone,
+                             near=t("colliders.similar", names=", ".join(near)) if near else ""))
         return self.bodies[bone]
 
     def find(self, needle: str) -> list[str]:
@@ -518,9 +519,9 @@ class ColliderSet:
     def _join(capsules: list[Capsule], segments: int) -> tuple[np.ndarray, np.ndarray]:
         verts, tris, base = [], [], 0
         for cap in capsules:
-            v, t = cap.mesh(segments)
+            v, faces = cap.mesh(segments)
             verts.append(v)
-            tris.append(t + base)
+            tris.append(faces + base)
             base += v.shape[0]
         if not verts:
             return np.zeros((0, 3), np.float32), np.zeros((0, 3), np.int32)
@@ -617,10 +618,10 @@ class ColliderSet:
         """
         path = Path(path)
         if same_file(path, self.path):
-            raise ValueError("записывать поверх исходного скелета нельзя: назовите новый файл")
+            raise ValueError(t("colliders.noOverwriteSkeleton"))
         changed = self.changed_bodies()
         if not changed:
-            raise ValueError("нечего записывать: ни одно тело не менялось")
+            raise ValueError(t("colliders.nothingChanged"))
         pynifly = load_nifly(cfg or Config())
         from pyn.nifdefs import bhkCapsuleShapeProps, bhkListShapeProps  # noqa: WPS433
         nif = pynifly.NifFile(str(self.path))

@@ -165,6 +165,18 @@ class Catalogue:
         except (KeyError, ValueError, TypeError):
             return "%s [%s]" % (text, ", ".join("%s=%s" % kv for kv in sorted(values.items())))
 
+    def section(self, prefix: str) -> dict[str, str]:
+        """Every text whose key starts with `prefix`, keyed by what follows it.
+
+        A browser page cannot call `t()` - it runs on the other side of the wire - so its
+        whole section travels with the payload as one object, already in the language of
+        this run. The base language fills what the chosen one does not have.
+        """
+        cut = len(prefix)
+        out = {k[cut:]: v for k, v in self.base.items() if k.startswith(prefix)}
+        out.update({k[cut:]: v for k, v in self.texts.items() if k.startswith(prefix)})
+        return out
+
     def missing(self, keys) -> list[str]:
         """Keys the current language has no text for - a check for translators."""
         return sorted(k for k in keys if k not in self.texts and k not in self.base)
@@ -186,3 +198,7 @@ def use(language: str = "auto") -> str:
 
 def t(key: str, **values) -> str:
     return CATALOGUE(key, **values)
+
+
+def section(prefix: str) -> dict[str, str]:
+    return CATALOGUE.section(prefix)

@@ -202,3 +202,10 @@ def t(key: str, **values) -> str:
 
 def section(prefix: str) -> dict[str, str]:
     return CATALOGUE.section(prefix)
+
+
+def language() -> str:
+    """The language this run speaks. The page declares it in `<html lang>`, which is what
+    tells a browser how to hyphenate, which font to reach for and how to read the text
+    aloud."""
+    return CATALOGUE.language

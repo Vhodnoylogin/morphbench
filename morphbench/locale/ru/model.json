@@ -1,0 +1,10 @@
+{
+  "#": "Ядро: меш - части, вершины, треугольники и кости.",
+  "model.noBlock": "в файле нет блока %(block)d (всего %(count)d)",
+  "model.noMeshFile": "нет файла меша: %(path)s",
+  "model.noMorphFile": "нет файла морфов: %(path)s",
+  "model.noShape": "в меше нет части %(name)r; есть: %(have)s",
+  "model.notAShape": "блок %(block)d - %(kind)s, а не часть меша",
+  "model.notTriFile": "не файл морфов TRIP или FRTRI: %(path)s (заголовок %(head)r)",
+  "model.oldBethesda": "файл версии Bethesda %(version)d: раскладка части известна от 100 (SSE)"
+}

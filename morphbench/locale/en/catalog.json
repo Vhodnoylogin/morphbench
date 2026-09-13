@@ -1,0 +1,10 @@
+{
+  "#": "Base language. Every key in use must have a text here: other languages fall back to it.",
+  "#keys": "A key is a latin label, never a sentence. Substitution is by name: %(name)s.",
+  "#adding": "A new section goes into a NEW FILE in this folder - no existing file is rewritten.",
+  "catalog.noEntryName": "the catalogue has no entry %(name)r%(near)s",
+  "catalog.noEntryNumber": "the catalogue has no entry number %(index)d (there are %(count)d)",
+  "catalog.noFolder": "no folder to browse: %(path)s",
+  "catalog.rootNotSet": "no folder to browse: name one outside MO2, or set catalogRoot in the settings",
+  "catalog.similarCount": "; similar ones: %(count)d"
+}

@@ -1,0 +1,17 @@
+{
+  "#": "Настройки Faster HDT-SMP: шапка собранного XML и что говорит проверка готового файла.",
+  "smp.badXml": "XML не разбирается: %(error)s",
+  "smp.chainDropped": ", без кожи отброшено: %(names)s",
+  "smp.chainNote": "%(chain)s: опора %(anchors)s, звеньев %(links)d%(dropped)s",
+  "smp.chains": "цепочки:",
+  "smp.collisionUnnamed": "столкновение с неназванной формой",
+  "smp.jointNowhere": "шарнир на кость, которой нет ни в файле, ни в скелете",
+  "smp.jointUndeclared": "шарнир на кость, не объявленную <bone>",
+  "smp.noBone": "такой кости нет в скелете",
+  "smp.noPart": "такой части нет в меше",
+  "smp.note": "Столкновения SMP считает по вершинам частей меша, капсул по костям он не читает:\nниже только имена частей, на которых лежит кожа цепочек. Подключить файл к части:\ndefaultBBPs.xml, <map shape=\"часть\" file=\"SKSE\\Plugins\\hdtSkinnedMeshConfigs\\этот файл\"/>.",
+  "smp.nothing": "SMP не отдано ни одной годной цепочки: писать нечего",
+  "smp.parts": "части меша с кожей цепочек: форма по их вершинам",
+  "smp.title": "morphbench: настройки Faster HDT-SMP",
+  "smp.titleFor": "morphbench: настройки Faster HDT-SMP для %(title)s"
+}

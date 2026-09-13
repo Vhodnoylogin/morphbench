@@ -1,0 +1,6 @@
+{
+  "#": "Base language. Every key in use must have a text here: other languages fall back to it.",
+  "#keys": "A key is a latin label, never a sentence. Substitution is by name: %(name)s.",
+  "#adding": "A new section goes into a NEW FILE in this folder - no existing file is rewritten.",
+  "#section": "Environment: MO2, usvfs, the game roots. This layer tells a person nothing - it answers yes or no and hands back paths, and the message is written by whoever called it. The file is here so the first text of the section has a home; its keys begin with environment."
+}

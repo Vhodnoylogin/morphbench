@@ -1,0 +1,16 @@
+{
+  "#": "Настройки CBPC: шапка собранного текста и что говорит проверка готового файла.",
+  "cbpc.atLine": "строка %(line)d",
+  "cbpc.atSection": "строка %(line)d, [%(section)s]",
+  "cbpc.badShape": "не сфера (x,y,z,r) и не капсула (x,y,z,r & x,y,z,r): %(line)r",
+  "cbpc.chains": "цепочки:",
+  "cbpc.noBone": "такой кости нет в скелете",
+  "cbpc.noCapsule": "%(bone)s: кожи на капсулу не хватило (%(points)d точек)",
+  "cbpc.note": "Капсулы посажены по коже каждого звена при нынешних ползунках, в системе своей\nкости, в единицах игры; обе половины строки (вес 0 | вес 100) одинаковы.\nТри раздела ниже - три файла CBPC в SKSE\\Plugins\\: каждый раздел вписать в свой.\nУсловие группы (например, IsRaceName(...)) в [ConfigMap] дописывается самому.",
+  "cbpc.nothing": "CBPC не отдано ни одной годной цепочки: писать нечего.",
+  "cbpc.partCollision": "CBPCollisionConfig_*.txt: столкновения",
+  "cbpc.partConfig": "CBPConfig_*.txt: качание группы",
+  "cbpc.partMaster": "CBPCMasterConfig_*.txt, раздел [ConfigMap]: кость = группа",
+  "cbpc.title": "morphbench: настройки CBPC",
+  "cbpc.titleFor": "morphbench: настройки CBPC для %(title)s"
+}

@@ -1,0 +1,17 @@
+{
+  "#": "Faster HDT-SMP settings: the header of the XML written out, and what the check of a ready file has to say.",
+  "smp.badXml": "the XML does not parse: %(error)s",
+  "smp.chainDropped": ", dropped for want of skin: %(names)s",
+  "smp.chainNote": "%(chain)s: anchor %(anchors)s, %(links)d links%(dropped)s",
+  "smp.chains": "chains:",
+  "smp.collisionUnnamed": "a collision with a shape nobody names",
+  "smp.jointNowhere": "a joint onto a bone that is neither in the file nor in the skeleton",
+  "smp.jointUndeclared": "a joint onto a bone that <bone> never declares",
+  "smp.noBone": "the skeleton has no such bone",
+  "smp.noPart": "the mesh has no such part",
+  "smp.note": "SMP works collisions out from the vertices of mesh parts and does not read capsules on bones:\nbelow are only the names of the parts the skin of the chains lies on. To hook the file to a part:\ndefaultBBPs.xml, <map shape=\"part\" file=\"SKSE\\Plugins\\hdtSkinnedMeshConfigs\\this file\"/>.",
+  "smp.nothing": "SMP was not given a single usable chain: nothing to write",
+  "smp.parts": "the mesh parts the skin of the chains lies on: the shape comes from their vertices",
+  "smp.title": "morphbench: Faster HDT-SMP settings",
+  "smp.titleFor": "morphbench: Faster HDT-SMP settings for %(title)s"
+}

@@ -1,0 +1,9 @@
+{
+  "#": "Colliders: reading capsules out of the skeleton, fitting them to the skin, writing them back.",
+  "colliders.badSplit": "the split method is one of %(have)s",
+  "colliders.noBodyOnBone": "no body on bone %(bone)r%(near)s",
+  "colliders.noOverwriteSkeleton": "writing over the source skeleton is refused: name a new file",
+  "colliders.noSkeletonFile": "no skeleton file: %(path)s",
+  "colliders.nothingChanged": "nothing to write: not one body was changed",
+  "colliders.similar": "; similar: %(names)s"
+}

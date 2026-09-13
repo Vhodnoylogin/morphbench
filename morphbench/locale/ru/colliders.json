@@ -1,0 +1,9 @@
+{
+  "#": "Колайдеры: чтение капсул из скелета, посадка по коже, запись обратно.",
+  "colliders.badSplit": "способ разбиения бывает %(have)s",
+  "colliders.noBodyOnBone": "нет тела на кости %(bone)r%(near)s",
+  "colliders.noOverwriteSkeleton": "записывать поверх исходного скелета нельзя: назовите новый файл",
+  "colliders.noSkeletonFile": "нет файла скелета: %(path)s",
+  "colliders.nothingChanged": "нечего записывать: ни одно тело не менялось",
+  "colliders.similar": "; похожи: %(names)s"
+}

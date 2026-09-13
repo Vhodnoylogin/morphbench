@@ -1,0 +1,5 @@
+{
+  "#": "The page's own files: what the assembler says when one of them is not there.",
+  "assets.missing": "the page file %(name)s is not in %(folder)s",
+  "assets.outside": "%(name)s leads outside the page folder"
+}

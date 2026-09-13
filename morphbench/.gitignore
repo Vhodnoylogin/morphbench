@@ -1,0 +1,17 @@
+# What belongs to this module alone. Build products, caches and logs are already
+# ignored repository-wide - see the .gitignore at the root.
+
+# The settings file is made on the first run and every machine has its own.
+morphbench.json
+
+# The entry point for MO2: a build product, built from launcher/morphbench.cs by
+# launcher/build.cmd.
+/morphbench.exe
+# What the launcher window remembers between runs - every machine has its own.
+/morphbench.launcher.json
+/morphbench.diag.json
+/morphbench.diag.png
+
+# Preview of the icon - an intermediate product of make-icon.py. The icon itself, the .ico,
+# is versioned through LFS: those are the bytes that travel inside morphbench.exe.
+/launcher/morphbench.png

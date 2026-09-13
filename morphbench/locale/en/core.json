@@ -1,0 +1,19 @@
+{
+  "#": "Core messages.",
+  "core.allHidden": "nothing to show: every shape of the mesh is hidden",
+  "core.badEngine": "chain %(chain)r: engine %(engine)r, but smp or cbpc was expected",
+  "core.boundsMismatch": "block %(block)d of shape %(shape)r: the sphere in the file (%(centre)s, %(radius).3f) does not match what PyNifly read - the layout is unknown, refusing to write",
+  "core.boundsNeedMorphs": "no morphs open: without them the needed sphere is the rest sphere, nothing to write",
+  "core.capsuleIndex": "bone %(bone)r has %(count)d capsules, and %(index)d was asked for",
+  "core.emptySet": "the set is empty: name at least one slider",
+  "core.morphMovesNothing": "morph %(morph)r moves not a single vertex of the mesh",
+  "core.noBoneMatches": "no bone matches %(needle)r",
+  "core.noMeshOpen": "open a mesh first: open(<path to .nif>)",
+  "core.noMorphFile": "no morph file is open for this mesh",
+  "core.noOverwriteMesh": "writing over the source mesh is refused: name a new file",
+  "core.noSkeletonOpen": "open a skeleton first: open_skeleton(<path to skeleton.nif>)",
+  "core.noSlider": "no slider %(name)r",
+  "core.nothingToDraw": "nothing to draw: every shape of the mesh is hidden",
+  "core.outsideData": "under MO2 browsing is limited to the game Data folder: %(data)s",
+  "core.pairOrder": "pair order: max or gain, not %(value)r"
+}

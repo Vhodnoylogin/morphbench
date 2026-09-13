@@ -1,0 +1,19 @@
+{
+  "#": "Сообщения ядра.",
+  "core.allHidden": "нечего показывать: все части меша скрыты",
+  "core.badEngine": "цепочка %(chain)r: движок %(engine)r, а ожидался smp или cbpc",
+  "core.boundsMismatch": "блок %(block)d части %(shape)r: шар в файле (%(centre)s, %(radius).3f) не совпал с тем, что прочитал PyNifly - раскладка неизвестна, не пишу",
+  "core.boundsNeedMorphs": "морфы не открыты: без них нужный шар - шар покоя, писать нечего",
+  "core.capsuleIndex": "у кости %(bone)r капсул %(count)d, а спрошена %(index)d",
+  "core.emptySet": "набор пуст: задайте хотя бы один ползунок",
+  "core.morphMovesNothing": "морф %(morph)r не двигает ни одной вершины меша",
+  "core.noBoneMatches": "ни одна кость не подходит под %(needle)r",
+  "core.noMeshOpen": "сначала откройте меш: open(<путь к .nif>)",
+  "core.noMorphFile": "к этому мешу не открыт файл морфов",
+  "core.noOverwriteMesh": "записывать поверх исходного меша нельзя: назовите новый файл",
+  "core.noSkeletonOpen": "сначала откройте скелет: open_skeleton(<путь к skeleton.nif>)",
+  "core.noSlider": "нет ползунка %(name)r",
+  "core.nothingToDraw": "нечего рисовать: все части меша скрыты",
+  "core.outsideData": "под MO2 обзор ограничен папкой Data игры: %(data)s",
+  "core.pairOrder": "порядок пар: max или gain, а не %(value)r"
+}

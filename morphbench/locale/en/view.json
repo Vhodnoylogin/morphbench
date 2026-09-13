@@ -1,0 +1,7 @@
+{
+  "#": "Core: the state of the view - the camera, the light, the colouring.",
+  "view.badColouring": "colouring is one of %(have)s",
+  "view.badPower": "a light power must be a finite number",
+  "view.noPreset": "no such view %(name)r; there are: %(have)s",
+  "view.zeroLight": "the light direction must be finite and non-zero"
+}

@@ -1,0 +1,16 @@
+{
+  "#": "CBPC settings: the header of the text written out, and what the check of a ready file has to say.",
+  "cbpc.atLine": "line %(line)d",
+  "cbpc.atSection": "line %(line)d, [%(section)s]",
+  "cbpc.badShape": "neither a sphere (x,y,z,r) nor a capsule (x,y,z,r & x,y,z,r): %(line)r",
+  "cbpc.chains": "chains:",
+  "cbpc.noBone": "the skeleton has no such bone",
+  "cbpc.noCapsule": "%(bone)s: not enough skin for a capsule (%(points)d points)",
+  "cbpc.note": "The capsules are fitted to the skin of every link at the sliders as they stand now, in the space\nof their own bone, in game units; both halves of a line (weight 0 | weight 100) are the same.\nThe three sections below are three CBPC files in SKSE\\Plugins\\: put each section into its own.\nThe condition of a group (IsRaceName(...), say) in [ConfigMap] is written in by hand.",
+  "cbpc.nothing": "CBPC was not given a single usable chain: nothing to write.",
+  "cbpc.partCollision": "CBPCollisionConfig_*.txt: collisions",
+  "cbpc.partConfig": "CBPConfig_*.txt: how the group swings",
+  "cbpc.partMaster": "CBPCMasterConfig_*.txt, section [ConfigMap]: bone = group",
+  "cbpc.title": "morphbench: CBPC settings",
+  "cbpc.titleFor": "morphbench: CBPC settings for %(title)s"
+}

@@ -1,0 +1,18 @@
+{
+  "#": "The local server: what the launch says about a port, and what a request is refused with.",
+  "#keys": "A key is a latin label, never a sentence. Substitution is by name: %(name)s.",
+  "#adding": "A new section goes into a NEW FILE in this folder - no existing file is rewritten.",
+  "serve.alreadyUp": "already up: %(url)s",
+  "serve.foreignServer": "the server at %(url)s was started outside MO2 and cannot see the build's meshes; close it and start again from inside MO2",
+  "serve.handedRoot": "browsing: %(root)s (%(meshes)d meshes)",
+  "serve.indexNotANumber": "index must be a whole number, not %(value)r",
+  "serve.leavingWithParent": "process %(pid)d, which started the server, has ended - leaving with it",
+  "serve.meshNotOpen": "no mesh open: name one with the name= or index= key",
+  "serve.noSuchPath": "no such path: %(path)s",
+  "serve.notMorphbench": "whatever answers at %(url)s, it is not morphbench",
+  "serve.openMeshOnPage": "the server is already up at %(url)s: pick a mesh on the page, --nif does not apply here",
+  "serve.parentGone": "the process that started the server (%(pid)d) is already gone",
+  "serve.portSilent": "something is at %(url)s but did not answer within %(seconds).0f s: if that is our server walking a large folder, try again later",
+  "serve.portTaken": "port %(port)d is taken by another program; name a different one with --port",
+  "serve.rootNotGiven": "no browse root: name a folder with the root= key"
+}

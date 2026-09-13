@@ -1,0 +1,10 @@
+{
+  "#": "Base language. Every key in use must have a text here: other languages fall back to it.",
+  "#keys": "A key is a latin label, never a sentence. Substitution is by name: %(name)s.",
+  "#adding": "A new section goes into a NEW FILE in this folder - no existing file is rewritten.",
+  "#section": "The journal: a level it does not know, a sink that dropped out, a stream that is not there. The level names (debug, info, warn, error) are settings the code reads, not texts, and stay as they are in every language.",
+  "journal.badLevel": "unknown journal level %(level)r; known levels: %(known)s",
+  "journal.configProblem": "journal settings: %(problem)s",
+  "journal.noStream": "there is no stream to write to",
+  "journal.sinkDown": "sink %(sink)s dropped out: %(error)s"
+}

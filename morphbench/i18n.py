@@ -80,19 +80,59 @@ class Catalogue:
 
     # ---- languages --------------------------------------------------------------------
     def available(self) -> list[str]:
+        """Languages on offer: a folder per language, plus a single file for anyone who
+        prefers one."""
         try:
-            return sorted(p.stem for p in self.folder.glob("*.json"))
+            names = {p.name for p in self.folder.iterdir() if p.is_dir()}
+            names |= {p.stem for p in self.folder.glob("*.json")}
         except OSError:
             return []
+        return sorted(names)
 
     def _read(self, language: str) -> dict[str, str]:
-        path = self.folder / ("%s.json" % language)
-        try:
-            data = json.loads(path.read_text(encoding="utf-8-sig"))
-        except (OSError, ValueError) as e:
-            self.problem = "%s: %s" % (path.name, e)
-            return {}
-        return {str(k): str(v) for k, v in data.items() if not str(k).startswith("#")}
+        """Every text of one language.
+
+        A language is a folder holding any number of files, one per section
+        (`cli.json`, `page.json`, `journal.json`). They are merged into one dictionary,
+        so a new section arrives as a NEW FILE and no existing file is rewritten - which
+        is the whole point: two people adding two sections do not collide. A single
+        `<lang>.json` next to the folders is read as well, for a language small enough
+        not to need splitting.
+
+        The same key declared in two files of one language is a layout mistake, not a
+        precedence rule: the first one wins and the clash is reported rather than
+        swallowed.
+        """
+        texts: dict[str, str] = {}
+        owner: dict[str, str] = {}
+        clashes = []
+        paths = []
+        flat = self.folder / ("%s.json" % language)
+        if flat.is_file():
+            paths.append(flat)
+        folder = self.folder / language
+        if folder.is_dir():
+            paths += sorted(folder.glob("*.json"))
+        for path in paths:
+            try:
+                data = json.loads(path.read_text(encoding="utf-8-sig"))
+            except (OSError, ValueError) as e:
+                self.problem = "%s: %s" % (path.name, e)
+                continue
+            for key, value in data.items():
+                key = str(key)
+                if key.startswith("#"):          # a note to the translator, not a text
+                    continue
+                if key in texts:
+                    # Plain English on purpose: a catalogue cannot report its own failure
+                    # through itself, and this is read by whoever laid the files out.
+                    clashes.append("%s: %s and %s" % (key, owner[key], path.name))
+                    continue
+                texts[key] = str(value)
+                owner[key] = path.name
+        if clashes:
+            self.problem = "; ".join(clashes[:5])
+        return texts
 
     def use(self, language: str = "auto") -> str:
         """Switch the language. An unknown one is not an error - the base language stays."""

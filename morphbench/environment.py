@@ -11,7 +11,9 @@ MO2 подменяет файловую систему запущенному п
 from __future__ import annotations
 
 import ctypes
+import os
 import sys
+import time
 from pathlib import Path
 
 # Игры семейства, чьи меши читает nifly; порядок - предпочтение при выборе корня.
@@ -23,6 +25,11 @@ _GAME_KEYS = (
     ("Fallout 4 VR", r"SOFTWARE\WOW6432Node\Bethesda Softworks\Fallout 4 VR"),
 )
 _USVFS = ("usvfs_x64.dll", "usvfs_x86.dll")
+# Права и ответы kernel32 для ожидания чужого процесса: SYNCHRONIZE даёт ровно право ждать,
+# и больше ничего, поэтому его хватает и для процесса под другими правами.
+_SYNCHRONIZE = 0x00100000
+_WAIT_TIMEOUT = 0x00000102
+_INFINITE = 0xFFFFFFFF
 
 
 def dir_exists(path) -> bool:
@@ -48,6 +55,46 @@ def file_exists(path) -> bool:
             return True
     except OSError:
         return False
+
+
+def process_alive(pid: int) -> bool:
+    """Жив ли процесс с таким номером. Нужно долгоживущим службам, которым нельзя
+    пережить того, кто их поднял."""
+    pid = int(pid)
+    if pid <= 0:
+        return False
+    if sys.platform != "win32":
+        try:
+            os.kill(pid, 0)                  # сигнал 0 ничего не делает, только проверяет
+            return True
+        except ProcessLookupError:
+            return False
+        except PermissionError:
+            return True                      # чужой, но существует
+    handle = ctypes.windll.kernel32.OpenProcess(_SYNCHRONIZE, False, pid)
+    if not handle:
+        return False
+    try:
+        # Ноль миллисекунд: ожидание, которое не ждёт. WAIT_TIMEOUT - процесс ещё жив.
+        return ctypes.windll.kernel32.WaitForSingleObject(handle, 0) == _WAIT_TIMEOUT
+    finally:
+        ctypes.windll.kernel32.CloseHandle(handle)
+
+
+def wait_process(pid: int, poll: float = 1.0) -> None:
+    """Ждать, пока процесс не завершится. Windows умеет ждать по-настоящему, без опроса;
+    где не умеет - опрос раз в `poll` секунд. Несуществующий номер - возврат сразу."""
+    pid = int(pid)
+    if sys.platform == "win32":
+        handle = ctypes.windll.kernel32.OpenProcess(_SYNCHRONIZE, False, pid)
+        if handle:
+            try:
+                ctypes.windll.kernel32.WaitForSingleObject(handle, _INFINITE)
+                return
+            finally:
+                ctypes.windll.kernel32.CloseHandle(handle)
+    while process_alive(pid):
+        time.sleep(max(0.1, float(poll)))
 
 
 def same_file(a, b) -> bool:

@@ -1,4 +1,4 @@
-﻿# Продукты сборки и окружения в репозиторий не попадают.
+# Продукты сборки и окружения в репозиторий не попадают.
 build/
 dist/
 .venv/
@@ -26,7 +26,7 @@ morphbench.json
 /morphbench.diag.json
 /morphbench.diag.png
 
-# Значок - продукт make-icon.py, а не исходник.
-launcher/morphbench.ico
+# Предпросмотр значка - промежуточный продукт make-icon.py. Сам значок .ico
+# версионируется через LFS: именно его байты уезжают внутрь morphbench.exe.
 launcher/morphbench.png
 morphbench.exe

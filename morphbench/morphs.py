@@ -1,7 +1,23 @@
-"""Именованные морфы: смещения вершин, хранимые под именем ползунка.
+"""Named morphs: vertex offsets kept under the name of a slider.
 
-Форматов два, и оба читаются штатными модулями PyNifly: TRIP (`PIRT`) — тот, которым живут
-морфы тела, и FRTRI — лицевой. Своего разбора здесь нет.
+There are two formats, and PyNifly's own modules read both: TRIP (`PIRT`), which is what
+body morphs live in, and FRTRI, the face one. Nothing is parsed here. This layer only turns
+what PyNifly hands back into `Morph` objects and files them by shape and by slider name.
+
+Which of the two a file holds is decided by its first bytes, not by its name: both arrive
+as `.tri`, and a file that is neither is refused by its header instead of being mis-read.
+
+The two formats do not store the same thing, and that difference is levelled out here.
+TRIP already holds offsets - a vertex number and the shift applied to it. FRTRI holds whole
+vertex clouds, one per morph, and keeps the unmoved one under the name `Basis`; the offset
+is the difference against that cloud, and a shift shorter than `frtriEpsilon` is the file's
+own rounding rather than a movement, or every vertex of the mesh would count as moved.
+
+Two things here look like mistakes and are not. A morph that moves no vertex at all is kept
+rather than dropped: it is in the file, it takes a value and it reads back, so only a tool
+that shows it can tell its owner that the slider does nothing. And a vertex number past the
+end of the shape is clipped rather than raised on: it means the morph file was built against
+a different mesh, and falling over in the middle of a report is worse than a short answer.
 """
 from __future__ import annotations
 
@@ -16,8 +32,9 @@ from .i18n import t
 
 
 def _module(name: str, path: Path):
-    """Пакет `tri` целиком импортировать нельзя: его __init__ тянет bpy, которого вне
-    Blender нет. Сами разборщики от bpy не зависят и грузятся по файлу."""
+    """The `tri` package cannot be imported whole: its `__init__` pulls in bpy, which does
+    not exist outside Blender. The parsers themselves do not depend on bpy, so they are
+    loaded from their files."""
     spec = importlib.util.spec_from_file_location(name, path)
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
@@ -25,7 +42,7 @@ def _module(name: str, path: Path):
 
 
 class Morph:
-    """Один ползунок на одной части меша: какие вершины он двигает и насколько."""
+    """One slider on one shape of the mesh: which vertices it moves, and by how much."""
 
     __slots__ = ("name", "shape_name", "indices", "offsets")
 
@@ -42,8 +59,8 @@ class Morph:
 
     @property
     def is_empty(self) -> bool:
-        """Пустой морф — тихая поломка: он есть в файле, принимает значение и читается
-        обратно, но не двигает ни одной вершины."""
+        """An empty morph is a quiet breakage: it is in the file, it takes a value and
+        reads back by the same number - and yet it moves not a single vertex."""
         return self.vertex_count == 0
 
     def lengths(self) -> np.ndarray:
@@ -62,27 +79,29 @@ class Morph:
         return float(lens.mean()) if lens.size else 0.0
 
     def apply(self, verts: np.ndarray, amount: float = 1.0) -> np.ndarray:
-        """Возвращает новое облако вершин; исходное не трогается."""
+        """A new cloud of vertices; the one passed in is left alone."""
         if self.is_empty or amount == 0.0:
             return verts
         out = verts.copy()
+        # A morph built against a bigger mesh: numbers past the end are dropped, because
+        # a wrong row in a report beats an IndexError in the middle of one.
         keep = self.indices < verts.shape[0]
         out[self.indices[keep]] += self.offsets[keep] * np.float32(amount)
         return out
 
     def region(self, shape) -> tuple[np.ndarray, np.ndarray] | None:
-        """Где на теле лежат вершины, которые морф двигает."""
+        """Whereabouts on the body the vertices this morph moves lie."""
         if self.is_empty:
             return None
         return shape.bounds(self.indices)
 
     def __repr__(self) -> str:
-        return "Morph(%r/%r, вершин=%d, макс=%.2f)" % (
+        return "Morph(%r/%r, vertices=%d, max=%.2f)" % (
             self.shape_name, self.name, self.vertex_count, self.max_shift)
 
 
 class MorphSet:
-    """Файл морфов целиком: морфы, разложенные по частям меша."""
+    """A whole morph file: its morphs, laid out by shape of the mesh."""
 
     def __init__(self, path: Path, kind: str, by_shape: dict[str, dict[str, Morph]]):
         self.path = Path(path)
@@ -120,13 +139,14 @@ class MorphSet:
             tri = trifile.from_filepath(str(path))
             shape_name = path.stem
             slot = by_shape.setdefault(shape_name, {})
-            # TriFile отдаёт морфы АБСОЛЮТНЫМИ координатами вершин, а базу кладёт под именем
-            # Basis. Смещение - разность с базой; Basis ползунком не является.
+            # TriFile hands the morphs back as ABSOLUTE vertex positions and keeps the base
+            # under the name Basis. The offset is the difference against that base; Basis
+            # is not a slider.
             base = np.asarray(tri.morphs.get("Basis", tri.vertices),
                               dtype=np.float32).reshape(-1, 3)
             morphs = dict(tri.morphs)
             for name, verts in (getattr(t, "modmorphs", None) or {}).items():
-                # Частичный морф с именем обычного не затирает его, а идёт рядом.
+                # A partial morph with the name of a full one goes beside it, not over it.
                 morphs[name if name not in morphs else name + " (mod)"] = verts
             epsilon = float(cfg["frtriEpsilon"])
             for morph_name, verts in morphs.items():
@@ -155,8 +175,8 @@ class MorphSet:
         return self.by_shape.get(shape_name, {}).get(morph_name)
 
     def for_morph(self, morph_name: str) -> dict[str, Morph]:
-        """Все части меша, которых касается этот ползунок. По нему видно, следует ли
-        оболочка шерсти за кожей и с какой амплитудой."""
+        """Every shape of the mesh this slider touches. It shows whether an outer layer
+        follows the skin beneath it, and with what amplitude."""
         return {shape: morphs[morph_name]
                 for shape, morphs in self.by_shape.items() if morph_name in morphs}
 
@@ -165,5 +185,5 @@ class MorphSet:
                 for m in morphs.values() if m.is_empty]
 
     def __repr__(self) -> str:
-        return "MorphSet(%r, %s, частей=%d, ползунков=%d)" % (
+        return "MorphSet(%r, %s, shapes=%d, sliders=%d)" % (
             self.path.name, self.kind, len(self.by_shape), len(self.names()))

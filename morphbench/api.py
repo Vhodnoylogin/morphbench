@@ -1,13 +1,35 @@
-"""Фасад верстака — набор методов, которым пользуются все слои поверх.
+"""The workbench facade - the one set of methods every layer above it goes through.
 
-Это и есть API программы: не веб-служба, а интерфейс объекта. Командная строка, растеризатор,
-страница в браузере и будущее окно — равноправные клиенты одного и того же набора методов.
-Правило, по которому здесь проведена граница: **любое действие интерфейса обязано быть вызовом
-отсюда.** Если что-то можно сделать кнопкой и нельзя — вызовом, значит фасад неполон.
+This is the program's API: not a web service, the interface of an object. The command line,
+the rasteriser, the page in the browser and the window that may come later are equal clients
+of one and the same set of methods. That is where the line is drawn here: **every action an
+interface offers has to be a call into this file.** If something can be done with a button and
+cannot be done with a call, the facade is incomplete - and the answer is a method here, not a
+piece of logic grown inside a presenter.
 
-Ничего про изображение здесь нет. Самое «графическое», что фасад умеет, — отдать облако вершин
-с применёнными значениями ползунков, признак раскраски числом и хранить числовое состояние
-показа, включая наведение камеры на часть тела.
+The name of a method is part of the contract: the page's script mirrors this file, and every
+button there calls a `MorphBench` method of the same name, so a feature is looked up in one
+place and explained once. There is deliberately nowhere else for a caller to reach - nothing
+above this file talks to the model, the morphs or the skeleton directly.
+
+The tables and the state that come back are plain data - numbers, strings, lists and
+dictionaries - and go into `json.dumps` with no help. Key names are part of that wire, so they
+never move with the language; every sentence a person reads comes out of the message
+catalogue, which is why no text is written down here. Bulk geometry is the one exception, and
+a deliberate one: vertices, normals and colouring keys come back as numpy arrays. They are
+drawn from rather than read, and a presenter packs them into arrays of its own; spelling them
+out as lists on the way would buy nothing.
+
+There is nothing about the image in here. The most "graphical" things the facade does are to
+hand out the cloud of vertices with the slider values applied, to hand out the colouring key
+as a number per vertex, and to hold the numeric state of the view, aiming the camera at a body
+part included. Turning a key into a colour, a state into pixels or a slider into a widget is a
+presenter's business, and the facade refuses to know about it - which is exactly what lets the
+page and the PNG be built from the same state and agree to the last digit.
+
+It refuses one more thing: to write over what it read. A mesh and a skeleton belong to someone
+else's mod, so `bounds_write` and `collider_save` insist on a new file, and edits travel as a
+mod of their own.
 """
 from __future__ import annotations
 
@@ -30,7 +52,7 @@ from .view import ViewState
 
 
 class MorphBench:
-    """Открытая пара «меш + морфы» и всё, что с ней можно сделать."""
+    """The open pair - a mesh and its morphs - and everything that can be done with it."""
 
     def __init__(self, config: Config | None = None):
         self.cfg = config or Config()
@@ -43,9 +65,10 @@ class MorphBench:
         self._sliders: dict[str, float] = {}
         self._catalogs: dict[tuple[str, bool], Catalog] = {}
 
-    # ---- окружение и обзор мешей ------------------------------------------------------
+    # ---- the environment, and browsing for meshes -------------------------------------
     def environment(self) -> dict:
-        """Под MO2 ли мы, какие игры установлены и какой корень обзора по умолчанию."""
+        """Whether we are under MO2, which games are installed, and the default root to
+        browse from."""
         return self.env.describe()
 
     def _catalog_root(self, root) -> Path:
@@ -59,8 +82,9 @@ class MorphBench:
         return root
 
     def catalog(self, root=None, with_morphs: bool = True, rescan: bool = False) -> list[dict]:
-        """Меши под корнем с подобранными файлами морфов. Корень None - умолчание
-        окружения: под MO2 это Data игры. Обход делается один раз на корень."""
+        """Meshes under the root with their morph files matched up. A root of None is the
+        environment's default: under MO2 that is the game's Data folder. The walk is done
+        once per root."""
         root = self._catalog_root(root)
         key = (os.path.normcase(str(root)), bool(with_morphs))
         cat = self._catalogs.get(key)
@@ -70,23 +94,25 @@ class MorphBench:
         return cat.as_dicts()
 
     def open_entry(self, key, root=None, with_morphs: bool = True) -> dict:
-        """Открыть меш из обзора по номеру в списке или по имени (пути от корня)."""
+        """Open a mesh from the listing - by its number there, or by name (the path from the
+        root)."""
         root = self._catalog_root(root)
         self.catalog(root, with_morphs)
         entry = self._catalogs[(os.path.normcase(str(root)), bool(with_morphs))].get(key)
         summary = self.open(entry.nif, entry.tri)
-        summary["entry"] = entry.name          # какую запись обзора открыли
+        summary["entry"] = entry.name          # which entry of the listing was opened
         summary["root"] = str(root)
         return summary
 
-    # ---- открытие ---------------------------------------------------------------------
+    # ---- opening ----------------------------------------------------------------------
     def open(self, nif, tri=None, skeleton=None) -> dict:
-        """Открывает меш и, если они есть, файл морфов и скелет рядом.
+        """Open a mesh and, if there are any, the morph file and the skeleton beside it.
 
-        Без явного пути морфы ищутся по соседству: то же имя без суффикса веса, .tri.
-        Скелет - файл `skeletonFile` из настроек в той же папке: у тел персонажей он
-        лежит рядом, и капсулы столкновений открываются вместе с телом. Пустая строка
-        вместо пути - не искать.
+        With no path given, the morphs are looked for next door: the same name without the
+        weight suffix, ending in .tri. The skeleton is the file named by `skeletonFile` in the
+        settings, taken from that same folder: for character bodies it lies right there, so the
+        collision capsules open together with the body. An empty string instead of a path means
+        do not look.
         """
         self.model = BodyModel.from_nif(nif, self.cfg)
         path = Path(nif)
@@ -108,7 +134,8 @@ class MorphBench:
         return self.summary()
 
     def _skeleton_beside(self, nif: Path) -> Path | None:
-        """Файл скелета в папке меша, без учёта регистра имени; None - его там нет."""
+        """The skeleton file in the mesh's folder, matched with no regard to case; None when
+        it is not there."""
         want = str(self.cfg["skeletonFile"] or "").lower()
         if not want:
             return None
@@ -121,8 +148,8 @@ class MorphBench:
         return None
 
     def attach(self, model: BodyModel, morph_set: MorphSet | None = None) -> dict:
-        """Открыть уже построенные объекты вместо файлов: так проверки собирают крошечное
-        тело в памяти и спрашивают фасад о нём точно так же, как о настоящем."""
+        """Open objects already built instead of files: this is how the tests put a tiny body
+        together in memory and ask the facade about it exactly as about a real one."""
         self.model = model
         self.morph_set = morph_set
         self.analyzer = self._analyzer() if morph_set is not None else None
@@ -131,7 +158,8 @@ class MorphBench:
         return self.summary()
 
     def _analyzer(self) -> Analyzer:
-        """Разборщик получает все пороги из настроек: единственное место, где они заданы."""
+        """The analyser gets every threshold from the settings: the single place they are
+        written down."""
         cfg = self.cfg
         return Analyzer(self.model, self.morph_set,
                         contact_radius=float(cfg["contactRadius"]),
@@ -142,7 +170,7 @@ class MorphBench:
                         bone_min_vertices=int(cfg["boneMinVertices"]))
 
     def base_shape(self) -> str:
-        """Имя базовой части - кожи, за которой следуют оболочки, - из настроек."""
+        """Name of the base shape - the skin the outer layers follow - from the settings."""
         return str(self.cfg["baseShape"])
 
     def is_open(self) -> bool:
@@ -174,7 +202,7 @@ class MorphBench:
                        "max": [round(float(x), 1) for x in hi]},
         }
 
-    # ---- вопросы к мешу ---------------------------------------------------------------
+    # ---- questions about the mesh -----------------------------------------------------
     def shapes(self) -> list[dict]:
         self._require()
         out = []
@@ -202,7 +230,7 @@ class MorphBench:
                 for k, v in sorted(acc.items(), key=lambda kv: -kv[1])]
 
     def shape_bone_names(self, shape: str) -> list[str]:
-        """Имена костей части в том порядке, в каком их нумерует признак `bone`."""
+        """Bone names of a shape, in the order the `bone` key numbers them."""
         self._require()
         return self.model.shape(shape).bone_order()
 
@@ -211,8 +239,8 @@ class MorphBench:
         return self.morph_set.names()
 
     def morph_deltas(self, shape: str, morph: str) -> dict | None:
-        """Смещения одного морфа на одной части: номера вершин и векторы сдвига.
-        None, если морф этой части не касается."""
+        """The offsets of one morph on one shape: vertex numbers and the vectors they move
+        by. None when the morph does not touch this shape."""
         self._require_morphs()
         m = self.morph_set.get(shape, morph)
         if m is None:
@@ -220,10 +248,10 @@ class MorphBench:
         return {"indices": m.indices, "offsets": m.offsets}
 
     def presets(self) -> dict:
-        """Ракурсы из настроек: имя -> [поворот, подъём]."""
+        """The views from the settings: name -> [yaw, pitch]."""
         return {k: list(v) for k, v in self.cfg["views"].items()}
 
-    # ---- разборы ----------------------------------------------------------------------
+    # ---- analyses ---------------------------------------------------------------------
     def morph_stats(self, morph: str | None = None, shape: str | None = None) -> list[dict]:
         self._require_morphs()
         return [s.as_dict() for s in self.analyzer.morph_stats(morph, shape)]
@@ -238,16 +266,17 @@ class MorphBench:
 
     def strain(self, amount: float = 1.0, threshold: float | None = None,
                morph: str | None = None) -> list[dict]:
-        """Порог None - strainThreshold из настроек."""
+        """A threshold of None means `strainThreshold` from the settings."""
         self._require_morphs()
         return [s.as_dict() for s in self.analyzer.strain_report(amount, threshold, morph)]
 
     def strain_set(self, values: dict | None = None, threshold: float | None = None) -> list[dict]:
-        """Растяжение рёбер при НАБОРЕ ползунков, а не от одного морфа.
+        """Edge strain under a SET of sliders, rather than from a single morph.
 
-        `values` - {морф: величина}; None - нынешние ползунки (`sliders()`). Строки те же,
-        что у `strain`, с полем `sliders` вместо `morph`; порог None - из настроек.
-        Пустой набор - отказ: мерить нечего, и молчать об этом нельзя.
+        `values` is {morph: amount}; None means the sliders as they stand (`sliders()`). The
+        rows are the ones `strain` gives, with a `sliders` field in place of `morph`; a
+        threshold of None comes from the settings. An empty set is refused: there is nothing
+        to measure, and keeping quiet about that would pass for an answer.
         """
         self._require_morphs()
         values = self.sliders() if values is None else dict(values)
@@ -262,9 +291,10 @@ class MorphBench:
 
     def strain_pairs(self, amount: float = 1.0, threshold: float | None = None,
                      top: int | None = 10, by: str = "max") -> list[dict]:
-        """Перебор пар ползунков: худшие `top` с `gain` - на сколько пара рвёт сильнее
-        худшего из двух одиночных. `by` - "max" (по наибольшему растяжению) или "gain"
-        (по прибавке: что даёт именно сочетание). `top` None или 0 - все."""
+        """Every pair of sliders tried: the worst `top` of them, with `gain` - how much harder
+        the pair tears than the worse of the two on its own. `by` is "max" (by the largest
+        strain) or "gain" (by the addition: what the combination itself brings). `top` of None
+        or 0 means all of them."""
         self._require_morphs()
         rows = self.analyzer.strain_pairs(amount, threshold, top, by)
         for row in rows:
@@ -273,9 +303,9 @@ class MorphBench:
         return rows
 
     def budget(self, threshold: float | None = None) -> list[dict]:
-        """Бюджет амплитуд: на какой величине каждый ползунок переходит порог растяжения.
-        Пределы поиска - `sliderRange`, точность - `budgetResolution` из настроек;
-        `limit` None - в пределах не рвёт."""
+        """The budget of amplitudes: at which amount each slider crosses the strain threshold.
+        The search runs within `sliderRange` to a precision of `budgetResolution` from the
+        settings; a `limit` of None means it does not tear within that range."""
         self._require_morphs()
         lo, hi = (float(x) for x in self.cfg["sliderRange"])
         rows = self.analyzer.budget(threshold, lo, hi, float(self.cfg["budgetResolution"]))
@@ -287,9 +317,9 @@ class MorphBench:
 
     def layers(self, morph: str, base: str | None = None,
                only_adjacent: bool = False) -> list[dict]:
-        """Следуют ли оболочки за базовой частью (None - baseShape из настроек).
-        `only_adjacent` оставляет лишь те, что лежат над сдвигаемой кожей и потому
-        обязаны следовать."""
+        """Whether the outer layers follow the base shape (None is `baseShape` from the
+        settings). `only_adjacent` keeps only those lying over skin that is being moved and
+        therefore obliged to follow."""
         self._require_morphs()
         base = self.base_shape() if base is None else base
         return [s.as_dict() for s in self.analyzer.layers(morph, base, only_adjacent)]
@@ -305,7 +335,7 @@ class MorphBench:
         return [{"bone": n, "leftBehind": round(v, 3)}
                 for n, v in self.analyzer.bones_left_behind(shape, morph, min_share)]
 
-    # ---- ползунки ---------------------------------------------------------------------
+    # ---- sliders ----------------------------------------------------------------------
     def set_slider(self, name: str, value: float) -> dict:
         self._require_morphs()
         if name not in self.morph_set.names():
@@ -328,9 +358,10 @@ class MorphBench:
         self._sliders.clear()
         return {}
 
-    # ---- цепочки для качающейся физики ------------------------------------------------
+    # ---- chains for the swinging physics ----------------------------------------------
     def bone_counts(self, shapes=None) -> dict[str, dict[str, int]]:
-        """Сколько вершин каких частей держит каждая кость по-настоящему (как главная)."""
+        """How many vertices of which shapes each bone really holds - holds as the dominant
+        one."""
         self._require()
         out: dict[str, dict[str, int]] = {}
         for name in (list(shapes) if shapes else self.model.shape_names()):
@@ -348,9 +379,9 @@ class MorphBench:
         return out
 
     def chains(self, engine: str | None = None, shapes=None) -> list[dict]:
-        """Цепочки костей с номерами: по звену - сколько вершин каких частей, где обрыв,
-        годится ли цепочка, чтобы её качали, и кому она отдана (`chainEngines`).
-        `engine` оставляет только цепочки этого движка."""
+        """Numbered chains of bones: per link, how many vertices of which shapes, where the
+        chain breaks, whether it is fit to be swung at all, and which engine it is given to
+        (`chainEngines`). `engine` keeps only the chains of that engine."""
         self._require()
         parents = self.rig.parents if self.rig is not None else None
         engines = dict(self.cfg.get("chainEngines") or {})
@@ -361,16 +392,18 @@ class MorphBench:
         return rows
 
     def skeleton_bones(self) -> list[str]:
-        """Кости, которые есть в скелете (открыт скелет) либо в привязках меша."""
+        """The bones the skeleton has, when one is open, otherwise those the mesh is weighted
+        to."""
         if self.rig is not None:
             return sorted(self.rig.matrices)
         self._require()
         return self.model.bone_names()
 
     def assign_chains(self, engines: dict | None = None) -> dict:
-        """Кому отдана цепочка - на этот запуск, поверх `chainEngines` из настроек:
-        подстрока ствола -> «smp» или «cbpc». Названное здесь сверяется первым, файл
-        настроек не трогается. Возвращает действующее назначение."""
+        """Which engine a chain is given to - for this run, on top of `chainEngines` from the
+        settings: a substring of the root bone -> "smp" or "cbpc". What is named here is
+        matched first, and the settings file is not touched. Returns the assignment in
+        force."""
         if engines:
             merged = {}
             for needle, engine in engines.items():
@@ -385,18 +418,20 @@ class MorphBench:
 
     def chain_capsules(self, engine: str | None = None, percentile: float | None = None,
                        min_weight: float | None = None, shapes=None) -> list[dict]:
-        """Цепочки (`chains`) с опорой в дереве костей и капсулой по коже каждого звена -
-        в системе этой кости, как их ждут настройки качающей физики.
+        """The chains (`chains`) with their anchor in the bone tree and a capsule over the
+        skin of every link - in that bone's own frame, the way the settings of the swinging
+        physics want them.
 
-        Звено цепочки своего тела в скелете обычно не имеет, поэтому капсула садится
-        по `skin_points` звена тем же способом, что и `fit`, и никуда не применяется:
-        это замер, а не правка скелета. Звено, на котором кожи нет, капсулы не получает.
+        A link of a chain usually has no body of its own in the skeleton, so its capsule is
+        fitted to the link's `skin_points` the same way `fit` does it, and is applied nowhere:
+        this is a measurement, not an edit of the skeleton. A link with no skin on it gets no
+        capsule.
         """
         self._require()
         self._require_rig()
         pct = float(self.cfg["colliderFitPercentile"] if percentile is None else percentile)
-        # Одни и те же части и для счёта вершин, и для точек: по чему садиться, решает
-        # состав видимых частей, как у `fit`.
+        # The same shapes both for counting vertices and for the points: what a capsule is
+        # fitted to is decided by which shapes are visible, exactly as in `fit`.
         shapes = list(shapes) if shapes else self.visible_shapes()
         out = []
         for row in self.chains(engine, shapes):
@@ -411,9 +446,10 @@ class MorphBench:
                         "links": links})
         return out
 
-    # ---- шары охвата ------------------------------------------------------------------
+    # ---- bounding spheres -------------------------------------------------------------
     def reach(self, shape_name: str) -> Reach:
-        """Во что может превратиться часть: покой и все морфы в пределах ползунков."""
+        """What a shape can turn into: the rest pose and every morph within the slider
+        range."""
         self._require()
         shape = self.model.shape(shape_name)
         deltas = {}
@@ -426,7 +462,7 @@ class MorphBench:
         return Reach(shape.verts, deltas, lo, hi)
 
     def _bounds(self, shape: str | None = None, margin: float | None = None):
-        """Строки `bounds` и рядом - нужные шары без округления, для записи."""
+        """The `bounds` rows and, beside them, the needed spheres unrounded, for writing."""
         self._require()
         margin = float(self.cfg["boundsMargin"] if margin is None else margin)
         tol = float(self.cfg["boundsTolerance"])
@@ -456,29 +492,33 @@ class MorphBench:
         return rows, spheres
 
     def bounds(self, shape: str | None = None, margin: float | None = None) -> list[dict]:
-        """Шары охвата: какой записан в файле, куда тянется геометрия и какой нужен.
+        """The bounding spheres: the one written in the file, how far the geometry reaches,
+        and the one it needs.
 
-        `reach` - как далеко от центра ФАЙЛОВОГО шара уходит часть при худшем наборе
-        ползунков (точный перебор углов куба значений, `Reach.reach_exact`); `excess` -
-        на сколько это дальше радиуса (доля); `state` - какой набор виноват; `single` -
-        какой одиночный ползунок уводит дальше всех. `needed` - наименьший шар, накрывающий
-        всё, с запасом `boundsMargin`. `ok` - перебор в пределах `boundsTolerance`.
-        `overCap` - сколько вершин трогает больше `boundsCornerCap` ползунков: их охват
-        считан прикидкой, а не перебором.
+        `reach` is how far from the centre of the FILE's sphere the shape goes under the worst
+        set of sliders (an exact walk of the corners of the cube of values,
+        `Reach.reach_exact`); `excess` is how much further that is than the radius, as a
+        fraction; `state` is the set to blame; `single` is the one slider that carries it
+        furthest on its own. `needed` is the smallest sphere covering everything, with
+        `boundsMargin` to spare. `ok` says the walk stayed within `boundsTolerance`. `overCap`
+        counts the vertices moved by more than `boundsCornerCap` sliders: their reach is
+        estimated rather than walked.
         """
         return self._bounds(shape, margin)[0]
 
     def bounds_write(self, path, shape: str | None = None, margin: float | None = None,
                      shrink: bool = False) -> dict:
-        """Записать нужные шары в НОВЫЙ файл меша - правкой чисел на месте.
+        """Write the needed spheres into a NEW mesh file - by editing the numbers in place.
 
-        Прочитанный меш принадлежит чужому моду, и трогать его нельзя; правки едут отдельным
-        модом, и писать поверх исходника отказано. Шар только расширяется: часть, чей шар
-        в файле уже накрывает всё (`ok`), не трогается, а более широкий шар не сжимается -
-        широкий шар в файле бывает намеренным (шерсть под качающейся физикой), и ядро о таких
-        причинах не знает; `shrink=True` пишет нужный шар как есть. Без открытых морфов
-        писать нечего: нужный шар без них - шар покоя. Перед записью каждый шар сверяется
-        с тем, что прочитал PyNifly: не совпали байты - раскладка не та, и ничего не пишется.
+        The mesh we read belongs to someone else's mod and must not be touched; edits travel
+        as a mod of their own, and writing over the source is refused. A sphere is only ever
+        widened: a shape whose sphere in the file already covers everything (`ok`) is left
+        alone, and a wider sphere is not shrunk - a wide sphere in the file is sometimes
+        deliberate (fur under swinging physics), and the core knows nothing of such reasons;
+        `shrink=True` writes the needed sphere as it is. With no morphs open there is nothing
+        to write: the needed sphere without them is the rest sphere. Before writing, every
+        sphere is checked against what PyNifly read: if the bytes do not match, the layout is
+        not the one assumed here, and nothing is written at all.
         """
         self._require()
         if self.morph_set is None:
@@ -508,14 +548,15 @@ class MorphBench:
         out = patch.save(path)
         return {"saved": str(out), "shapes": written, "kept": kept, "rows": rows}
 
-    # ---- колайдеры --------------------------------------------------------------------
+    # ---- colliders --------------------------------------------------------------------
     def open_skeleton(self, path) -> dict:
-        """Открыть скелет и прочитать его физические тела.
+        """Open a skeleton and read the physical bodies in it.
 
-        Скелет - отдельный файл от меша, и открывается он отдельно: капсулы можно смотреть
-        и без тела. Тело нужно только посадке, и она берёт его сама. При открытии меша
-        скелет подбирается рядом сам (`skeletonFile` из настроек в той же папке); этот
-        метод нужен, когда он лежит в другом месте.
+        The skeleton is a file apart from the mesh, and it opens apart from it: the capsules
+        can be looked at with no body at all. The body is needed only by the fitting, and that
+        takes it itself. Opening a mesh picks up the skeleton beside it on its own
+        (`skeletonFile` of the settings, in the same folder); this method is for when it lies
+        somewhere else.
         """
         self.rig = ColliderSet.from_nif(path, self.cfg)
         return self.rig.summary()
@@ -531,12 +572,13 @@ class MorphBench:
         return int(self.cfg["colliderSegments"] if segments is None else segments)
 
     def collider_bones(self, needle: str | None = None) -> list[str]:
-        """Кости, несущие физическое тело; с подстрокой - только подходящие."""
+        """The bones carrying a physical body; with a substring, only the matching ones."""
         self._require_rig()
         return self.rig.find(needle) if needle else self.rig.bone_names()
 
     def colliders(self, needle: str | None = None) -> list[dict]:
-        """Капсулы числами: где стоят в мировых координатах, какие и чем являются движку."""
+        """The capsules as numbers: where they stand in world coordinates, of what kind, and
+        what they are to the engine."""
         self._require_rig()
         out = []
         for bone in self.collider_bones(needle):
@@ -547,17 +589,18 @@ class MorphBench:
         return out
 
     def collider_local(self, needle: str | None = None) -> list[dict]:
-        """Те же капсулы в системе своей кости - как они лежат в файле. Так их ждут
-        настройки чужих программ; складывает такие строки слой показа."""
+        """The same capsules in their own bone's frame - the way they lie in the file. That is
+        the form the settings files of other programs expect; folding such rows into a file is
+        a presenter's job."""
         self._require_rig()
         return self.rig.local_capsules(self.collider_bones(needle))
 
     def visible_collider_bones(self, needle: str | None = None) -> list[str]:
-        """Кости с телом, чьи вершины есть хотя бы в одной видимой части меша.
+        """Bones with a body whose vertices are in at least one visible shape of the mesh.
 
-        Капсула висит на кости, а не на части, но смотрят на неё вместе с кожей: скрыл
-        голову - капсула головы не нужна, скрыл всё - не нужна ни одна. Без открытого меша
-        или при выключенном `collidersFollowParts` - все кости.
+        A capsule hangs on a bone, not on a shape, but it is looked at together with the skin:
+        hide the head and the head's capsule is not wanted, hide everything and none of them
+        are. With no mesh open, or with `collidersFollowParts` off, every bone is returned.
         """
         bones = self.collider_bones(needle)
         if self.model is None or not bool(self.cfg["collidersFollowParts"]):
@@ -568,44 +611,47 @@ class MorphBench:
         return [b for b in bones if b in held]
 
     def held_bones(self, shape_name: str) -> list[str]:
-        """Кости, для которых часть - главная хотя бы на `boneMinVertices` вершинах."""
+        """Bones for which this shape is the dominant one on `boneMinVertices` vertices at
+        least."""
         self._require()
         return self.model.shape(shape_name).held_bones(int(self.cfg["boneMinVertices"]))
 
     def collider_meshes(self, needle: str | None = None, segments: int | None = None) -> list[dict]:
-        """Треугольники капсул по костям: имя кости, вершины, треугольники - для слоя,
-        который скрывает и показывает их вместе с частями меша, не спрашивая ядро заново."""
+        """Capsule triangles bone by bone: the name of the bone, its vertices, its triangles -
+        for a layer that hides and shows them along with the shapes of the mesh, without
+        asking the core all over again."""
         self._require_rig()
         seg = self._segments(segments)
-        return [{"bone": bone, "verts": v, "tris": t}
+        return [{"bone": bone, "verts": verts, "tris": tris}
                 for bone in self.collider_bones(needle)
-                for v, t in [self.rig.mesh([bone], seg)] if t.shape[0]]
+                for verts, tris in [self.rig.mesh([bone], seg)] if tris.shape[0]]
 
     def collider_mesh(self, needle: str | None = None, segments: int | None = None):
-        """Треугольники капсул тел для слоя показа - в тех же координатах, что и тело;
-        только кости, чьи вершины видны (`visible_collider_bones`)."""
+        """Triangles of the bodies' capsules for the presenter - in the same coordinates as
+        the body; only the bones whose vertices are visible (`visible_collider_bones`)."""
         self._require_rig()
         return self.rig.mesh(self.visible_collider_bones(needle), self._segments(segments))
 
     def bumper_mesh(self, segments: int | None = None):
-        """Треугольники цилиндра перемещения - отдельно: слой показа кладёт его только
-        по просьбе, потому что он вчетверо больше любой части тела."""
+        """Triangles of the movement cylinder - on their own: a presenter puts it in only when
+        asked, because it is four times the size of any part of the body."""
         self._require_rig()
         return self.rig.bumper_mesh(self._segments(segments))
 
     def show_colliders(self, on: bool = True, bumper: bool | None = None) -> dict:
-        """Включить слой капсул поверх тела. Числовое состояние - рисует слой показа."""
+        """Turn the layer of capsules on over the body. The state is numbers; the drawing is
+        the presenter's."""
         return self.view.show_colliders(on, bumper)
 
     def skin_points(self, bone: str, min_weight: float | None = None,
                     shapes=None, dominant: bool = True) -> np.ndarray:
-        """Вершины кожи, которые держит эта кость, - с применёнными ползунками.
+        """The skin vertices this bone holds - with the sliders applied.
 
-        Берутся только те части меша, что сейчас видимы: капсула должна садиться по тому,
-        что видно. Скрыв шерсть, подгоняешь по коже; показав - по силуэту вместе с ней.
-        Кому принадлежит вершина, решает часть меша (`Shape.owned_vertices`): по умолчанию
-        той кости, которая держит её сильнее всех, иначе цепочки - хвост, пальцы -
-        расплываются на соседние звенья.
+        Only the shapes of the mesh that are visible right now are taken: a capsule has to be
+        fitted to what is on show. Hide the fur and you fit to the skin; show it and you fit
+        to the silhouette it makes. Who owns a vertex is decided by the shape
+        (`Shape.owned_vertices`): by default it goes to the bone holding it hardest, or else
+        chains - a tail, fingers - bleed onto the neighbouring links.
         """
         self._require()
         thr = float(self.cfg["colliderMinWeight"] if min_weight is None else min_weight)
@@ -618,11 +664,13 @@ class MorphBench:
 
     def covered_skin_points(self, bone: str, min_weight: float | None = None,
                             shapes=None) -> np.ndarray:
-        """Кожа, за которую отвечает тело этой кости, - вместе с костями без своих тел.
+        """The skin this bone's body answers for - together with the bones that have no body
+        of their own.
 
-        Тел меньше, чем костей: у пальцев, крутящих костей и у таза тела нет, и их кожу
-        обязано накрывать ближайшее тело выше по дереву. Спрашивать одну кость мало -
-        стопа тогда садится без пальцев, а таз без ягодиц.
+        There are fewer bodies than bones: fingers, twist bones and the pelvis have none, and
+        their skin has to be covered by the nearest body up the tree. Asking about one bone is
+        not enough - the foot would then be fitted without the toes, and the pelvis without
+        the buttocks.
         """
         self._require_rig()
         chunks = [self.skin_points(b, min_weight, shapes)
@@ -632,10 +680,10 @@ class MorphBench:
 
     def collider_clearance(self, needle: str | None = None,
                            min_weight: float | None = None) -> list[dict]:
-        """Насколько капсулы расходятся с кожей при нынешних ползунках.
+        """How far the capsules and the skin part company at the current slider values.
 
-        `worst` - самая дальняя точка кожи снаружи капсулы: сквозь неё рука пройдёт,
-        ничего не задев. `outside` - доля кожи, оставшаяся снаружи.
+        `worst` is the furthest point of skin outside the capsule: a hand goes through there
+        touching nothing. `outside` is the share of the skin left outside.
         """
         self._require()
         self._require_rig()
@@ -649,11 +697,12 @@ class MorphBench:
     def collider_fit(self, needle: str | None = None, percentile: float | None = None,
                      min_weight: float | None = None, apply: bool = True,
                      bundle: int = 1, split: str | None = None) -> list[dict]:
-        """Посадить капсулы по коже при нынешних ползунках.
+        """Fit the capsules to the skin at the current slider values.
 
-        Ради этого верстак и трогает колайдеры: тело мы деформируем сами и знаем каждую
-        вершину, поэтому подгонку можно посчитать точно и заранее, а не угадывать её
-        в игре. `apply=False` - только посмотреть «было - стало», ничего не меняя.
+        This is why the workbench touches colliders at all: we deform the body ourselves and
+        know every vertex, so the fit can be worked out exactly and in advance instead of
+        being guessed at in the game. `apply=False` only shows "was - now" and changes
+        nothing.
         """
         self._require()
         self._require_rig()
@@ -684,7 +733,7 @@ class MorphBench:
 
     def collider_set(self, bone: str, index: int = 0, p1=None, p2=None,
                      radius: float | None = None) -> dict:
-        """Правка одной капсулы числами: концы и радиус в системе своей кости."""
+        """Editing one capsule by numbers: the ends and the radius in its own bone's frame."""
         self._require_rig()
         caps = self.rig.body(bone).capsules
         if not 0 <= index < len(caps):
@@ -699,17 +748,17 @@ class MorphBench:
         return cap.as_dict()
 
     def collider_save(self, path) -> str:
-        """Записать нынешние капсулы в новый файл скелета.
+        """Write the capsules as they stand into a new skeleton file.
 
-        Всегда в НОВЫЙ файл: скелет, который мы читали, принадлежит чужому моду, и править
-        его на месте нельзя. Правки едут отдельным модом-надстройкой.
+        Always a NEW file: the skeleton we read belongs to someone else's mod, and editing it
+        in place is not allowed. Edits travel as an add-on mod of their own.
         """
         self._require_rig()
         return str(self.rig.save_as(path, self.cfg))
 
-    # ---- геометрия для слоёв показа ---------------------------------------------------
+    # ---- geometry for the presenters --------------------------------------------------
     def deformed(self, shape_name: str) -> np.ndarray:
-        """Вершины части меша с применёнными значениями ползунков."""
+        """The vertices of a shape with the slider values applied."""
         self._require()
         verts = self.model.shape(shape_name).verts
         if not self._sliders or self.morph_set is None:
@@ -726,14 +775,15 @@ class MorphBench:
         return [n for n in self.model.shape_names() if self.view.is_visible(n)]
 
     def vertex_normals(self, shape_name: str) -> np.ndarray:
-        """Нормали вершин части с применёнными ползунками - для мягкого затенения."""
+        """Vertex normals of a shape with the sliders applied - for smooth shading."""
         self._require()
         return vertex_normals(self.deformed(shape_name), self.model.shape(shape_name).tris)
 
     def framing(self) -> tuple[np.ndarray, float]:
-        """Центр и полуразмах кадра: охват видимых частей с применёнными ползунками в осях
-        камеры, затем наведение и панорама. Считает ядро; слои показа лишь ставят по нему
-        камеру, и масштаб к точке знает, какой кадр был на экране."""
+        """The centre and half-span of the frame: the extent of the visible shapes with the
+        sliders applied, along the axes of the camera, then the aim and the pan. The core
+        works it out; the presenters only place the camera by it, and that is how zooming at a
+        point knows which frame was on the screen."""
         self._require()
         chunks = [self.deformed(n) for n in self.visible_shapes()
                   if self.model.shape(n).triangle_count]
@@ -745,14 +795,14 @@ class MorphBench:
         half = float(np.abs(((verts - whole) @ basis.T)[:, :2]).max())
         return self.view.framing(whole, half)
 
-    # ---- признаки раскраски: числа, а не цвета ----------------------------------------
+    # ---- colouring keys: numbers, not colours -----------------------------------------
     def bone_key(self, shape_name: str) -> np.ndarray:
-        """Номер главной кости каждой вершины; -1 у вершин без привязки."""
+        """The number of the dominant bone of every vertex; -1 where there are no weights."""
         self._require()
         return self.model.shape(shape_name).dominant_bone()
 
     def morph_key(self, shape_name: str, morph: str) -> np.ndarray:
-        """Величина сдвига каждой вершины этим морфом; ноль там, где он не трогает."""
+        """How far this morph moves each vertex; zero where it does not touch it."""
         self._require()
         shape = self.model.shape(shape_name)
         out = np.zeros(shape.vertex_count, dtype=np.float32)
@@ -763,17 +813,18 @@ class MorphBench:
         return out
 
     def strain_key(self, shape_name: str, morph: str) -> np.ndarray:
-        """Наибольшее растяжение рёбер у каждой вершины от этого морфа."""
+        """The largest edge strain at each vertex under this morph."""
         self._require()
         if self.analyzer is None:
             return np.zeros(self.model.shape(shape_name).vertex_count, dtype=np.float32)
         return self.analyzer.vertex_strain(shape_name, morph)
 
     def vertex_colour_key(self, shape_name: str) -> np.ndarray | None:
-        """Признак, по которому слой показа красит вершины, — числом, а не цветом.
+        """The key a presenter paints the vertices by - a number, not a colour.
 
-        `bone` - номер главной кости вершины; `morph` - двигает ли её выбранный ползунок;
-        `strain` - наибольшее растяжение рёбер вершины. Перевод в цвет делает слой показа.
+        `bone` is the number of the vertex's dominant bone; `morph` is whether the chosen
+        slider moves it; `strain` is the largest edge strain at the vertex. Turning that into
+        a colour is a presenter's job.
         """
         self._require()
         mode = self.view.colouring
@@ -787,7 +838,7 @@ class MorphBench:
             return self.morph_key(shape_name, self.view.highlight_morph)
         return self.strain_key(shape_name, self.view.highlight_morph)
 
-    # ---- состояние показа: те же методы, что нажмёт будущая кнопка --------------------
+    # ---- the view state: the same methods a future button will press ------------------
     def orbit(self, d_yaw: float, d_pitch: float) -> dict:
         return self.view.orbit(d_yaw, d_pitch).as_dict()
 
@@ -798,24 +849,26 @@ class MorphBench:
         return self.view.preset(name).as_dict()
 
     def preset_name(self) -> str | None:
-        """Имя ракурса из настроек, совпадающего с камерой, либо None."""
+        """Name of the view from the settings that the camera matches, or None."""
         return self.view.preset_name()
 
     def zoom(self, factor: float) -> dict:
         return self.view.set_zoom(factor).as_dict()
 
     def resize(self, width: int, height: int) -> dict:
-        """Размер кадра в пикселях - тоже состояние показа, а не дело слоя."""
+        """The size of the frame in pixels - view state as well, not a presenter's own
+        business."""
         return self.view.resize(width, height).as_dict()
 
     def zoom_at(self, factor: float, fx: float, fy: float) -> dict:
-        """Масштаб к точке под курсором: `fx`, `fy` - её положение от центра кадра в долях
-        половины меньшей стороны холста (вправо, вверх). Кадр пересчитывается здесь же,
-        чтобы точка бралась с того кадра, который на экране."""
+        """Zoom towards the point under the cursor: `fx`, `fy` are its position from the
+        centre of the frame, in fractions of half the shorter side of the canvas (right and
+        up). The frame is worked out right here, so that the point is taken from the frame
+        that is on the screen."""
         self.framing()
         return self.view.zoom_at(factor, fx, fy).as_dict()
 
-    # ---- свет: тоже состояние показа ----------------------------------------------------
+    # ---- light: view state as well ----------------------------------------------------
     def light_follow_camera(self, on: bool) -> dict:
         return self.view.light_follow_camera(on).as_dict()
 
@@ -827,15 +880,16 @@ class MorphBench:
         return self.view.light_power(ambient, diffuse, fill).as_dict()
 
     def light_reset(self) -> dict:
-        """Свет как в настройках."""
+        """The light as the settings have it."""
         return self.view.light_reset().as_dict()
 
     def light_vector(self) -> list[float]:
-        """Единичный вектор на источник в мировых координатах для текущего ракурса."""
+        """Unit vector towards the light in world coordinates, for the camera as it stands."""
         return [float(x) for x in self.view.light_vector()]
 
     def pan(self, dx: float, dy: float) -> dict:
-        """Сдвинуть кадр вдоль осей экрана - вправо и вверх - в единицах модели."""
+        """Shift the frame along the axes of the screen - right and up - in the units of the
+        model."""
         return self.view.set_pan(dx, dy).as_dict()
 
     def pan_by(self, dx: float, dy: float) -> dict:
@@ -851,27 +905,28 @@ class MorphBench:
         return self.view.show_all().as_dict()
 
     def hide(self, name: str) -> dict:
-        """Спрятать одну часть. Состояние «видно всё» ядро хранит как None, и ViewState имён
-        частей не знает, поэтому перечень видимых разворачивается здесь."""
+        """Hide one shape. The core keeps "everything is visible" as None, and `ViewState`
+        does not know the names of the shapes, so the list of visible ones is spelled out
+        here."""
         self._require()
         if self.view.visible is None:
             self.view.only(self.model.shape_names())
         return self.view.hide(name).as_dict()
 
     def show(self, name: str) -> dict:
-        """Показать одну часть, не трогая остальные."""
+        """Show one shape, leaving the rest as they are."""
         self._require()
         return self.view.show(name).as_dict()
 
     def view_state(self, precise: bool = False) -> dict:
-        """Состояние показа; `precise` - числа без округления, для слоя, который по ним
-        строит кадр и должен совпасть с растеризатором до последнего знака."""
+        """The view state; `precise` gives the numbers unrounded, for a layer that builds its
+        frame from them and has to agree with the rasteriser to the last digit."""
         return self.view.as_dict(precise)
 
-    # ---- наведение камеры: смотреть на часть тела, а не на модель целиком -------------
+    # ---- aiming the camera: looking at a body part, not at the whole model ------------
     def focus_bone(self, needle: str, shape: str | None = None) -> dict:
-        """Смотреть на кость: точное имя либо подстрока без учёта регистра («Finger» —
-        все пальцы). Охват берётся по вершинам, которые эти кости держат."""
+        """Look at a bone: the exact name, or a substring with no regard to case ("Finger" is
+        every finger). The extent is taken from the vertices those bones hold."""
         self._require()
         pts = self.model.bone_points(needle, exact=True, shape=shape)
         if pts.shape[0] == 0:
@@ -882,7 +937,7 @@ class MorphBench:
         return self.view.focus_on(centre, radius, "bone:" + needle).as_dict()
 
     def focus_morph(self, morph: str) -> dict:
-        """Смотреть на область, которую двигает ползунок, во всех частях меша."""
+        """Look at the region this slider moves, across every shape of the mesh."""
         self._require_morphs()
         chunks = []
         for shape_name, m in self.morph_set.for_morph(morph).items():
@@ -896,20 +951,21 @@ class MorphBench:
         return self.view.focus_on(centre, radius, "morph:" + morph).as_dict()
 
     def focus_shape(self, name: str) -> dict:
-        """Смотреть на одну часть меша целиком."""
+        """Look at one shape of the mesh, whole."""
         self._require()
         centre, radius = self.model.shape(name).sphere()
         return self.view.focus_on(centre, radius, "shape:" + name).as_dict()
 
     def focus_all(self) -> dict:
-        """Снова охватывать модель целиком."""
+        """Take in the whole model again."""
         return self.view.focus_all().as_dict()
 
     def focus_targets(self, precise: bool = False) -> dict:
-        """Все цели наведения числами — центр и радиус каждой кости, морфа и части.
-        Слою показа этого хватает, чтобы навести камеру, не обращаясь к ядру. Цели без
-        единой вершины не перечисляются - на них и focus_* навестись не может.
-        `precise` отдаёт числа без округления: так кадр страницы совпадает с PNG."""
+        """Every target to aim at, as numbers - the centre and radius of each bone, morph and
+        shape. That is enough for a presenter to aim the camera without going back to the
+        core. Targets without a single vertex are left out - `focus_*` cannot aim at them
+        either. `precise` gives the numbers unrounded: that is how the page's frame comes out
+        the same as the PNG."""
         self._require()
 
         def entry(name, pts):

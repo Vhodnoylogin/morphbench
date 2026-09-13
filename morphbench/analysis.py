@@ -1,31 +1,33 @@
-"""Разборы: то, что надо знать о морфе, не глядя на картинку.
+"""Analyses: what there is to know about a morph without looking at a picture.
 
-Четыре вопроса, на которые здесь есть числовой ответ.
+Four questions that get a numeric answer here.
 
-**Работает ли ползунок вообще.** Пустой морф выглядит совершенно исправным: он есть в файле,
-принимает значение и читается обратно тем же числом — и не двигает ни одной вершины.
-Отличить его от рабочего можно только пересчётом.
+**Does the slider work at all.** An empty morph looks perfectly sound: it is in the file, it
+takes a value and reads back as the same number - and it moves not a single vertex. Only a
+recount tells it apart from a working one.
 
-**Не рвёт ли он поверхность.** Если морф двигает вершины ладони и не трогает вершины пальцев,
-рёбра между ними растягиваются во столько же раз, во сколько разъехались их концы. Эту меру —
-растяжение ребра — видно числом, и она ловит и «перчатку» на лапе, и разрыв шва на груди,
-не требуя ни игры, ни глаза.
+**Does it tear the surface.** If a morph moves the vertices of the palm and leaves the
+vertices of the fingers alone, the edges between them stretch in the same proportion as
+their ends drew apart. That measure - edge strain - shows as a number, and it catches both
+the "glove" on a paw and a split seam on the chest, with no game and no eye needed.
 
-**Следуют ли за ним слои.** Кожа под шерстью двигается своим морфом, оболочки — своими копиями.
-Если у оболочки амплитуда вдвое меньше или её нет вовсе, слои разъезжаются.
+**Do the layers follow it.** The skin under the fur is moved by its own morph, the covers by
+their own copies. If a cover's amplitude is half as large, or there is none at all, the layers
+come apart.
 
-**Должна ли оболочка следовать вообще.** Голова не обязана следовать за животом. Оболочка
-обязана следовать за морфом только там, где лежит поверх сдвигаемой кожи: для каждой её
-вершины ищется ближайшая вершина базовой части, и если ту вершину морф двигает — оболочка
-над ней смежна с морфом. Это тот же приём, которым сборщик переносит сдвиг на оболочки
-(усреднение по ближайшим вершинам кожи), и тот же, что у Automorph в BodySlide.
+**Does a cover have to follow at all.** A head is not obliged to follow a belly. A cover must
+follow a morph only where it lies over skin the morph shifts: for each of its vertices the
+nearest vertex of the base shape is found, and if the morph moves that vertex, the cover above
+it is adjacent to the morph. This is the trick the builder uses to carry the shift onto the
+covers (averaging over the nearest skin vertices), and the one Automorph in BodySlide uses.
 
-**Что делает сочетание.** Дефект бывает свойством пары, а не одного ползунка: грудь и грудная
-клетка поодиночке тянут шов терпимо, а вместе рвут. Поэтому растяжение меряется и при наборе
-значений (смещения складываются, как при последовательном применении морфов), перебираются
-все пары, и для каждого ползунка ищется величина, на которой он переходит порог, - бюджет
-амплитуды. Рёбра и их длины в покое считаются один раз на часть: перебор из сотен пар
-обходится одним сложением смещений и одним промером рёбер на пару.
+**What the combination does.** A fault can be a property of a pair rather than of one slider:
+the breast and the ribcage each pull the seam within reason, and together they tear it. So
+strain is measured over a set of values as well (the offsets add up, as they do when morphs
+are applied one after another), every pair is walked, and each slider is followed up to the
+value where it crosses the threshold - its amplitude budget. Edges and their lengths at rest
+are computed once per shape: a walk of hundreds of pairs then costs one addition of offsets
+and one measurement of edges per pair.
 """
 from __future__ import annotations
 
@@ -36,7 +38,7 @@ from .i18n import t
 
 
 class MorphStat:
-    """Итог по одному морфу на одной части меша."""
+    """One morph on one shape of the mesh, summed up."""
 
     __slots__ = ("shape", "morph", "vertices", "max_shift", "mean_shift", "bounds")
 
@@ -65,11 +67,11 @@ class MorphStat:
 
 
 class StrainStat:
-    """Растяжение рёбер: во сколько раз изменилась длина ребра после морфа.
+    """Edge strain: by what factor the length of an edge changed under the morph.
 
-    Ноль означает, что часть меша сдвинулась целиком и форма сохранилась. Большие значения
-    означают, что одну сторону ребра морф двигал, а другую нет: поверхность растянута
-    или порвана. Место худших рёбер даёт охват - по нему сразу видно, где именно.
+    Zero means the shape moved as a whole and kept its form. Large values mean the morph moved
+    one end of an edge and not the other: the surface is stretched, or torn. The place of the
+    worst edges gives a box - it shows at once where exactly.
     """
 
     __slots__ = ("shape", "morph", "edges", "max_strain", "p99_strain",
@@ -85,7 +87,7 @@ class StrainStat:
         self.over_threshold = over_threshold
         self.threshold = threshold
         self.worst_bounds = worst_bounds
-        # Итог по НАБОРУ ползунков {морф: величина}: тогда имени морфа нет, есть набор.
+        # The summary of a SET of sliders {morph: value}: no morph name then, a set instead.
         self.sliders = sliders
 
     def as_dict(self) -> dict:
@@ -103,12 +105,12 @@ class StrainStat:
 
 
 class LayerStat:
-    """Насколько оболочка следует за базовой формой в одном и том же морфе.
+    """How well a cover follows the base shape under one and the same morph.
 
-    `contact` — доля вершин оболочки, лежащих над сдвигаемой областью базовой части;
-    `adjacent` — смежна ли оболочка с морфом, то есть обязана ли следовать вообще;
-    `expected_max` — наибольший сдвиг кожи прямо под оболочкой: столько она и должна была
-    сдвинуться. Отношение `ratio` по-прежнему считается к сдвигу всей кожи.
+    `contact` - the share of the cover's vertices lying over the shifted area of the base
+    shape; `adjacent` - whether the cover is adjacent to the morph, that is, whether it has to
+    follow at all; `expected_max` - the largest shift of the skin right under the cover: that
+    is how far it should have moved. `ratio` is still taken against the shift of the whole skin.
     """
 
     __slots__ = ("morph", "base", "base_max", "follower", "follower_max", "ratio",
@@ -133,7 +135,7 @@ class LayerStat:
 
     @property
     def adjacent(self) -> bool | None:
-        """None — смежность не считалась: базовой части в меше нет."""
+        """None - adjacency was not computed: the base shape is not in the mesh."""
         if self.contact is None:
             return None
         return self.contact >= self.min_contact
@@ -150,12 +152,12 @@ class LayerStat:
 
 
 class Proximity:
-    """Кто под кем лежит: для каждой вершины оболочки — ближайшая вершина базовой части
-    в пределах радиуса, либо -1, если базовой части рядом нет.
+    """Who lies under whom: for every vertex of the cover, the nearest vertex of the base
+    shape within the radius, or -1 when there is no base shape nearby.
 
-    Считается один раз на пару частей и переиспользуется всеми морфами: это работа, которую
-    делают один раз, а не в горячем пути. Поиск идёт по равномерной сетке с ячейкой в радиус:
-    кандидаты берутся из 27 соседних ячеек, дальше — точное расстояние.
+    Computed once per pair of shapes and reused by every morph: this is work done once, not in
+    the hot path. The search runs over a uniform grid with a cell the size of the radius:
+    candidates are taken from the 27 neighbouring cells, and the exact distance decides.
     """
 
     __slots__ = ("radius", "nearest", "distance")
@@ -171,7 +173,7 @@ class Proximity:
 
     @staticmethod
     def _keys(cells: np.ndarray) -> np.ndarray:
-        # Три координаты ячейки в одном числе; сдвиг на 2**20 делает их неотрицательными.
+        # Three cell coordinates in one number; the shift by 2**20 makes them non-negative.
         c = cells + (1 << 20)
         return (c[:, 0] << 42) | (c[:, 1] << 21) | c[:, 2]
 
@@ -186,9 +188,9 @@ class Proximity:
         border = np.argsort(bkeys, kind="stable")
         bsorted = bkeys[border]
         fcells = np.floor(fv / radius).astype(np.int64)
-        # Оболочка группируется по самим ячейкам, а не по упакованным ключам: ключ может
-        # совпасть у далёких ячеек, и тогда группа получила бы чужих соседей. У базы
-        # совпадение ключей лишь добавляет кандидатов, которых отсеет расстояние.
+        # The cover is grouped by the cells themselves, not by the packed keys: two far-apart
+        # cells can share a key, and then a group would get someone else's neighbours. On the
+        # base side a shared key only adds candidates, which the distance then throws out.
         _, inverse = np.unique(fcells, axis=0, return_inverse=True)
         inverse = np.asarray(inverse).reshape(-1)
         forder = np.argsort(inverse, kind="stable")
@@ -213,19 +215,19 @@ class Proximity:
 
     @property
     def covered(self) -> np.ndarray:
-        """Маска вершин оболочки, под которыми базовая часть в пределах радиуса есть."""
+        """Mask of the cover vertices with the base shape under them within the radius."""
         return self.nearest >= 0
 
 
 class Analyzer:
-    """Считает разборы по паре «меш + набор морфов». Ничего не рисует и не печатает."""
+    """Computes analyses over a mesh and a set of morphs. Draws nothing and prints nothing."""
 
     def __init__(self, model, morph_set, contact_radius: float = 6.0,
                  min_contact: float = 0.02, strain_threshold: float = 0.25,
                  bone_share_min: float = 0.02, left_behind_min: float = 0.35,
                  bone_min_vertices: int = 8):
-        # Умолчания повторяют DEFAULTS из config.py: разборщик пригоден и без настроек,
-        # а фасад передаёт сюда значения из morphbench.json.
+        # The defaults repeat DEFAULTS from config.py: the analyzer is usable with no settings
+        # at all, and the facade passes the values from morphbench.json in here.
         self.model = model
         self.morphs = morph_set
         self.contact_radius = float(contact_radius)
@@ -235,12 +237,13 @@ class Analyzer:
         self.left_behind_min = float(left_behind_min)
         self.bone_min_vertices = int(bone_min_vertices)
         self._edge_cache: dict[str, np.ndarray] = {}
-        # Рёбра, их векторы и длины в покое - один раз на часть: перебор пар меряет
-        # сотни наборов, и пересчитывать «до» на каждый было бы работой в горячем пути.
+        # Edges, their vectors and their lengths at rest - once per shape: the walk of pairs
+        # measures hundreds of sets, and recomputing the "before" each time would be work in
+        # the hot path.
         self._baseline: dict[str, tuple[np.ndarray, np.ndarray, np.ndarray] | None] = {}
         self._prox: dict[tuple[str, str], Proximity] = {}
 
-    # ---- ползунки ---------------------------------------------------------------------
+    # ---- sliders ----------------------------------------------------------------------
     def morph_stats(self, morph_filter: str | None = None,
                     shape_filter: str | None = None) -> list[MorphStat]:
         out: list[MorphStat] = []
@@ -261,35 +264,35 @@ class Analyzer:
         return [s for s in self.morph_stats() if s.is_empty]
 
     def declared_but_absent(self, expected: list[str]) -> list[str]:
-        """Ползунки, которые ждали в файле и не нашли. Так виден морф, потерянный сборщиком
-        молча: в рецепте он есть, в файле его нет вовсе."""
+        """Sliders that were expected in the file and not found there. This is how a morph the
+        builder lost silently shows up: the recipe has it, the file has no trace of it."""
         have = set(self.morphs.names())
         return [name for name in expected if name not in have]
 
-    # ---- разрывы ----------------------------------------------------------------------
+    # ---- tearing ----------------------------------------------------------------------
     @staticmethod
     def _edges(tris: np.ndarray) -> np.ndarray:
         e = np.vstack([tris[:, [0, 1]], tris[:, [1, 2]], tris[:, [2, 0]]])
         e = np.sort(e, axis=1)
         e = np.unique(e, axis=0)
-        return e[e[:, 0] != e[:, 1]]          # вырожденный треугольник даёт петлю - не ребро
+        return e[e[:, 0] != e[:, 1]]          # a degenerate triangle gives a loop, not an edge
 
     def edges(self, shape_name: str) -> np.ndarray:
-        """Уникальные рёбра части меша; считаются один раз на часть."""
+        """Unique edges of a shape of the mesh; computed once per shape."""
         if shape_name not in self._edge_cache:
             self._edge_cache[shape_name] = self._edges(self.model.shape(shape_name).tris)
         return self._edge_cache[shape_name]
 
     def edge_strain(self, shape_name: str, morph_name: str,
                     amount: float = 1.0) -> tuple[np.ndarray, np.ndarray] | None:
-        """Растяжение каждого ребра, |после / до - 1|. Возвращает (рёбра, растяжение)."""
+        """Strain of every edge, |after / before - 1|. Returns (edges, strain)."""
         shape = self.model.shapes.get(shape_name)
         morph = self.morphs.get(shape_name, morph_name)
         if shape is None or morph is None or morph.is_empty:
             return None
         edges = self.edges(shape_name)
         if edges.shape[0] == 0:
-            return None                     # облако точек без треугольников: рёбер нет
+            return None                     # a point cloud with no triangles: no edges
         a, b = shape.verts[edges[:, 0]], shape.verts[edges[:, 1]]
         before = np.linalg.norm(a - b, axis=1)
         moved = morph.apply(shape.verts, amount)
@@ -301,7 +304,7 @@ class Analyzer:
 
     def vertex_strain(self, shape_name: str, morph_name: str,
                       amount: float = 1.0) -> np.ndarray:
-        """Наибольшее растяжение рёбер у каждой вершины — признак для раскраски."""
+        """The largest edge strain at each vertex - the value the colouring goes by."""
         shape = self.model.shape(shape_name)
         out = np.zeros(shape.vertex_count, dtype=np.float32)
         es = self.edge_strain(shape_name, morph_name, amount)
@@ -314,7 +317,7 @@ class Analyzer:
 
     def strain(self, shape_name: str, morph_name: str, amount: float = 1.0,
                threshold: float | None = None) -> StrainStat | None:
-        """Растяжение рёбер части меша от одного морфа. Порог None - из настроек."""
+        """Edge strain of a shape from one morph. Threshold None - from the settings."""
         threshold = self.strain_threshold if threshold is None else float(threshold)
         es = self.edge_strain(shape_name, morph_name, amount)
         if es is None:
@@ -345,10 +348,10 @@ class Analyzer:
         out.sort(key=lambda s: -s.max_strain)
         return out
 
-    # ---- разрывы от набора ползунков --------------------------------------------------
+    # ---- tearing from a set of sliders ------------------------------------------------
     def edge_lengths(self, shape_name: str):
-        """Рёбра части, их векторы и длины в покое: (рёбра, векторы, длины). Считаются
-        один раз на часть. None - части нет в меше или у неё нет рёбер."""
+        """Edges of a shape, their vectors and their rest lengths: (edges, vectors, lengths).
+        Computed once per shape. None - no such shape in the mesh, or it has no edges."""
         if shape_name not in self._baseline:
             shape = self.model.shapes.get(shape_name)
             if shape is None:
@@ -362,9 +365,9 @@ class Analyzer:
         return self._baseline[shape_name]
 
     def displacement(self, shape_name: str, values: dict) -> np.ndarray | None:
-        """Суммарное смещение каждой вершины части при наборе {морф: величина} - то же,
-        что последовательное Morph.apply, только без копий облака. None - ни один морф
-        набора эту часть не двигает (нет, пуст или величина ноль)."""
+        """Total offset of every vertex of a shape under a set {morph: value} - the same as
+        Morph.apply one after another, only without copies of the cloud. None - not one morph
+        of the set moves this shape (absent, empty, or its value is zero)."""
         shape = self.model.shapes.get(shape_name)
         if shape is None:
             return None
@@ -381,9 +384,9 @@ class Analyzer:
 
     def edge_strain_set(self, shape_name: str,
                         values: dict) -> tuple[np.ndarray, np.ndarray] | None:
-        """Растяжение каждого ребра при наборе {морф: величина}, |после / до - 1|.
-        Смещения складываются; ребро меряется до и после. Возвращает (рёбра, растяжение);
-        None - части нет, рёбер нет или набор её не двигает."""
+        """Strain of every edge under a set {morph: value}, |after / before - 1|. The offsets
+        add up; the edge is measured before and after. Returns (edges, strain); None - no such
+        shape, no edges, or the set does not move it."""
         base = self.edge_lengths(shape_name)
         if base is None:
             return None
@@ -411,14 +414,14 @@ class Analyzer:
 
     @staticmethod
     def _values(values: dict) -> dict[str, float]:
-        """Набор без нулей: ноль - это не ползунок, а его отсутствие."""
+        """The set without zeroes: a zero is not a slider, it is the absence of one."""
         return {str(k): float(v) for k, v in values.items() if float(v) != 0.0}
 
     def strain_set(self, values: dict, threshold: float | None = None) -> list[StrainStat]:
-        """Растяжение рёбер каждой части при наборе {морф: величина}.
+        """Edge strain of every shape under a set {morph: value}.
 
-        Строки те же, что у strain_report, только вместо имени морфа - набор; части,
-        которых набор не двигает, не перечисляются. По убыванию наибольшего растяжения.
+        The rows are the ones strain_report gives, only with the set in place of the morph
+        name; shapes the set does not move are not listed. By decreasing largest strain.
         """
         threshold = self.strain_threshold if threshold is None else float(threshold)
         values = self._values(values)
@@ -436,8 +439,8 @@ class Analyzer:
 
     def strain_extent(self, values: dict,
                       threshold: float | None = None) -> tuple[float, int, str | None]:
-        """Итог набора по всем частям разом: наибольшее растяжение, число рёбер сверх
-        порога и часть, где растяжение наибольшее (None - набор ничего не двигает)."""
+        """The set over every shape at once: the largest strain, the number of edges over the
+        threshold, and the shape where the strain is largest (None - the set moves nothing)."""
         threshold = self.strain_threshold if threshold is None else float(threshold)
         best, over, where = 0.0, 0, None
         for shape_name in self.model.shape_names():
@@ -452,8 +455,8 @@ class Analyzer:
         return best, over, where
 
     def active_morphs(self) -> list[str]:
-        """Ползунки, двигающие хоть одну вершину хоть одной части меша, - те, что имеет
-        смысл перебирать. Пустые и те, чьих частей в меше нет, не в счёт."""
+        """Sliders that move at least one vertex of at least one shape of the mesh - the ones
+        worth walking. Empty ones, and ones whose shapes are not in the mesh, do not count."""
         names = []
         for name in self.morphs.names():
             for shape_name, m in self.morphs.for_morph(name).items():
@@ -464,16 +467,16 @@ class Analyzer:
 
     def strain_pairs(self, amount: float = 1.0, threshold: float | None = None,
                      top: int | None = 10, by: str = "max") -> list[dict]:
-        """Перебор пар: какие два ползунка вместе рвут сильнее, чем каждый поодиночке.
+        """The walk of pairs: which two sliders together tear worse than each one alone.
 
-        Все сочетания по два из непустых морфов при одной величине `amount`. У пары -
-        наибольшее растяжение и число рёбер сверх порога по всем частям, часть, где оно
-        наибольшее, растяжение каждого поодиночке и `gain`: на сколько пара хуже худшего
-        из двух одиночных. Порядок `by`: "max" - по наибольшему растяжению (тогда верх
-        занимают все пары с самым рвущим одиночкой), "gain" - по прибавке, то есть по
-        тому, что даёт именно сочетание. `top` - сколько худших вернуть, None или 0 - все.
-        Каждая пара - одно сложение смещений и один промер рёбер против длин в покое,
-        посчитанных один раз.
+        Every combination of two out of the non-empty morphs, at one value `amount`. A pair
+        gets the largest strain and the number of edges over the threshold across every shape,
+        the shape where it is largest, the strain of each one alone, and `gain`: how much worse
+        the pair is than the worse of the two singles. The order `by`: "max" sorts by the
+        largest strain (the top then fills with every pair that contains the worst single),
+        "gain" by the addition, that is, by what the combination itself gives. `top` - how many
+        of the worst to return, None or 0 - all of them. Each pair costs one addition of
+        offsets and one measurement of edges against the rest lengths, computed once.
         """
         if by not in ("max", "gain"):
             raise ValueError(t("core.pairOrder", value=by))
@@ -497,14 +500,15 @@ class Analyzer:
 
     def budget(self, threshold: float | None = None, low: float = 0.0, high: float = 1.0,
                resolution: float = 0.005) -> list[dict]:
-        """Бюджет амплитуд: величина, на которой каждый непустой ползунок переходит порог
-        наибольшим растяжением рёбер по всем частям.
+        """Amplitude budget: the value at which each non-empty slider crosses the threshold
+        with the largest edge strain over all shapes.
 
-        Двоичный поиск по величине в пределах [low, high] до точности `resolution`.
-        Если и на `high` порог не перейдён, `limit` - None: в пределах ползунок не рвёт.
-        `maxAt` - растяжение на верхнем пределе, `shape` - часть, где рвётся первой
-        (а если не рвёт - где растяжение наибольшее на верхнем пределе). Рвущие идут
-        первыми, по возрастанию предела; не рвущие - следом, по убыванию `maxAt`.
+        A binary search over the value within [low, high] down to `resolution`. If the
+        threshold is not crossed even at `high`, `limit` is None: within these bounds the
+        slider does not tear. `maxAt` is the strain at the upper bound, `shape` is where it
+        tears first (and where the strain is largest at the upper bound when it does not tear
+        at all). The tearing ones come first, by increasing limit; the rest follow, by
+        decreasing `maxAt`.
         """
         threshold = self.strain_threshold if threshold is None else float(threshold)
         low, high, resolution = float(low), float(high), float(resolution)
@@ -513,10 +517,10 @@ class Analyzer:
             top_max, _, top_shape = self.strain_extent({name: high}, threshold)
             row = {"morph": name, "limit": None, "maxAt": top_max, "shape": top_shape,
                    "threshold": threshold, "high": high}
-            # Предел ищется от нуля наружу по каждой стороне диапазона отдельно: нулевая
-            # величина не рвёт, а растяжение по величине не обязано быть монотонным -
-            # схлопывающийся морф рвёт посередине и отпускает на пределе. Диапазон
-            # проходится шагами, и делится пополам первый отрезок, где порог перейдён.
+            # The limit is sought outwards from zero, each side of the range on its own: a
+            # value of zero does not tear, and strain is not obliged to grow with the value -
+            # a collapsing morph tears in the middle and lets go at the limit. The range is
+            # walked in steps, and the first stretch where the threshold is crossed is halved.
             for end, key in ((high, "limit"), (low, "limitLow")):
                 if (end > 0.0) == (key == "limitLow") or end == 0.0:
                     continue
@@ -552,9 +556,9 @@ class Analyzer:
                                 r["limit"] if r["limit"] is not None else -r["maxAt"]))
         return out
 
-    # ---- слои -------------------------------------------------------------------------
+    # ---- layers -----------------------------------------------------------------------
     def proximity(self, follower: str, base: str) -> Proximity:
-        """Ближайшие вершины базовой части под оболочкой; считается один раз на пару."""
+        """The nearest base vertices under the cover; computed once per pair."""
         key = (follower, base)
         if key not in self._prox:
             self._prox[key] = Proximity(self.model.shape(follower).verts,
@@ -563,11 +567,11 @@ class Analyzer:
 
     def layers(self, morph_name: str, base: str = "body",
                only_adjacent: bool = False) -> list[LayerStat]:
-        """Как оболочки следуют за базовой формой в этом морфе.
+        """How the covers follow the base shape under this morph.
 
-        По умолчанию перечисляются все части, как и раньше, но у каждой теперь есть
-        `contact` и `adjacent`. С `only_adjacent` остаются лишь те, что лежат над
-        сдвигаемой кожей, то есть обязаны следовать.
+        By default every shape is listed, as before, but each one now carries `contact` and
+        `adjacent`. With `only_adjacent` only those lying over shifted skin are left - the
+        ones that have to follow.
         """
         touched = self.morphs.for_morph(morph_name)
         base_morph = touched.get(base)
@@ -582,8 +586,8 @@ class Analyzer:
                 lens = base_morph.lengths()[keep]
                 moved[base_morph.indices[keep]] = True
                 shift[base_morph.indices[keep]] = lens
-                # Сдвиг кожи - по тем же вершинам, что и сдвинутая область: номера
-                # за пределами части в счёт не идут.
+                # The shift of the skin goes by the same vertices as the shifted area:
+                # numbers past the end of the shape do not count.
                 base_max = float(lens.max()) if lens.size else 0.0
         out = []
         for shape_name in sorted(self.model.shape_names()):
@@ -603,10 +607,10 @@ class Analyzer:
             out.append(st)
         return out
 
-    # ---- привязки ---------------------------------------------------------------------
+    # ---- bindings ---------------------------------------------------------------------
     def bone_load(self, shape_name: str, needle: str | None = None) -> list[tuple[str, int]]:
-        """Сколько вершин держит каждая кость. Так видно, что ладонь и пальцы — разные
-        хозяева, и во сколько раз пальцы весомее."""
+        """How many vertices each bone holds. This is how it shows that the palm and the
+        fingers have different owners, and by how much the fingers outweigh them."""
         shape = self.model.shape(shape_name)
         rows = [(b.name, b.vertex_count) for b in shape.bones.values()
                 if needle is None or needle.lower() in b.name.lower()]
@@ -615,11 +619,11 @@ class Analyzer:
 
     def morph_bones(self, shape_name: str, morph_name: str,
                     min_share: float | None = None) -> list[tuple[str, float]]:
-        """Каким костям принадлежат вершины, которые двигает морф.
+        """Which bones own the vertices the morph moves.
 
-        Отвечает на вопрос «что именно этот ползунок считает лапой»: если в списке есть
-        кость кисти и нет костей пальцев, ползунок двигает ладонь отдельно от пальцев.
-        Доля None - порог из настроек.
+        Answers the question "what exactly does this slider take for a paw": if the list holds
+        the hand bone and none of the finger bones, the slider moves the palm apart from the
+        fingers. Share None - the threshold from the settings.
         """
         min_share = self.bone_share_min if min_share is None else float(min_share)
         shape = self.model.shape(shape_name)
@@ -641,10 +645,11 @@ class Analyzer:
 
     def bones_left_behind(self, shape_name: str, morph_name: str,
                           min_share: float | None = None) -> list[tuple[str, float]]:
-        """Кости, чьи вершины морф двигает лишь частично.
+        """Bones whose vertices the morph moves only in part.
 
-        Ровно это и есть «перчатка»: часть геометрии кости уехала, часть осталась.
-        Доля - какая часть вершин кости НЕ сдвинулась; None - порог из настроек.
+        This is precisely the "glove": part of the bone's geometry drove off, part stayed
+        behind. The share is how much of the bone's vertices did NOT move; None - the
+        threshold from the settings.
         """
         min_share = self.left_behind_min if min_share is None else float(min_share)
         shape = self.model.shape(shape_name)

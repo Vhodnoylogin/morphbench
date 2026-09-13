@@ -1,10 +1,14 @@
-"""Настройки верстака.
+"""Settings of the workbench.
 
-Набор значений по умолчанию встроен в программу и создаёт файл `morphbench.json` рядом с ней
-при первом запуске. Ничего настраиваемого в коде числом быть не должно: путь к чужой библиотеке,
-размер картинки, углы съёмки, фон и свет, пороги разборов — это настройки, а не константы.
-Ключи, которых в старом файле нет, дописываются в него из умолчаний; значения пользователя
-не трогаются.
+The set of defaults is built into the program and writes `morphbench.json` next to it on the
+first run. Nothing adjustable may sit in the code as a number: the path to somebody else's
+library, the size of a picture, the angles it is shot from, background and light, the
+thresholds of the analyses - these are settings, not constants.
+
+Keys the old file has never heard of are written into it from the defaults; the values the
+user set are left alone. That rewrite on start-up looks like the program overwriting a file
+it does not own - it is not. It only fills in what a newer version added, so that everything
+adjustable stays visible in the file instead of hiding in the code.
 """
 from __future__ import annotations
 
@@ -18,15 +22,16 @@ _ROOT = Path(__file__).resolve().parent.parent
 _FILE = _ROOT / "morphbench.json"
 
 DEFAULTS = {
-    # Язык сообщений: auto - язык системы, иначе код языка из папки locale (en, ru).
+    # Language of the messages: auto - the language of the system, otherwise a language code
+    # from the locale folder (en, ru).
     "language": "auto",
-    # Пусто - значит искать самому в каталоге аддонов Blender.
+    # Empty means: go and find it among the Blender add-ons.
     "pynifly": "",
-    # Растеризатор.
+    # The rasteriser.
     "imageWidth": 900,
     "imageHeight": 900,
     "background": [26, 28, 32],
-    # Съёмка: угол поворота вокруг модели и подъём камеры, в градусах.
+    # Shots: the turn around the model and the lift of the camera, in degrees.
     "views": {
         "front": [0.0, 0.0],
         "side": [90.0, 0.0],
@@ -35,11 +40,11 @@ DEFAULTS = {
         "below": [0.0, -60.0],
         "quarter": [40.0, 15.0],
     },
-    # Свет. За камерой (lightFollowCamera) направление задаётся в осях камеры - вправо,
-    # вверх, к зрителю - и едет вместе с ракурсом: что видно, то и освещено. Отдельно от
-    # камеры - направление в мировых координатах (lightDirection). Силы: рассеянная,
-    # направленная и встречная подсветка с противоположной стороны. Затенение по нормали
-    # вершины (smooth) или по нормали треугольника (flat).
+    # Light. Behind the camera (lightFollowCamera) the direction is given in the axes of the
+    # camera - right, up, towards the viewer - and travels with the shot: whatever is seen is
+    # lit. Detached from the camera, it is a direction in world coordinates (lightDirection).
+    # Strengths: ambient, directed, and a fill coming from the opposite side. Shading by the
+    # normal of the vertex (smooth) or by the normal of the triangle (flat).
     "lightFollowCamera": True,
     "lightCameraDirection": [0.35, 0.45, 0.82],
     "lightDirection": [-0.4, -0.7, 0.6],
@@ -47,64 +52,73 @@ DEFAULTS = {
     "diffuse": 0.65,
     "fill": 0.15,
     "shading": "smooth",
-    # Обзор мешей. Корень по умолчанию: пусто - под MO2 это Data игры из реестра, вне MO2
-    # корень надо назвать. Подпапки корня, где искать меши.
+    # Browsing meshes. The root by default: empty - under MO2 that is the game's Data taken
+    # from the registry, outside MO2 the root has to be named. Subfolders of the root where
+    # meshes are looked for.
     "catalogRoot": "",
     "catalogSubdirs": ["meshes"],
-    # Страница со списком мешей: адрес и порт локального сервера.
+    # The page with the list of meshes: address and port of the local server.
     "serveHost": "127.0.0.1",
     "servePort": 8767,
-    # Журнал сервера. Что писать решает уровень записи (debug, info, warn, error), куда -
-    # приёмники: труба к тому, кто сервер запустил (окно запуска или консоль), и файл рядом
-    # с этими настройками. Пороги у них разные намеренно: опрос состояния пишется уровнем
-    # debug и в окне не виден, а в файле остаётся - там он и нужен, когда разбираются,
-    # что происходило. Пустое имя файла - файл не вести.
+    # The server journal. What gets written is decided by the level of the record (debug,
+    # info, warn, error), where it goes - by the sinks: the pipe back to whoever started the
+    # server (the launcher window or a console) and a file next to these settings. Their
+    # thresholds differ on purpose: a poll for state is written at debug, is not seen in the
+    # window and stays in the file - which is where it is wanted when somebody works out what
+    # went on. An empty file name means no file is kept.
     "logLevel": "info",
     "logFile": "morphbench.log",
     "logFileLevel": "debug",
-    # Слои. Радиус, в котором вершина оболочки считается лежащей над базовой частью
-    # (в единицах модели; оболочки шерсти стоят над кожей в двух-трёх единицах), и доля
-    # таких вершин над сдвигаемой областью, начиная с которой оболочка обязана следовать.
+    # Layers. The radius within which a vertex of an outer layer counts as lying over the base
+    # part (in model units; a fur layer stands two or three units above the skin), and the
+    # share of such vertices over the region being moved from which the outer layer is obliged
+    # to follow.
     "contactRadius": 6.0,
     "minContact": 0.02,
-    # Наведение камеры: запас вокруг части, на которую смотрим, в долях её радиуса.
+    # Aiming the camera: the margin around the part being looked at, in fractions of its
+    # radius.
     "focusPadding": 1.25,
-    # Имя базовой части меша - кожи, за которой следуют оболочки.
+    # Name of the base part of the mesh - the skin the outer layers follow.
     "baseShape": "body",
-    # Разборы. Порог растяжения ребра, с которого оно считается разорванным; доля вершин
-    # морфа на кости, с которой кость попадает в список задетых; доля вершин кости,
-    # оставшихся на месте, с которой кость считается брошенной; наименьшее число вершин
-    # кости, чтобы о ней вообще судить.
+    # Analyses. The stretch of an edge from which it counts as torn; the share of a morph's
+    # vertices sitting on a bone from which the bone lands in the list of affected ones; the
+    # share of a bone's vertices left in place from which the bone counts as abandoned; the
+    # smallest number of vertices a bone needs before it is judged at all.
     "strainThreshold": 0.25,
     "boneShareMin": 0.02,
     "leftBehindMin": 0.35,
     "boneMinVertices": 8,
-    # Бюджет амплитуд: с какой точностью по величине ползунка искать переход через порог
-    # (двоичный поиск в пределах sliderRange).
+    # The budget of amplitudes: how precisely, in slider value, the crossing of a threshold is
+    # looked for (a binary search within sliderRange).
     "budgetResolution": 0.005,
-    # Лицевой формат FRTRI хранит морфы абсолютными координатами; сдвиг короче порога - ноль.
+    # The facial FRTRI format keeps morphs in absolute coordinates; a shift shorter than the
+    # threshold is a zero.
     "frtriEpsilon": 1e-4,
-    # Колайдеры: на сколько долек делить окружность капсулы при отрисовке; наименьший
-    # вес, с которым вершина считается принадлежащей кости при подгонке; процентиль
-    # расстояния до оси, берущийся за радиус (сотня раздула бы капсулу по одной
-    # выпирающей вершине); цвет и прозрачность слоя поверх тела.
+    # Colliders: into how many slices the circle of a capsule is cut when drawn; the smallest
+    # weight at which a vertex counts as belonging to a bone during the fit; the percentile of
+    # the distance to the axis taken for the radius (a hundred would blow the capsule up on a
+    # single vertex sticking out); colour and opacity of the layer over the body.
     "colliderSegments": 14,
-    # Капсулы следуют за частями меша: кость, чьих вершин нет ни в одной видимой части,
-    # капсулу не показывает. Скрыл голову - пропала капсула головы.
+    # Capsules follow the parts of the mesh: a bone with no vertices in any visible part shows
+    # no capsule. Hide the head and the capsule of the head goes with it.
     "collidersFollowParts": True,
-    # Шар охвата части: запас сверх нужного радиуса в долях (1.0 - ровно по геометрии)
-    # и перебор в файле, с которого часть считается исправной (доля лишнего радиуса).
-    # Цепочки для качающейся физики: кому отдана цепочка - подстрока ствола имени кости ->
-    # движок ("smp" или "cbpc"). SMP и CBPC - разные движки, одну кость обоим отдавать
-    # нельзя; цепочка без назначения в вывод настроек не попадает.
+    # The sphere covering a part: the margin over the radius needed, in fractions (1.0 -
+    # exactly by the geometry), and the excess in the file up to which the part still counts
+    # as sound (the share of superfluous radius).
+    # Chains for swinging physics: who a chain is given to - a substring of the stem of the
+    # bone name -> the engine ("smp" or "cbpc"). SMP and CBPC are different engines, the same
+    # bone cannot be given to both; a chain given to nobody does not reach the settings
+    # written out.
     "chainEngines": {},
-    # Числа качающей физики для слоёв показа smp и cbpc. Ядро о форматах обоих движков
-    # не знает: здесь только величины, а в какие строки и теги они ложатся - дело слоя.
-    # SMP, тело звена: масса первого качающегося звена и множитель на каждое следующее
-    # к кончику (хвост легчает к концу); инерция по трём осям; затухания; трение и отскок;
-    # доля силы тяжести; множитель зазора. smpStaticLinks - сколько первых звеньев
-    # цепочки держать неподвижными (0 - опора у цепочки её родитель в скелете,
-    # 1 - первое звено, как у пушистых хвостов).
+    # The numbers of swinging physics for the smp and cbpc presentation layers. The core knows
+    # nothing about the formats of either engine: only the magnitudes are here, and which
+    # lines and tags they end up in is the business of the layer.
+    # SMP, the body of a link: the mass of the first swinging link and the multiplier on each
+    # next one towards the tip (a tail gets lighter towards its end); inertia along three
+    # axes; the dampings; friction and bounce; the share of gravity; the multiplier of the
+    # margin. smpStaticLinks - how many of the first links of the chain are held still
+    # (0 - the chain rests on its parent in the skeleton, 1 - on its own first link, the way
+    # fluffy tails do).
     "smpMass": 0.5,
     "smpMassTaper": 0.7,
     "smpInertia": 200.0,
@@ -116,9 +130,9 @@ DEFAULTS = {
     "smpGravityFactor": 0.0,
     "smpMarginMultiplier": 0.1,
     "smpStaticLinks": 0,
-    # SMP, шарнир между соседними звеньями: пределы сдвига (ноль - звено не отходит
-    # от родителя) и поворота в радианах по осям кости, жёсткости и затухания пружин,
-    # покой поворота.
+    # SMP, the joint between neighbouring links: the limits of the shift (zero - the link does
+    # not move away from its parent) and of the turn in radians along the axes of the bone,
+    # the stiffnesses and the dampings of the springs, the rest angle of the turn.
     "smpLinearLowerLimit": [0.0, 0.0, 0.0],
     "smpLinearUpperLimit": [0.0, 0.0, 0.0],
     "smpAngularLowerLimit": [-0.1, -0.15, -0.1],
@@ -128,14 +142,16 @@ DEFAULTS = {
     "smpConstraintLinearDamping": [15.0, 15.0, 15.0],
     "smpConstraintAngularDamping": [15.0, 15.0, 15.0],
     "smpAngularEquilibrium": [0.0, 0.0, 0.0],
-    # SMP, форма столкновения по вершинам части меша: зазор и допустимая глубина.
+    # SMP, the collision shape built on the vertices of a mesh part: the margin and the depth
+    # allowed.
     "smpMargin": 0.1,
     "smpPenetration": 0.2,
-    # CBPC, качание группы: линейная и квадратичная жёсткость пружины, затухание
-    # (доля скорости за такт), предел ухода от цели по каждой оси (± единиц), такт
-    # в мс, общая скорость, размах движения по осям (X вбок, Y вперёд-назад, Z вверх),
-    # размах поворота, куда линейная сила переходит в поворот (строки X, Y, Z - в какие
-    # оси поворота), растекание силы на соседние оси.
+    # CBPC, the swing of a group: the linear and the quadratic stiffness of the spring, the
+    # damping (the share of the speed per tick), the limit of straying from the target along
+    # each axis (± units), the tick in ms, the overall speed, the range of movement along the
+    # axes (X sideways, Y back and forth, Z up), the range of the turn, where a linear force
+    # passes into a turn (the rows X, Y, Z - into which axes of the turn), the spill of the
+    # force onto neighbouring axes.
     "cbpcStiffness": 0.03,
     "cbpcStiffness2": 0.01,
     "cbpcDamping": 0.05,
@@ -146,8 +162,9 @@ DEFAULTS = {
     "cbpcRotational": [0.15, 0.0, 0.0],
     "cbpcLinearRotation": [[0.0, 1.0, 0.0], [0.0, 0.0, 1.0], [1.0, 0.0, 0.0]],
     "cbpcSpreadForce": 0.0,
-    # CBPC, столкновения: трение, чувствительность, сила толчка и поворота от толчка,
-    # упругость (1 - есть, 0 - нет), предел ухода от толчка (± единиц).
+    # CBPC, collisions: friction, sensitivity, the force of a push and of the turn the push
+    # gives, elasticity (1 - there is some, 0 - none), the limit of straying from a push
+    # (± units).
     "cbpcCollisionFriction": 0.8,
     "cbpcCollisionPenetration": 0.0,
     "cbpcCollisionMultiplier": 1.0,
@@ -156,21 +173,23 @@ DEFAULTS = {
     "cbpcCollisionOffset": 100.0,
     "boundsMargin": 1.01,
     "boundsTolerance": 0.01,
-    # Сколько ползунков на одну вершину ещё перебираются по углам точно (2^N наборов);
-    # вершины с большим числом меряются прикидкой по направлению.
+    # How many sliders on one vertex are still gone through corner by corner exactly
+    # (2^N combinations); vertices carrying more than that are measured by an estimate along
+    # the direction.
     "boundsCornerCap": 12,
-    # Файл скелета, который подбирается рядом с мешем сам, - в той же папке.
+    # The skeleton file picked up next to the mesh by itself - in the same folder.
     "skeletonFile": "skeleton.nif",
     "colliderMinWeight": 0.5,
     "colliderFitPercentile": 90.0,
-    # Связка: способ резать облако кожи на куски (axis - ломтики вдоль оси кости,
-    # kmeans - сгустки по близости) и наименьший кусок, на который садится капсула.
+    # The bundle: how to cut the cloud of skin into pieces (axis - slices along the axis of
+    # the bone, kmeans - clumps by proximity) and the smallest piece a capsule is seated on.
     "bundleSplit": "kmeans",
     "bundleMinPoints": 12,
     "colliderColour": [90, 200, 255],
     "colliderOpacity": 0.45,
-    # Слои показа: доля кадра под модель; на странице - пределы и шаг ползунков,
-    # чувствительность орбиты (градусов на пиксель) и скорость колеса.
+    # Presentation layers: the share of the frame given to the model; on the page - the limits
+    # and the step of the sliders, the sensitivity of the orbit (degrees per pixel) and the
+    # rate of the wheel.
     "frameFill": 0.92,
     "sliderRange": [0.0, 1.0],
     "sliderStep": 0.01,
@@ -180,7 +199,7 @@ DEFAULTS = {
 
 
 class Config:
-    """Настройки как объект, а не как словарь, разбросанный по коду."""
+    """The settings as an object, not as a dictionary scattered through the code."""
 
     def __init__(self, path: Path | None = None):
         self.path = Path(path) if path else _FILE
@@ -190,11 +209,12 @@ class Config:
         raw = json.loads(self.path.read_text(encoding="utf-8-sig"))
         self._values = {**DEFAULTS, **raw}
         if any(key not in raw for key in DEFAULTS):
-            # Файл старше программы: дописать новые ключи, чтобы было видно, что настраивается.
+            # The file is older than the program: write the new keys in, so that what is
+            # adjustable can be seen.
             self.path.write_text(json.dumps(self._values, indent=2, ensure_ascii=False),
                                  encoding="utf-8")
-        # Язык сообщений применяется здесь: настройки читает всякий, кто вообще что-то
-        # делает, и это самая ранняя точка, где язык уже известен.
+        # The language of the messages is applied here: the settings are read by everyone who
+        # does anything at all, and this is the earliest point at which the language is known.
         use(self._values.get("language", "auto"))
 
     def __getitem__(self, key: str):
@@ -204,19 +224,20 @@ class Config:
         return self._values.get(key, default)
 
     def set(self, key: str, value) -> None:
-        """Значение на этот запуск: в памяти, файл не трогается."""
+        """A value for this run: in memory, the file is not touched."""
         self._values[key] = value
 
-    # ---- то, что нельзя записать числом: чужая библиотека ----------------------------
+    # ---- what cannot be written down as a number: somebody else's library ---------------
     def pynifly_root(self) -> Path:
-        """Папка аддона PyNifly. Явная настройка перевешивает поиск."""
+        """The folder of the PyNifly add-on. An explicit setting outweighs the search."""
         if self._values.get("pynifly"):
             p = Path(self._values["pynifly"])
             if p.is_dir():
                 return p
             raise FileNotFoundError(t("config.pyniflyBadPath", path=p))
-        # Выпуск самодостаточен: аддон лежит внутри пакета и смотрится первым. В рабочей
-        # копии этой папки нет, и поиск идёт дальше - среди аддонов Blender.
+        # A release is self-contained: the add-on lies inside the package and is looked at
+        # first. A working copy has no such folder, and the search goes on - among the
+        # Blender add-ons.
         inside = _ROOT / "vendor" / "io_scene_nifly"
         if inside.is_dir():
             return inside

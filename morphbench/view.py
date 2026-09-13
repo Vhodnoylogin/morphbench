@@ -1,12 +1,12 @@
-"""Состояние показа — числами.
+"""The state of the view - as numbers.
 
-Здесь нет ни одного пикселя и ни одной строки разметки: только куда смотрит камера, какие
-части меша включены и по какому признаку красить вершины. Слои показа берут эти числа
-и рисуют; ядро о том, как именно, не знает.
+Not a pixel here and not a line of markup: only where the camera looks, which shapes of the
+mesh are on, and what the vertices are coloured by. The presentation layers take these
+numbers and draw; the core does not know how they do it.
 
-Ради этого состояние и вынесено в объект: поворот камеры в будущем окне — это вызов
-`orbit`, а не отдельная жизнь внутри окна. Наведение на часть тела — тоже числа: центр
-и радиус того, что должно попасть в кадр.
+That is what the state was pulled out into an object for: turning the camera in a future
+window is a call to `orbit`, not a life of its own inside that window. Aiming at a part of
+the body is numbers too - the centre and the radius of what has to be in frame.
 """
 from __future__ import annotations
 
@@ -17,7 +17,7 @@ from .i18n import t
 
 
 class ViewState:
-    """Камера, видимые части, способ раскраски и наведение."""
+    """The camera, the visible shapes, the way of colouring and the aim."""
 
     COLOURINGS = ("shade", "bone", "morph", "strain")
 
@@ -26,34 +26,35 @@ class ViewState:
         self.yaw = 0.0
         self.pitch = 0.0
         self.zoom = 1.0
-        # Панорама: сдвиг кадра вдоль осей экрана - вправо и вверх - в единицах модели.
+        # Panning: the frame shifted along the screen axes - right and up - in model units.
         self.pan = np.zeros(2, dtype=np.float32)
-        self.visible: set[str] | None = None      # None - видно всё
+        self.visible: set[str] | None = None      # None - everything is visible
         self.colouring = "shade"
-        # Слой капсул поверх тела: числом, потому что состояние показа - дело ядра,
-        # а рисование - дело слоя показа.
+        # The capsule layer over the body: a flag, because what is on show is the core's
+        # business, and drawing it is the business of the presentation layer.
         self.colliders = False
         self.bumper = False
         self.highlight_morph: str | None = None
         self.width = int(cfg["imageWidth"])
         self.height = int(cfg["imageHeight"])
-        # Наведение: None - кадр охватывает модель целиком.
+        # The aim: None - the frame takes in the whole model.
         self.focus_centre: np.ndarray | None = None
         self.focus_radius: float | None = None
         self.focus_name: str | None = None
-        # Свет: за камерой (направление в осях камеры - вправо, вверх, к зрителю) либо
-        # отдельно (направление в мировых координатах); силы рассеянной, направленной
-        # и встречной подсветки.
+        # Light: behind the camera (the direction in camera axes - right, up, towards the
+        # viewer) or on its own (the direction in world coordinates); the powers of the
+        # ambient, the diffuse and the fill light.
         self.light_follow = bool(cfg["lightFollowCamera"])
         self.light_camera_dir = np.asarray(cfg["lightCameraDirection"], dtype=np.float32).reshape(3)
         self.light_world_dir = np.asarray(cfg["lightDirection"], dtype=np.float32).reshape(3)
         self.ambient = float(cfg["ambient"])
         self.diffuse = float(cfg["diffuse"])
         self.fill = float(cfg["fill"])
-        # Полуразмах последнего кадра: по нему масштаб к точке переводит доли кадра в единицы.
+        # Half-span of the last frame: zooming at a point uses it to turn fractions of the
+        # frame into model units.
         self.frame_half: float | None = None
 
-    # ---- камера -----------------------------------------------------------------------
+    # ---- camera -----------------------------------------------------------------------
     def orbit(self, d_yaw: float, d_pitch: float) -> "ViewState":
         self.yaw = (self.yaw + d_yaw) % 360.0
         self.pitch = max(-89.0, min(89.0, self.pitch + d_pitch))
@@ -73,7 +74,7 @@ class ViewState:
         return sorted(self.cfg["views"])
 
     def preset_name(self) -> str | None:
-        """Имя ракурса из настроек, с которым совпадает текущая камера, либо None."""
+        """The name of the view from the settings that the camera matches right now, or None."""
         yaw, pitch = round(self.yaw, 1), round(self.pitch, 1)
         for name, (y, p) in self.cfg["views"].items():
             if round(float(y) % 360.0, 1) == yaw and round(float(p), 1) == pitch:
@@ -85,10 +86,11 @@ class ViewState:
         return self
 
     def zoom_at(self, factor: float, fx: float, fy: float) -> "ViewState":
-        """Масштаб к точке: новый масштаб `factor` при том, что точка сцены под курсором
-        остаётся на месте. `fx`, `fy` - положение курсора от центра кадра в долях половины
-        меньшей стороны холста: вправо и вверх, -1..1. Нужен полуразмах последнего кадра -
-        его оставляет framing(); без него точка неизвестна, и масштаб идёт от центра."""
+        """Zoom at a point: the new zoom is `factor`, and the point of the scene under the
+        cursor stays where it is. `fx`, `fy` - where the cursor is relative to the centre of
+        the frame, in fractions of half the shorter side of the canvas: right and up, -1..1.
+        The half-span of the last frame is needed - framing() leaves it behind; without it
+        the point is unknown, and the zoom goes from the centre."""
         old = self.zoom
         new = max(0.05, float(factor))
         if self.frame_half is not None and old > 0.0 and new != old:
@@ -106,17 +108,18 @@ class ViewState:
         return self
 
     def set_pan(self, dx: float, dy: float) -> "ViewState":
-        """Сдвинуть кадр вдоль осей экрана: вправо и вверх, в единицах модели. (0, 0) - по центру."""
+        """Shift the frame along the screen axes: right and up, in model units. (0, 0) - centred."""
         self.pan = np.array([dx, dy], dtype=np.float32)
         return self
 
     def pan_by(self, dx: float, dy: float) -> "ViewState":
         return self.set_pan(float(self.pan[0]) + dx, float(self.pan[1]) + dy)
 
-    # ---- наведение --------------------------------------------------------------------
+    # ---- the aim ----------------------------------------------------------------------
     def focus_on(self, centre, radius: float, name: str | None = None) -> "ViewState":
-        """Смотреть на сферу: центр в координатах модели и радиус. Что это за сфера —
-        кость, морф или часть меша — камере всё равно; имя хранится для отчёта."""
+        """Look at a sphere: the centre in model coordinates, and the radius. What the sphere
+        is - a bone, a morph or a shape of the mesh - is all the same to the camera; the name
+        is kept for the report."""
         self.focus_centre = np.asarray(centre, dtype=np.float32).reshape(3)
         self.focus_radius = max(float(radius), 1e-3)
         self.focus_name = name
@@ -133,9 +136,9 @@ class ViewState:
         return self.focus_centre is not None
 
     def framing(self, centre, half_span: float) -> tuple[np.ndarray, float]:
-        """Центр и полуразмах кадра. Если камера наведена — её сфера с запасом из настроек,
-        иначе то, что передал рисующий слой (обычно охват всей модели). Панорама сдвигает
-        центр вдоль осей экрана."""
+        """The centre and the half-span of the frame. When the camera is aimed - its sphere
+        with the padding from the settings; otherwise what the drawing layer passed in
+        (usually the whole model). Panning shifts the centre along the screen axes."""
         if self.focus_centre is None:
             c, half = np.asarray(centre, dtype=np.float32).reshape(3), float(half_span)
         else:
@@ -146,15 +149,15 @@ class ViewState:
         self.frame_half = float(half)
         return c, half
 
-    # ---- свет --------------------------------------------------------------------------
+    # ---- light ------------------------------------------------------------------------
     def light_follow_camera(self, on: bool) -> "ViewState":
-        """Свет за камерой: источник едет вместе с ракурсом, что видно - то и освещено."""
+        """Light behind the camera: the source travels with the view, so what is seen is lit."""
         self.light_follow = bool(on)
         return self
 
     def light_direction(self, x: float, y: float, z: float) -> "ViewState":
-        """Направление НА источник. За камерой - в осях камеры (вправо, вверх, к зрителю),
-        отдельно - в мировых координатах. Нулевой вектор отвергается."""
+        """The direction TOWARDS the source. Behind the camera - in camera axes (right, up,
+        towards the viewer); on its own - in world coordinates. A zero vector is refused."""
         v = np.asarray([x, y, z], dtype=np.float32)
         if not np.all(np.isfinite(v)) or float(np.linalg.norm(v)) < 1e-6:
             raise ValueError(t("view.zeroLight"))
@@ -166,7 +169,7 @@ class ViewState:
 
     def light_power(self, ambient: float | None = None, diffuse: float | None = None,
                     fill: float | None = None) -> "ViewState":
-        """Силы света: рассеянная, направленная, встречная подсветка. None - не менять."""
+        """The powers of the light: ambient, diffuse, fill. None - leave that one alone."""
         for name, value in (("ambient", ambient), ("diffuse", diffuse), ("fill", fill)):
             if value is None:
                 continue
@@ -177,7 +180,7 @@ class ViewState:
         return self
 
     def light_reset(self) -> "ViewState":
-        """Свет как в настройках: режим, оба направления и силы."""
+        """Light as the settings have it: the mode, both directions and the powers."""
         cfg = self.cfg
         self.light_follow = bool(cfg["lightFollowCamera"])
         self.light_camera_dir = np.asarray(cfg["lightCameraDirection"], dtype=np.float32).reshape(3)
@@ -187,7 +190,8 @@ class ViewState:
         return self
 
     def light_vector(self) -> np.ndarray:
-        """Единичный вектор на источник в мировых координатах - то, что нужно рисующему."""
+        """The unit vector towards the source in world coordinates - what the drawing layer
+        needs."""
         if self.light_follow:
             right, up, forward = self.basis()
             d = self.light_camera_dir
@@ -198,8 +202,9 @@ class ViewState:
         return (v / n).astype(np.float32) if n > 1e-6 else np.array([0.0, 0.0, 1.0], np.float32)
 
     def light_state(self, precise: bool = False) -> dict:
-        """Свет числами: режим, направление текущего режима и оба направления отдельно,
-        силы. `precise` - без округления, для слоёв, которые считают по этим числам."""
+        """The light as numbers: the mode, the direction of the current mode and both
+        directions apart, the powers. `precise` - no rounding, for layers that compute from
+        these numbers."""
         r = (lambda x: float(x)) if precise else (lambda x: round(float(x), 3))
         d = self.light_camera_dir if self.light_follow else self.light_world_dir
         return {"follow": self.light_follow,
@@ -208,17 +213,18 @@ class ViewState:
                 "worldDirection": [r(x) for x in self.light_world_dir],
                 "ambient": r(self.ambient), "diffuse": r(self.diffuse), "fill": r(self.fill)}
 
-    # ---- слой капсул ------------------------------------------------------------------
+    # ---- the capsule layer ------------------------------------------------------------
     def show_colliders(self, on: bool = True, bumper: bool | None = None) -> dict:
-        """Слой капсул столкновений поверх тела. Бампер - цилиндр перемещения - отдельно
-        и по умолчанию выключен: он вчетверо больше любой части тела и закрыл бы собой
-        ровно то, ради чего слой и смотрят. None - не менять."""
+        """The layer of collision capsules over the body. The bumper - the cylinder the
+        character moves with - is separate and off by default: it is four times the size of
+        any part of the body and would hide exactly what the layer is there to show.
+        None - leave that one alone."""
         self.colliders = bool(on)
         if bumper is not None:
             self.bumper = bool(bumper)
         return {"colliders": self.colliders, "bumper": self.bumper}
 
-    # ---- слои -------------------------------------------------------------------------
+    # ---- layers -----------------------------------------------------------------------
     def show_all(self) -> "ViewState":
         self.visible = None
         return self
@@ -241,7 +247,7 @@ class ViewState:
     def is_visible(self, name: str) -> bool:
         return self.visible is None or name in self.visible
 
-    # ---- раскраска --------------------------------------------------------------------
+    # ---- colouring --------------------------------------------------------------------
     def colour_by(self, mode: str, morph: str | None = None) -> "ViewState":
         if mode not in self.COLOURINGS:
             raise ValueError(t("view.badColouring", have=", ".join(self.COLOURINGS)))
@@ -249,12 +255,12 @@ class ViewState:
         self.highlight_morph = morph
         return self
 
-    # ---- то, что нужно рисующему слою -------------------------------------------------
+    # ---- what the drawing layer needs -------------------------------------------------
     def basis(self) -> np.ndarray:
-        """Три оси камеры: вправо, вверх, от зрителя к модели.
+        """The three axes of the camera: right, up, and from the viewer towards the model.
 
-        Персонаж Skyrim смотрит вдоль +Y, поэтому нулевой поворот ставит камеру перед ним:
-        взгляд идёт навстречу, в сторону -Y.
+        A Skyrim character faces along +Y, so a yaw of zero puts the camera in front of it:
+        the look goes to meet it, towards -Y.
         """
         ry, rp = math.radians(self.yaw), math.radians(self.pitch)
         forward = np.array([-math.sin(ry) * math.cos(rp),
@@ -268,8 +274,9 @@ class ViewState:
         return np.stack([right, up, forward])
 
     def as_dict(self, precise: bool = False) -> dict:
-        """Состояние показа словарём из чисел. По умолчанию числа округлены для глаза
-        и командной строки; `precise` отдаёт их как есть - слою, который по ним считает."""
+        """The state of the view as a dictionary of numbers. By default the numbers are
+        rounded for the eye and for the command line; `precise` hands them over as they are,
+        to a layer that computes from them."""
         r = (lambda x, n: float(x)) if precise else (lambda x, n: round(float(x), n))
         return {"yaw": r(self.yaw, 1), "pitch": r(self.pitch, 1),
                 "preset": self.preset_name(),

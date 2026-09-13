@@ -1,9 +1,10 @@
-"""Тело: части меша, вершины, треугольники и привязки к костям.
+"""The body: the shapes of a mesh, its vertices, its triangles and its bone weights.
 
-Ни строчки про изображение. Здесь только числа: где лежит вершина, какому треугольнику
-она принадлежит, каким костям и с каким весом отдана.
+Not a line about the picture. Numbers only: where a vertex lies, which triangle it belongs
+to, which bones hold it and with what weight.
 
-Разбор формата берётся у nifly через обвязку PyNifly — своего читателя NIF тут нет.
+The format is read by nifly through the PyNifly wrapper - there is no NIF reader of our own
+here.
 """
 from __future__ import annotations
 
@@ -19,25 +20,26 @@ from .i18n import t
 
 
 def load_nifly(cfg: Config):
-    """Обвязка PyNifly грузится один раз за жизнь процесса: она тянет за собой NiflyDLL."""
+    """The PyNifly wrapper is loaded once in the life of the process: it drags NiflyDLL in
+    behind it."""
     root = cfg.pynifly_root()
     if str(root) not in sys.path:
         sys.path.insert(0, str(root))
-    from pyn import pynifly  # noqa: WPS433 - импорт по месту, библиотека внешняя
+    from pyn import pynifly  # noqa: WPS433 - imported here on purpose, the library is external
     if getattr(pynifly.NifFile, "nifly", None) is None:
         pynifly.NifFile.Load(str(root / "NiflyDLL.dll"))
     return pynifly
 
 
 def vertex_normals(verts: np.ndarray, tris: np.ndarray) -> np.ndarray:
-    """Нормаль в каждой вершине: сумма нормалей прилегающих треугольников, взвешенных
-    их площадью, приведённая к единичной длине. Вершины без треугольников смотрят вверх."""
+    """The normal at every vertex: the sum of the normals of the adjoining triangles, each
+    weighted by its area, brought to unit length. A vertex with no triangles points up."""
     v = np.asarray(verts, dtype=np.float32).reshape(-1, 3)
     out = np.zeros_like(v)
     if tris is not None and len(tris):
         faces = np.asarray(tris, dtype=np.int32).reshape(-1, 3)
         a, b, c = v[faces[:, 0]], v[faces[:, 1]], v[faces[:, 2]]
-        face = np.cross(b - a, c - a)          # длина - удвоенная площадь: вес сам собой
+        face = np.cross(b - a, c - a)          # length is twice the area: the weight comes free
         for k in range(3):
             np.add.at(out, faces[:, k], face)
     n = np.linalg.norm(out, axis=1, keepdims=True)
@@ -48,8 +50,8 @@ def vertex_normals(verts: np.ndarray, tris: np.ndarray) -> np.ndarray:
 
 
 def sphere_of(points: np.ndarray) -> tuple[np.ndarray, float]:
-    """Центр и радиус сферы, охватывающей облако точек: середина охвата и наибольшее
-    расстояние до неё. Для пустого облака — ноль в начале координат."""
+    """The centre and the radius of a sphere around a cloud of points: the middle of the
+    extent and the greatest distance to it. An empty cloud gives zero at the origin."""
     pts = np.asarray(points, dtype=np.float32).reshape(-1, 3)
     if pts.shape[0] == 0:
         return np.zeros(3, dtype=np.float32), 0.0
@@ -58,7 +60,7 @@ def sphere_of(points: np.ndarray) -> tuple[np.ndarray, float]:
 
 
 class Bone:
-    """Кость скелета в том виде, в каком её знает меш: имя и вершины, которые на ней висят."""
+    """A bone of the skeleton as the mesh knows it: a name, and the vertices hanging on it."""
 
     __slots__ = ("name", "weights")
 
@@ -71,7 +73,8 @@ class Bone:
         return len(self.weights)
 
     def mask(self, count: int) -> np.ndarray:
-        """Вектор весов длиной во все вершины части меша — нули там, где кость не влияет."""
+        """A vector of weights, one per vertex of the shape - zero where the bone has no
+        say."""
         out = np.zeros(count, dtype=np.float32)
         if self.weights:
             idx = np.fromiter(self.weights.keys(), dtype=np.int32, count=len(self.weights))
@@ -81,11 +84,11 @@ class Bone:
         return out
 
     def __repr__(self) -> str:
-        return "Bone(%r, вершин=%d)" % (self.name, self.vertex_count)
+        return "Bone(%r, vertices=%d)" % (self.name, self.vertex_count)
 
 
 class Shape:
-    """Одна часть меша: кожа, оболочка шерсти, заплатка шва, когти, глаза."""
+    """One shape of the mesh: the skin, a fur shell, a seam patch, the claws, the eyes."""
 
     def __init__(self, name: str, verts: np.ndarray, tris: np.ndarray,
                  normals: np.ndarray | None, uvs: np.ndarray | None,
@@ -97,10 +100,11 @@ class Shape:
         self.uvs = uvs
         self.bones = bones
         self.textures = textures or []
-        # Как часть записана в файле: шар охвата и номер блока - для проверки и правки.
+        # How the shape is written in the file: the bounding sphere and the block number -
+        # for checking it and for patching it.
         self.bound: Sphere | None = None
         self.block: int = -1
-        # Главная кость каждой вершины считается один раз: части меша не меняются.
+        # The dominant bone of each vertex is worked out once: the shapes do not change.
         self._dominant: np.ndarray | None = None
 
     @property
@@ -112,8 +116,9 @@ class Shape:
         return int(self.tris.shape[0])
 
     def bounds(self, indices=None) -> tuple[np.ndarray, np.ndarray]:
-        """Охват облака вершин: минимум и максимум по каждой оси. Номера вершин за пределами
-        части отбрасываются: файл морфов мог быть собран под другой меш."""
+        """The extent of a cloud of vertices: the least and the greatest along each axis.
+        Vertex numbers outside the shape are thrown away: the morph file may have been built
+        for another mesh."""
         if indices is None:
             v = self.verts
         else:
@@ -124,7 +129,7 @@ class Shape:
         return v.min(axis=0), v.max(axis=0)
 
     def sphere(self, indices=None) -> tuple[np.ndarray, float]:
-        """Центр и радиус охвата части целиком или её подмножества вершин."""
+        """The centre and the radius around the whole shape, or around some of its vertices."""
         v = self.verts if indices is None else self.verts[np.asarray(indices, dtype=np.int32)]
         return sphere_of(v)
 
@@ -136,8 +141,8 @@ class Shape:
         return [b for n, b in self.bones.items() if low in n.lower()]
 
     def bone_vertices(self, needle: str, exact: bool = False) -> np.ndarray:
-        """Номера вершин, которые держат кости с таким именем: подстрока без учёта
-        регистра, либо точное имя. По подстроке «Finger» соберутся все пальцы."""
+        """The numbers of the vertices held by bones with such a name: a substring, case
+        ignored, or the exact name. The substring `Finger` gathers every finger."""
         low = needle.lower()
         acc: set[int] = set()
         for name, bone in self.bones.items():
@@ -147,10 +152,10 @@ class Shape:
         return idx[idx < self.vertex_count]
 
     def dominant_bone(self) -> np.ndarray:
-        """Для каждой вершины — номер кости, которая держит её сильнее прочих.
+        """For each vertex - the number of the bone that holds it harder than any other.
 
-        Это ответ на вопрос «к чему привязана точка»: именно по нему видно, что ладонь
-        и пальцы — разные хозяева, и где между ними проходит граница.
+        This is the answer to "what is this point attached to": it is what shows that the
+        palm and the fingers have different owners, and where the border between them runs.
         """
         if self._dominant is None:
             n = self.vertex_count
@@ -166,13 +171,13 @@ class Shape:
 
     def owned_vertices(self, bone_name: str, min_weight: float = 0.0,
                        dominant: bool = True) -> np.ndarray:
-        """Номера вершин, которые принадлежат кости с точным именем.
+        """The numbers of the vertices that belong to the bone with this exact name.
 
-        `dominant` отдаёт вершину той кости, которая держит её сильнее всех, - это
-        умолчание. Иначе цепочки - хвост, пальцы - расплываются: соседние звенья делят
-        одни и те же вершины, каждое видит почти весь хвост и раздувается на него целиком.
-        Порог веса при этом остаётся нижней границей: вершина, которую не держит толком
-        никто, не достаётся никому.
+        `dominant` gives a vertex to the bone that holds it harder than any other, and that
+        is the default. Without it chains - a tail, the fingers - smear out: neighbouring
+        links share the same vertices, each link sees almost the whole tail and swells to
+        cover all of it. The weight threshold stays a lower bound all the same: a vertex
+        that nobody really holds goes to nobody.
         """
         bone = self.bones.get(bone_name)
         if bone is None:
@@ -187,21 +192,22 @@ class Shape:
         return list(self.bones.keys())
 
     def held_bones(self, min_vertices: int = 1) -> list[str]:
-        """Кости, которым эта часть принадлежит по-настоящему: главные хотя бы для
-        `min_vertices` её вершин. Кость с крошечным весом на краю части сюда не попадает:
-        кость головы держит по чуть-чуть и кожу шеи, но кожа - не голова."""
+        """The bones this shape really belongs to: dominant over at least `min_vertices` of
+        its vertices. A bone with a tiny weight at the edge of the shape does not get in
+        here: the head bone holds a little of the neck skin too, but the skin is not the
+        head."""
         counts = np.bincount(self.dominant_bone()[self.dominant_bone() >= 0],
                              minlength=len(self.bones))
         names = list(self.bones)
         return [names[i] for i in range(len(names)) if counts[i] >= max(1, int(min_vertices))]
 
     def __repr__(self) -> str:
-        return "Shape(%r, вершин=%d, треугольников=%d, костей=%d)" % (
+        return "Shape(%r, vertices=%d, triangles=%d, bones=%d)" % (
             self.name, self.vertex_count, self.triangle_count, len(self.bones))
 
 
 class BodyModel:
-    """Меш целиком: набор частей, прочитанных из одного файла."""
+    """The whole mesh: the set of shapes read out of one file."""
 
     def __init__(self, path: Path, shapes: dict[str, Shape]):
         self.path = Path(path)
@@ -224,7 +230,8 @@ class BodyModel:
             uvs = np.asarray(s.uvs, dtype=np.float32).reshape(-1, 2) if s.uvs else None
             raw = s.bone_weights or {}
             bones = {name: Bone(name, dict(pairs)) for name, pairs in raw.items()}
-            textures = [t for t in (s.textures.values() if hasattr(s, "textures") else []) if t]
+            textures = [tex for tex in (s.textures.values() if hasattr(s, "textures") else [])
+                        if tex]
             shape = Shape(s.name, verts, tris, normals, uvs, bones, textures)
             pr = getattr(s, "properties", None)
             if pr is not None and hasattr(pr, "boundingSphereRadius"):
@@ -264,7 +271,7 @@ class BodyModel:
 
     def bone_points(self, needle: str, exact: bool = False,
                     shape: str | None = None) -> np.ndarray:
-        """Вершины всех частей (или одной), которые держат кости с таким именем."""
+        """The vertices of every shape (or of one) held by bones with such a name."""
         names = [shape] if shape else self.shape_names()
         chunks = []
         for n in names:
@@ -275,5 +282,5 @@ class BodyModel:
         return np.vstack(chunks) if chunks else np.zeros((0, 3), dtype=np.float32)
 
     def __repr__(self) -> str:
-        return "BodyModel(%r, частей=%d, вершин=%d)" % (
+        return "BodyModel(%r, shapes=%d, vertices=%d)" % (
             self.path.name, len(self.shapes), self.vertex_count)

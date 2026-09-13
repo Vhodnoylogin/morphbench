@@ -1,4 +1,4 @@
-"""Ядро верстака: объекты и вычисления, ни строчки про изображение."""
+"""The core of the tool: the objects and the arithmetic, not a line about how it is drawn."""
 from .api import MorphBench
 from .catalog import Catalog, CatalogEntry
 from .config import Config

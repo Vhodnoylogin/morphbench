@@ -1,9 +1,10 @@
-"""Обзор мешей: какие тела есть в папке и к какому подобран файл морфов.
+"""Browsing meshes: what bodies a folder holds, and which morph file goes with each.
 
-Каталог обходит корень, находит `.nif` и к каждому ищет `.tri` рядом: с тем же именем либо
-с тем же именем без суффикса веса `_0`/`_1`. Файлы не открываются - только имена и заголовок
-морфов из первых байтов, поэтому обход тысяч мешей сборки не требует ни nifly, ни секунд
-на каждый. Открыть выбранное - дело фасада.
+The catalogue walks a root, finds the `.nif` files and looks beside each one for a `.tri`:
+either the same name, or the same name without the weight suffix `_0`/`_1`. Nothing is
+opened - only names, plus the morph header read from the first few bytes - so walking the
+thousands of meshes of a build needs neither nifly nor a second per mesh. Opening the one
+that was picked is the facade's business.
 """
 from __future__ import annotations
 
@@ -16,7 +17,7 @@ from .i18n import t
 
 
 class CatalogEntry:
-    """Один меш: путь, подобранный файл морфов и его формат."""
+    """One mesh: its path, the morph file matched to it, and that file's format."""
 
     __slots__ = ("root", "nif", "tri", "kind")
 
@@ -28,7 +29,8 @@ class CatalogEntry:
 
     @property
     def name(self) -> str:
-        """Имя записи - путь от корня, прямыми косыми: им же запись и выбирают."""
+        """The name of an entry - its path from the root, with forward slashes: the same
+        string picks the entry back out."""
         return self.nif.relative_to(self.root).as_posix()
 
     @property
@@ -42,12 +44,12 @@ class CatalogEntry:
                 "file": self.nif.name}
 
     def __repr__(self) -> str:
-        return "CatalogEntry(%r, морфы=%s)" % (self.name, self.kind or "нет")
+        return "CatalogEntry(%r, morphs=%s)" % (self.name, self.kind or "none")
 
 
 class Catalog:
-    """Меши под корнем, с подобранными морфами. Обход делается один раз, при первом
-    обращении; `rescan()` повторяет его."""
+    """The meshes under a root, with their morphs matched. The walk happens once, at the
+    first question; `rescan()` repeats it."""
 
     def __init__(self, root, subdirs=None, with_morphs: bool = True):
         self.root = Path(root)
@@ -57,9 +59,10 @@ class Catalog:
         self.with_morphs = bool(with_morphs)
         self._entries: list[CatalogEntry] | None = None
 
-    # ---- обход ------------------------------------------------------------------------
+    # ---- the walk ---------------------------------------------------------------------
     def _walk_roots(self) -> list[Path]:
-        """Где искать: названные подпапки корня, если они есть, иначе весь корень."""
+        """Where to look: the named subfolders of the root if they are there, the whole
+        root otherwise."""
         found = [self.root / s for s in self.subdirs if dir_exists(self.root / s)]
         return found or [self.root]
 
@@ -81,8 +84,9 @@ class Catalog:
         seen: set[str] = set()
         for base in self._walk_roots():
             for dirpath, dirs, files in os.walk(base):
-                # Связанные папки (junction) обходятся - так устроены папки модов, - но
-                # каждая настоящая папка только раз: петля внутрь корня иначе бесконечна.
+                # Linked folders (junctions) are walked - that is how mod folders are put
+                # together - but every real folder only once: a loop back into the root is
+                # endless otherwise.
                 real = os.path.normcase(os.path.realpath(dirpath))
                 if real in seen:
                     dirs[:] = []
@@ -119,13 +123,14 @@ class Catalog:
             self.rescan()
         return self._entries
 
-    # ---- вопросы ----------------------------------------------------------------------
+    # ---- questions --------------------------------------------------------------------
     def find(self, needle: str) -> list[CatalogEntry]:
         low = needle.lower()
         return [e for e in self.entries if low in e.name.lower()]
 
     def get(self, key) -> CatalogEntry:
-        """Запись по номеру в списке либо по имени (пути от корня, любой косой)."""
+        """An entry by its number in the list, or by name (the path from the root, either
+        slash)."""
         entries = self.entries
         if isinstance(key, numbers.Integral) and not isinstance(key, bool):
             key = int(key)
@@ -149,4 +154,4 @@ class Catalog:
         return len(self.entries)
 
     def __repr__(self) -> str:
-        return "Catalog(%r, мешей=%d)" % (str(self.root), len(self))
+        return "Catalog(%r, meshes=%d)" % (str(self.root), len(self))

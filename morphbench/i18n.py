@@ -183,7 +183,14 @@ class Catalogue:
 
 
 #: The catalogue everything uses. One per process: the language is a property of the run.
-CATALOGUE = Catalogue()
+#:
+#: The environment variable is read here, at the first import, and not only when somebody
+#: calls `use()`. It has to be: until a setting is read the catalogue already answers
+#: questions, and whether it answers them in the right language must not depend on which
+#: module happened to be imported first. That dependency was real - the tests pinned the
+#: language through the variable and got it only because building a `Config` calls `use()`
+#: on the way past.
+CATALOGUE = Catalogue(_os.environ.get(ENV) or "auto")
 
 
 def use(language: str = "auto") -> str:

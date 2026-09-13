@@ -1,5 +1,5 @@
-# cmd.exe теряет позицию в пакетном файле с окончаниями LF и не-ASCII байтами:
-# строки исполняются обрывками. Пакетным файлам - только CRLF, на любой машине.
+# cmd.exe loses its place in a batch file that has LF endings and non-ASCII bytes:
+# the lines are then run in fragments. Batch files get CRLF, on every machine.
 *.cmd text eol=crlf
 *.bat text eol=crlf
 *.ico filter=lfs diff=lfs merge=lfs -text

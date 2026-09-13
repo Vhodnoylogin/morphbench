@@ -1,16 +1,18 @@
-"""Точечная правка чисел в файле NIF - там, где PyNifly писать не умеет.
+"""Single numbers edited in place inside a NIF file - where PyNifly cannot write them.
 
-Единственное место верстака, которое трогает байты NIF, и оно намеренно крошечное.
-Разбор формата остаётся за PyNifly: здесь читается ровно заголовок и ровно ради адресов
-блоков. Заголовок перечисляет длины всех блоков подряд, поэтому смещение любого из них
-получается сложением, без понимания содержимого.
+The only place in the tool that touches the bytes of a NIF, and it is deliberately tiny.
+Parsing the format stays PyNifly's job: what is read here is the header, and only for the
+addresses of the blocks. The header lists the length of every block one after another, so
+the offset of any one of them comes out of addition, with nothing understood about what is
+inside it.
 
-Ради чего: шар охвата части меша через сеттер PyNifly пишется без ошибки и молча
-не меняется. Шар - поле постоянного размера внутри блока части, поэтому файл копируется
-байт в байт, а числа правятся на своих местах: ни длины блоков, ни таблица строк,
-ни ссылки не сдвигаются. Капсулы столкновений так больше не правятся: их пишет PyNifly
-новой формой тела (см. `colliders.ColliderSet.save_as`). Как только PyNifly научится
-писать и шар, этот модуль становится лишним целиком.
+What it is for: writing the bounding sphere of a shape through PyNifly's setter raises no
+error and quietly changes nothing. The sphere is a field of fixed size inside the block of
+the shape, so the file is copied byte for byte and the numbers are overwritten where they
+lie: no block length, no string table and no reference moves. Collision capsules are no
+longer patched this way - PyNifly writes them as a new body shape (see
+`colliders.ColliderSet.save_as`). The day PyNifly learns to write the sphere as well, this
+module can go entirely.
 """
 from __future__ import annotations
 
@@ -20,11 +22,12 @@ from .i18n import t
 
 
 class NifPatch:
-    """Копия файла NIF в памяти со смещениями блоков; правит числа на месте."""
+    """A NIF file copied into memory with the offsets of its blocks; edits numbers in place."""
 
-    #: Часть меша: имя (4), число доп. данных (4) и их ссылки, контроллер (4), флаги (4),
-    #: перенос (12), поворот (36), масштаб (4), коллизия (4) - и затем центр (12) и радиус (4)
-    #: шара охвата. Ссылки на доп. данные - единственное переменное место до шара.
+    #: A shape of the mesh: name (4), the count of extra data (4) and its references,
+    #: controller (4), flags (4), translation (12), rotation (36), scale (4), collision (4)
+    #: - and then the centre (12) and radius (4) of the bounding sphere. The references to
+    #: extra data are the only part of variable length before the sphere.
     SHAPE_TYPES = ("BSTriShape", "BSDynamicTriShape", "BSSubIndexTriShape")
     SHAPE_HEAD = 4 + 4 + 4 + 4 + 12 + 36 + 4 + 4
 
@@ -33,18 +36,18 @@ class NifPatch:
         self.raw = bytearray(self.path.read_bytes())
         self.offsets, self.sizes, self.types, self.bs_version, self.end = self._block_table(self.raw)
 
-    # ---- заголовок --------------------------------------------------------------------
+    # ---- the header -------------------------------------------------------------------
     @staticmethod
     def _block_table(raw: bytearray) -> tuple[dict[int, int], list[int], list[str], int, int]:
-        """Смещение, длина и тип каждого блока по его номеру, версия Bethesda и позиция
-        сразу за последним блоком."""
-        pos = raw.index(b"\n") + 1                       # строка версии формата
-        pos += 4 + 1 + 4                                 # версия, порядок байтов, версия игры
+        """The offset, the length and the type of every block by its number, the Bethesda
+        version, and the position just past the last block."""
+        pos = raw.index(b"\n") + 1                       # the format version line
+        pos += 4 + 1 + 4                                 # version, byte order, game version
         blocks = struct.unpack_from("<I", raw, pos)[0]
         pos += 4
         bs_version = struct.unpack_from("<I", raw, pos)[0]
         pos += 4
-        for _ in range(3):                               # три строки о том, чем собран файл
+        for _ in range(3):                               # three strings on what built the file
             pos += 1 + raw[pos]
         types = struct.unpack_from("<H", raw, pos)[0]
         pos += 2
@@ -54,7 +57,7 @@ class NifPatch:
             names.append(raw[pos + 4:pos + 4 + n].decode("ascii", "replace"))
             pos += 4 + n
         kinds = struct.unpack_from("<%dH" % blocks, raw, pos)
-        pos += 2 * blocks                                # тип каждого блока
+        pos += 2 * blocks                                # the type of every block
         block_types = [names[k] if k < len(names) else "?" for k in kinds]
         sizes = list(struct.unpack_from("<%dI" % blocks, raw, pos))
         pos += 4 * blocks
@@ -75,9 +78,9 @@ class NifPatch:
         return len(self.sizes)
 
     def consistent(self) -> bool:
-        """Сходится ли разбор заголовка с файлом: за последним блоком лежит подвал -
-        число корней и их номера, - и на нём файл кончается. Проверка для тех, кто
-        не верит сложению, и для проверок."""
+        """Whether the reading of the header adds up against the file: past the last block
+        lies the footer - the count of roots and their numbers - and there the file ends.
+        A check for anyone who does not trust the addition, and for the tests."""
         if self.end + 4 > len(self.raw):
             return False
         roots = struct.unpack_from("<I", self.raw, self.end)[0]
@@ -86,7 +89,7 @@ class NifPatch:
     def has_block(self, block: int) -> bool:
         return block in self.offsets
 
-    # ---- шар охвата части -----------------------------------------------------------
+    # ---- the bounding sphere of a shape -----------------------------------------------
     def _bounds_offset(self, block: int) -> int:
         if block not in self.offsets:
             raise KeyError(t("model.noBlock", block=block, count=self.block_count))
@@ -99,13 +102,13 @@ class NifPatch:
         return off + self.SHAPE_HEAD + 4 * extra
 
     def read_bounds(self, block: int) -> tuple[tuple[float, float, float], float]:
-        """Центр и радиус шара охвата части, как они лежат в файле."""
+        """The centre and radius of the shape's bounding sphere, as they lie in the file."""
         off = self._bounds_offset(block)
         x, y, z, r = struct.unpack_from("<4f", self.raw, off)
         return (x, y, z), r
 
     def write_bounds(self, block: int, centre, radius: float) -> None:
-        """Новый шар охвата части - на то же место, тем же числом байтов."""
+        """A new bounding sphere for the shape - the same place, the same count of bytes."""
         off = self._bounds_offset(block)
         struct.pack_into("<4f", self.raw, off, float(centre[0]), float(centre[1]),
                          float(centre[2]), float(radius))

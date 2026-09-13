@@ -1,4 +1,4 @@
-# Продукты сборки и окружения в репозиторий не попадают.
+# Products of a build and of an environment do not belong in the repository.
 build/
 dist/
 .venv/
@@ -6,27 +6,27 @@ models/
 __pycache__/
 *.pyc
 
-# Логи, токены и локальные настройки - у каждой машины свои.
+# Logs, tokens and local settings - every machine has its own.
 *.log
 *-token.txt
 build.local.json
 
-# Черновики прогонов.
+# Drafts left by a run.
 session.jsonl
 *.wav
 *.bak-*
 
-# Настройки создаются при первом запуске и у каждой машины свои.
+# The settings file is made on the first run and every machine has its own.
 morphbench.json
 
-# Точка входа для MO2: продукт сборки, собирается из launcher/morphbench.cs командой launcher/build.cmd.
+# The entry point for MO2: a build product, built from launcher/morphbench.cs by launcher/build.cmd.
 /morphbench.exe
-# Что окно запуска помнит между запусками - у каждой машины своё.
+# What the launcher window remembers between runs - every machine has its own.
 /morphbench.launcher.json
 /morphbench.diag.json
 /morphbench.diag.png
 
-# Предпросмотр значка - промежуточный продукт make-icon.py. Сам значок .ico
-# версионируется через LFS: именно его байты уезжают внутрь morphbench.exe.
+# Preview of the icon - an intermediate product of make-icon.py. The icon itself, the .ico,
+# is versioned through LFS: those are the bytes that travel inside morphbench.exe.
 launcher/morphbench.png
 morphbench.exe

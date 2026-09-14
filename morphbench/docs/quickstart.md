@@ -147,6 +147,14 @@ launcher\build.cmd
    recognised and the window offers to stop it — it cannot see the build's meshes, and silently
    using it would be the worst of the possible outcomes.
 
+**The window is a convenience, not a condition.** MO2 launches executables rather than scripts,
+which is the only reason it exists - but `python.exe` is an executable too. An entry whose
+**Binary** is `<path to morphbench>\python\python.exe` and whose **Arguments** are
+`mb.py serve` does the same job: MO2 injects usvfs into it exactly the same way, and the server
+sees the same merged `Data`. Set **Start in** to the morphbench folder for that variant. Anyone
+who would rather not run an unsigned binary downloaded from the internet can work this way and
+lose nothing but the buttons.
+
 Without MO2 you can check the same thing from the command line, which answers `under MO2: no` and
 lists the games it found in the registry:
 

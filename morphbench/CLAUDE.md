@@ -4,7 +4,10 @@ You have been handed this folder with no history. This file is what the history 
 you. It is not the README: [README.md](README.md) answers the user, this answers whoever is about
 to change the code.
 
-Русская версия — [CLAUDE.ru.md](CLAUDE.ru.md).
+This file has no Russian twin, on purpose: its reader is an assistant, and an assistant
+reads English. Two files that must never drift apart - and the section on what looks like a
+mistake is exactly what must never drift - would be a cost with no reader. The documentation
+for people is the part that comes in both languages.
 
 ## What the module is
 

@@ -82,10 +82,11 @@ CONTENT = [
     "LICENSE",
     "README.md",
     "README.ru.md",
+    "CHANGELOG.md",
+    "CHANGELOG.ru.md",
     # The manifest travels with the archive: whoever unpacks it may hand the folder to an
     # assistant, and it is the file that tells one what must not be "simplified".
     "CLAUDE.md",
-    "CLAUDE.ru.md",
     "dependencies.json",
     "morphbench/*.py",
     "presenters/*.py",
@@ -94,6 +95,14 @@ CONTENT = [
     "web/*.css",
     "web/js/*.js",
     "docs/*.md",
+    # The source of the one compiled thing in the archive. GPL-3 lets the source be offered
+    # from the same place as the binary rather than inside it, but "the same place" has to be
+    # somewhere the recipient can actually reach - and this repository is private. Forty
+    # kilobytes settle the question for good, and settle it for whoever mirrors the archive too.
+    "launcher/*.cs",
+    "launcher/*.cmd",
+    "launcher/*.py",
+    "launcher/*.manifest",
 ]
 #: What we leave out even when it matched a pattern above.
 SKIP = ("__pycache__", ".pyc", "morphbench.json", "morphbench.log")
@@ -150,8 +159,24 @@ def vendor_folder(dep: dict, home: Path, stage: Path, named: str | None) -> str:
         raise SystemExit(t("release.noFolder", name=dep["name"],
                            source=dep.get("source", "")))
     target = stage / str(dep.get("into") or ("vendor/" + dep["name"]))
-    shutil.copytree(folder, target, dirs_exist_ok=True,
-                    ignore=shutil.ignore_patterns("__pycache__", "*.pyc", "tests", "docs"))
+    junk = shutil.ignore_patterns("__pycache__", "*.pyc", "tests", "docs")
+    # `keep` names what we actually use, and it is an allow-list for the same reason CONTENT
+    # is: a later version of somebody else's add-on can grow a new folder, and a deny-list
+    # would carry it in without anyone noticing. Absent `keep`, the whole folder travels.
+    keep = [str(k) for k in dep.get("keep", [])]
+    if keep:
+        target.mkdir(parents=True, exist_ok=True)
+        for name in keep:
+            src = folder / name
+            if not src.exists():
+                raise SystemExit(t("release.noPart", part=name, name=dep["name"],
+                                   folder=str(folder)))
+            if src.is_dir():
+                shutil.copytree(src, target / name, dirs_exist_ok=True, ignore=junk)
+            else:
+                shutil.copy2(src, target / name)
+        return "%s <- %s (%s)" % (target.relative_to(stage), folder, ", ".join(keep))
+    shutil.copytree(folder, target, dirs_exist_ok=True, ignore=junk)
     return "%s <- %s" % (target.relative_to(stage), folder)
 
 

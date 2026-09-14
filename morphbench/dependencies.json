@@ -65,7 +65,11 @@
       "bundle": true,
       "into": "vendor/io_scene_nifly",
       "setting": "pynifly",
-      "proof": ["pyn/pynifly.py", "NiflyDLL.dll", "tri/trifile.py"],
+      "proof": [
+        "pyn/pynifly.py",
+        "NiflyDLL.dll",
+        "tri/trifile.py"
+      ],
       "search": [
         "%APPDATA%/Blender Foundation/Blender/*/scripts/addons/io_scene_nifly",
         "%APPDATA%/Blender Foundation/Blender/*/extensions/*/io_scene_nifly",
@@ -76,11 +80,22 @@
       "license": "GPL-3.0",
       "remark": [
         "Blender itself is NOT needed: the workbench never touches bpy, only the add-on folder.",
+        "Only the parts named in keep travel: the add-on carries 42 MB, of which the",
+        "workbench imports `pyn` (with NiflyDLL.dll beside it) and `tri`. The Blender",
+        "assets, hkxcmd.exe and the material list are 39 MB that nothing here ever opens.",
+        "keep is an allow-list on purpose: a future release of the add-on can add another",
+        "folder, and a deny-list would let it in without anyone noticing.",
         "That folder usually sits among the Blender add-ons - which is where the build looks.",
         "Putting it inside the package is lawful: the licences match. NiflyDLL.dll is a binary, so",
         "the GPL requires naming where its sources came from - see source and THIRD-PARTY.md.",
         "The add-on has no Nexus page for Skyrim; its home is GitHub, and there is one more page",
         "in the Fallout 4 section: https://www.nexusmods.com/fallout4/mods/52319"
+      ],
+      "keep": [
+        "pyn",
+        "tri",
+        "nif",
+        "NiflyDLL.dll"
       ]
     }
   ]

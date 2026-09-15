@@ -112,5 +112,54 @@ class TestFromNif(unittest.TestCase):
         self.assertIsNone(bench.analyzer)
 
 
+class TestReadingSurvivesTheLibrary(unittest.TestCase):
+    """A failure of the native library in the middle of the reading is a refusal, not a crash.
+
+    Opening the file is not the only place nifly can give up: a mesh of this build opens,
+    lists its shapes and then fails on the texture coordinates of one of them - and the file
+    is sound, its block table adds up to the byte. That reached the user as a traceback out
+    of a DLL. Every entry point of the workbench answers "the file you named will not do"
+    with one line and code 2, and this is such a case whatever the library stumbled on.
+    """
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.cfg = common.config(self.tmp.name)
+
+    def test_a_failure_after_the_file_is_open_becomes_one_line(self):
+        from morphbench import model as module
+        native = Exception("Error calling nifly getUVs: exception: access violation "
+                           "reading 0x0000000000000000")
+
+        class Stub:                                 # what open_nif hands back
+            @property
+            def shapes(self):
+                raise native
+
+        path = Path(self.tmp.name) / "drops.nif"
+        path.write_bytes(bytes(64))          # stubbed reading: it need only exist
+        original = module.open_nif
+        module.open_nif = lambda pynifly, where: Stub()
+        try:
+            with self.assertRaises(ValueError) as caught:
+                BodyModel.from_nif(path, self.cfg)
+        finally:
+            module.open_nif = original
+        self.assertIn("drops.nif", str(caught.exception))
+        self.assertIn("getUVs", str(caught.exception))       # the library's own words kept
+        self.assertIs(caught.exception.__cause__, native)    # and the failure itself kept
+
+    def test_our_own_refusal_is_not_dressed_up_as_the_library(self):
+        """The guard sits around someone else's code, so it must not relabel ours: a refusal
+        raised inside comes out as it went in, with its own type and its own text."""
+        from morphbench.model import reading_nif
+        mine = KeyError("the mesh has no shape 'body'")
+        with self.assertRaises(KeyError) as caught:
+            with reading_nif(Path("anywhere.nif")):
+                raise mine
+        self.assertIs(caught.exception, mine)
+
+
 if __name__ == "__main__":
     common.main()

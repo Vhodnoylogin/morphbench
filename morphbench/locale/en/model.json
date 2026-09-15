@@ -7,5 +7,6 @@
   "model.notAMesh": "not a mesh file: %(path)s (%(error)s)",
   "model.notAShape": "block %(block)d is %(kind)s, not a shape of the mesh",
   "model.notTriFile": "not a TRIP or FRTRI morph file: %(path)s (header %(head)r)",
-  "model.oldBethesda": "file of Bethesda version %(version)d: the shape layout is known from 100 (SSE) on"
+  "model.oldBethesda": "file of Bethesda version %(version)d: the shape layout is known from 100 (SSE) on",
+  "model.unreadable": "the mesh cannot be read: %(path)s (%(error)s)"
 }

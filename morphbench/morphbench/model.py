@@ -9,6 +9,7 @@ here.
 from __future__ import annotations
 
 import sys
+from contextlib import contextmanager
 from pathlib import Path
 
 import numpy as np
@@ -45,6 +46,31 @@ def open_nif(pynifly, path):
         return pynifly.NifFile(str(path))
     except Exception as e:                  # noqa: BLE001 - PyNifly raises the base class
         raise ValueError(t("model.notAMesh", path=path, error=e)) from e
+
+
+@contextmanager
+def reading_nif(path):
+    """The same refusal, for the part of the reading that happens after the file is open.
+
+    Opening is not the only place the library can give up. One mesh of the build opens, lists
+    its shapes, and then fails inside the native reader on the texture coordinates of one of
+    them - and the file itself is sound: its block table adds up to the byte. Why that file
+    and not its neighbours is not known and does not have to be: 120 meshes of the same older
+    generation read cleanly, and so did 150 carrying the same kind of particle system, so
+    neither explains it. The guard is built not to need the explanation - whatever the
+    library stumbles on, the user named a file and the file cannot be read: one line, code 2,
+    with the library's own words kept in brackets.
+
+    What this cannot do is save a hard fault: if the native library ever walks off its memory
+    instead of returning an error, the process dies and no handler in Python sees it. Here it
+    returns an error, and that is why the guard works.
+    """
+    try:
+        yield
+    except (ValueError, KeyError, FileNotFoundError):
+        raise                               # already one of ours, already a line
+    except Exception as e:                  # noqa: BLE001 - PyNifly raises the base class
+        raise ValueError(t("model.unreadable", path=path, error=e)) from e
 
 
 def vertex_normals(verts: np.ndarray, tris: np.ndarray) -> np.ndarray:
@@ -238,22 +264,24 @@ class BodyModel:
             raise FileNotFoundError(t("model.noMeshFile", path=path))
         nif = open_nif(pynifly, path)
         shapes: dict[str, Shape] = {}
-        for s in nif.shapes:
-            verts = np.asarray(s.verts, dtype=np.float32).reshape(-1, 3)
-            tris = np.asarray(s.tris, dtype=np.int32).reshape(-1, 3)
-            normals = (np.asarray(s.normals, dtype=np.float32).reshape(-1, 3)
-                       if s.normals else None)
-            uvs = np.asarray(s.uvs, dtype=np.float32).reshape(-1, 2) if s.uvs else None
-            raw = s.bone_weights or {}
-            bones = {name: Bone(name, dict(pairs)) for name, pairs in raw.items()}
-            textures = [tex for tex in (s.textures.values() if hasattr(s, "textures") else [])
-                        if tex]
-            shape = Shape(s.name, verts, tris, normals, uvs, bones, textures)
-            pr = getattr(s, "properties", None)
-            if pr is not None and hasattr(pr, "boundingSphereRadius"):
-                shape.bound = Sphere(list(pr.boundingSphereCenter), float(pr.boundingSphereRadius))
-            shape.block = int(getattr(s, "id", -1))
-            shapes[s.name] = shape
+        with reading_nif(path):
+            for s in nif.shapes:
+                verts = np.asarray(s.verts, dtype=np.float32).reshape(-1, 3)
+                tris = np.asarray(s.tris, dtype=np.int32).reshape(-1, 3)
+                normals = (np.asarray(s.normals, dtype=np.float32).reshape(-1, 3)
+                           if s.normals else None)
+                uvs = np.asarray(s.uvs, dtype=np.float32).reshape(-1, 2) if s.uvs else None
+                raw = s.bone_weights or {}
+                bones = {name: Bone(name, dict(pairs)) for name, pairs in raw.items()}
+                textures = [tex for tex in (s.textures.values()
+                                            if hasattr(s, "textures") else []) if tex]
+                shape = Shape(s.name, verts, tris, normals, uvs, bones, textures)
+                pr = getattr(s, "properties", None)
+                if pr is not None and hasattr(pr, "boundingSphereRadius"):
+                    shape.bound = Sphere(list(pr.boundingSphereCenter),
+                                         float(pr.boundingSphereRadius))
+                shape.block = int(getattr(s, "id", -1))
+                shapes[s.name] = shape
         return cls(path, shapes)
 
     @property

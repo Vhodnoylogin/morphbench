@@ -76,7 +76,12 @@ class Reach:
     there are 2^N corners, and only the ones bound to be farther than the rest are tried:
     each slider on its own, all of them at once and the "worst set" for each vertex - the
     sliders that carry it away from the centre. The radius at the end is measured over all
-    the points anyway."""
+    the points anyway.
+
+    A shape with no vertices at all is a normal thing in someone else's mesh - a name kept
+    for its properties, a stump left by an exporter - and it reaches nowhere. Every answer
+    here is zero for it and none of them is an error: refusing the file would take the other
+    shapes of the mesh down with it."""
 
     def __init__(self, rest: np.ndarray, deltas: dict[str, np.ndarray],
                  low: float = 0.0, high: float = 1.0):
@@ -129,6 +134,8 @@ class Reach:
         """
         c = np.asarray(centre, dtype=np.float32).reshape(3)
         names = list(self.deltas)
+        if self.rest.shape[0] == 0:
+            return 0.0, "rest", 0
         if not names:
             return Sphere(c, 0.0).reach(self.rest), "rest", 0
         stack = np.stack([self.deltas[k] for k in names], axis=1)            # (n, m, 3)
@@ -203,6 +210,8 @@ class Reach:
         whole cloud. A `start` the caller names - the centre from the file, say - is tried as
         a candidate: the sphere cannot come out worse than it.
         """
+        if self.rest.shape[0] == 0:
+            return Sphere(np.zeros(3, np.float32), 0.0)
         first = self.cloud(0.5 * (self.rest.min(axis=0) + self.rest.max(axis=0)))
         centre = enclosing_sphere(first, iterations, start).centre
         cloud = self.cloud(centre)

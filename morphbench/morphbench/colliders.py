@@ -35,7 +35,7 @@ import numpy as np
 
 from .config import Config
 from .environment import file_exists, same_file
-from .model import load_nifly, open_nif
+from .model import load_nifly, open_nif, reading_nif
 from .i18n import t
 
 #: Havok measures lengths in its own units; the game in its own. This is a property of the
@@ -363,27 +363,28 @@ class ColliderSet:
         matrices: dict[str, np.ndarray] = {}
         bumper: CollisionBody | None = None
         parents: dict[str, str] = {}
-        for name, node in nif.nodes.items():
-            up = getattr(node, "parent", None)
-            if up is not None and getattr(up, "name", None):
-                parents[name] = up.name
-            try:
-                matrices[name] = cls._matrix(node.global_transform)
-            except Exception:                       # a node without a transform is not a bone
-                pass
-            col = getattr(node, "collision_object", None)
-            body = getattr(col, "body", None) if col is not None else None
-            if body is None:
-                continue
-            caps = cls._capsules_of(name, getattr(body, "shape", None))
-            if not caps:
-                continue
-            kind = type(body).__name__
-            entry = CollisionBody(name, caps, cls._physics_of(body, names), kind)
-            if "Phantom" in kind:
-                bumper = entry
-            else:
-                bodies[name] = entry
+        with reading_nif(path):
+            for name, node in nif.nodes.items():
+                up = getattr(node, "parent", None)
+                if up is not None and getattr(up, "name", None):
+                    parents[name] = up.name
+                try:
+                    matrices[name] = cls._matrix(node.global_transform)
+                except Exception:                   # a node without a transform is not a bone
+                    pass
+                col = getattr(node, "collision_object", None)
+                body = getattr(col, "body", None) if col is not None else None
+                if body is None:
+                    continue
+                caps = cls._capsules_of(name, getattr(body, "shape", None))
+                if not caps:
+                    continue
+                kind = type(body).__name__
+                entry = CollisionBody(name, caps, cls._physics_of(body, names), kind)
+                if "Phantom" in kind:
+                    bumper = entry
+                else:
+                    bodies[name] = entry
         return cls(path, bodies, matrices, bumper, parents)
 
     @staticmethod

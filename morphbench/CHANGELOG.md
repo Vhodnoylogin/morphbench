@@ -45,6 +45,12 @@ script.
   which only `physics --check` produces, and which mean the settings file points at something the
   skeleton or the mesh does not have. A file that is not a mesh, a mesh with no morph file beside
   it, a mesh that is not open yet: all of these are refusals, not faults of the program.
+- **Somebody else's mesh does not bring the program down.** 600 files of the build - doors,
+  trees, effects, armour stands, things nobody wrote the workbench for - were read, listed and
+  measured for their spheres: 598 answers and 2 refusals of one line each. A shape with no
+  vertices is an answer and not a refusal: nothing of it leaves any sphere, and the other
+  shapes of the same file answer as usual. A file the reading library itself stumbles on is a
+  refusal carrying the library's own words in brackets, not a stack trace out of a DLL.
 - **One word for writing.** Every command that writes takes `--out`. `bounds --write` and
   `fit --save` go on working, because links and scripts written before the spelling was unified
   should not become wrong.

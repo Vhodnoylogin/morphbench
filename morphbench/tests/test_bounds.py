@@ -16,7 +16,7 @@ from pathlib import Path
 import numpy as np
 
 import common
-from common import bench, grid, main, model, morph, morph_set
+from common import Shape, bench, grid, main, model, morph, morph_set
 from morphbench.bounds import Reach, Sphere, enclosing_sphere
 from morphbench.nifpatch import NifPatch
 
@@ -142,6 +142,24 @@ class TestReach(unittest.TestCase):
                              "the worst-set cloud was rebuilt %d times" % len(calls))
         self.assertGreater(far, 0.0)
 
+    def test_a_shape_with_no_vertices_reaches_nowhere(self):
+        """A shape with no vertices at all - a name kept for its properties, a stump left by
+        an exporter - turns up in shipped meshes, and every answer about it is zero. None of
+        them is an error: `needed` used to die inside numpy on "zero-size array to reduction
+        operation minimum", and the death took the whole file with it, the shapes that did
+        have vertices along with the one that did not."""
+        none = np.zeros((0, 3), np.float32)
+        r = Reach(none, {"Up": none.copy()}, 0.0, 1.0)
+        self.assertEqual(r.needed().radius, 0.0)
+        self.assertEqual(r.needed(2.0).radius, 0.0)
+        self.assertEqual(r.reach_exact([1.0, 2.0, 3.0]), (0.0, "rest", 0))
+        self.assertEqual(r.cloud([0, 0, 0]).shape[1], 3)
+        far_sphere = Sphere([1.0, 2.0, 3.0], 5.0)
+        self.assertEqual(r.farthest(far_sphere)[1], 0.0)
+        self.assertEqual(r.farthest(far_sphere, single=True)[1], 0.0)
+        # And with no sliders either: the same zero, by the other road through the method.
+        self.assertEqual(Reach(none, {}).needed().radius, 0.0)
+
     def test_without_morphs_only_rest(self):
         r = Reach(self.rest, {})
         self.assertEqual(list(r.states([0, 0, 0])), ["rest"])
@@ -182,6 +200,25 @@ class TestFacadeBounds(unittest.TestCase):
         row = self.bench.bounds("body")[0]
         self.assertTrue(row["ok"])
         self.assertLessEqual(row["excess"], 0.0)
+
+    def test_a_shape_with_no_vertices_does_not_stop_the_others(self):
+        """`akiphysicsfarmdoorbeta.nif` of Interactive Doors holds two shapes, and one of
+        them has no vertices. Asking for the spheres of that file used to end in a traceback
+        out of numpy, so the shape that did have vertices went unanswered as well. The empty
+        one is entitled to a row of its own: nothing reaches out of its sphere, so it is `ok`
+        whatever the file says, and the sphere it needs is nothing at all."""
+        stub = Shape("stub", np.zeros((0, 3), np.float32), np.zeros((0, 3), np.int32),
+                     None, None, {})
+        stub.bound = Sphere([0.3, 52.2, -2.0], 28.0)       # as the file holds it
+        stub.block = 11
+        self.bench.model.shapes["stub"] = stub
+        by = {r["shape"]: r for r in self.bench.bounds()}
+        self.assertEqual(by["stub"]["vertices"], 0)
+        self.assertEqual(by["stub"]["reach"], 0.0)
+        self.assertEqual(by["stub"]["needed"]["radius"], 0.0)
+        self.assertTrue(by["stub"]["ok"])
+        self.assertEqual(by["stub"]["overCap"], 0)
+        self.assertGreater(by["body"]["reach"], 20.0)      # the other shape still answers
 
     def test_margin_from_config_and_argument(self):
         base = self.bench.bounds("body", margin=1.0)[0]["needed"]["radius"]

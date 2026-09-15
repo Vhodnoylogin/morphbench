@@ -116,6 +116,32 @@ class TestReach(unittest.TestCase):
         self.assertEqual(state, "worst")
         self.assertGreater(far, 0.0)
 
+    def test_the_worst_set_cloud_is_built_at_most_once(self):
+        """`states()` builds an array the size of the mesh for every slider end - a hundred
+        of them on a real body - and it does not depend on the group being measured.
+
+        It used to be called inside the loop, once for every group of vertices past the cap.
+        On a CBBE body that was 1877 rebuilds, and `bounds` took 115 seconds where it now
+        takes under seven. The time is not what is checked here - a clock makes a flaky test
+        - but the call count is, and it is the thing that went wrong.
+        """
+        rest = grid("body", 6, 6).verts
+        # Every vertex is touched by more sliders than the cap allows, so every group takes
+        # the fallback and would have rebuilt the cloud under the old arrangement.
+        d = {"m%d" % i: np.full((36, 3), 0.1 * (i + 1), np.float32) for i in range(5)}
+        # ...and they are not all the same set, so there is more than one group to loop over.
+        for i, key in enumerate(d):
+            d[key][: i * 6] = 0.0
+        reach = Reach(rest, d)
+        calls = []
+        plain = reach.states
+        reach.states = lambda centre: (calls.append(1), plain(centre))[1]
+        far, state, over = reach.reach_exact([0.0, 0.0, 0.0], cap=1)
+        self.assertGreater(over, 0, "the fixture must reach the fallback at all")
+        self.assertLessEqual(len(calls), 1,
+                             "the worst-set cloud was rebuilt %d times" % len(calls))
+        self.assertGreater(far, 0.0)
+
     def test_without_morphs_only_rest(self):
         r = Reach(self.rest, {})
         self.assertEqual(list(r.states([0, 0, 0])), ["rest"])

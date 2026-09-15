@@ -131,23 +131,34 @@ class Reach:
         names = list(self.deltas)
         if not names:
             return Sphere(c, 0.0).reach(self.rest), "rest", 0
-        n = self.rest.shape[0]
         stack = np.stack([self.deltas[k] for k in names], axis=1)            # (n, m, 3)
         touch = np.linalg.norm(stack, axis=2) > 0.0                            # (n, m)
         best, best_state, over = float(np.linalg.norm(self.rest - c, axis=1).max()), "rest", 0
         lo, hi = self.low, self.high
         keys, inverse = np.unique(touch, axis=0, return_inverse=True)
         inverse = np.asarray(inverse).reshape(-1)
+        # The vertices of a group are wanted as a block. Sorting the numbers once and cutting
+        # the sorted order costs a single pass; asking `inverse == g` inside the loop costs a
+        # pass over every vertex per group, and a body has thousands of groups.
+        order = np.argsort(inverse, kind="stable")
+        edges = np.searchsorted(inverse[order], np.arange(len(keys) + 1))
+        #: The "worst set" cloud does not depend on the group: it is the whole mesh, and
+        #: building it costs a hundred arrays the size of the mesh. It used to be built inside
+        #: the loop, once for every group past the cap - on a body of 97 sliders that is 1877
+        #: rebuilds, and they were 34 seconds of the 115 this method took. Once, here, and
+        #: only if a group past the cap actually turns up.
+        worst_all = None
         for g, key in enumerate(keys):
-            idx = np.nonzero(inverse == g)[0]
+            idx = order[edges[g]:edges[g + 1]]
             cols = np.nonzero(key)[0]
             k = int(cols.size)
             if k == 0:
                 continue
             if k > int(cap):
                 over += int(idx.size)
-                worst = self.states(c)["worst"][idx]
-                r = float(np.linalg.norm(worst - c, axis=1).max())
+                if worst_all is None:
+                    worst_all = self.states(c)["worst"]
+                r = float(np.linalg.norm(worst_all[idx] - c, axis=1).max())
                 if r > best:
                     best, best_state = r, "worst"
                 continue

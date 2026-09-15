@@ -124,10 +124,10 @@ The header comment in `build.cmd` still says the icon is not versioned. That com
 ## The release archive
 
 ```
-python release.py --version 0.9.0
+python release.py --version 0.7.0
 ```
 
-That stages `build/morphbench-0.9.0/` and packs it into `build/morphbench-0.9.0.zip`. The staging
+That stages `build/morphbench-0.7.0/` and packs it into `build/morphbench-0.7.0.zip`. The staging
 folder is **deleted and rebuilt** on every run, so nothing of your own should be left inside it.
 
 Before building anything, it is worth asking what would go in:

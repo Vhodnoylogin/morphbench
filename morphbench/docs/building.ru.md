@@ -123,10 +123,10 @@ python launcher/make-icon.py --show
 ## Архив выпуска
 
 ```
-python release.py --version 0.9.0
+python release.py --version 0.7.0
 ```
 
-Эта команда раскладывает `build/morphbench-0.9.0/` и пакует её в `build/morphbench-0.9.0.zip`.
+Эта команда раскладывает `build/morphbench-0.7.0/` и пакует её в `build/morphbench-0.7.0.zip`.
 Папка раскладки на каждом запуске **удаляется и создаётся заново**, так что ничего своего внутри
 оставлять нельзя.
 

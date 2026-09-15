@@ -29,5 +29,5 @@
   "release.tpSource": "Исходники: %(source)s",
   "release.tpTitle": "Чужое внутри morphbench %(version)s",
   "release.tpWhy": "Зачем: %(why)s",
-  "release.usage": "Сборка выпуска: самодостаточный архив верстака.\n\n    python release.py                      собрать в build\\ и запаковать\n    python release.py --version 0.9.0      номер выпуска в имя архива и в manifest.json\n    python release.py --no-python          без встроенного Python (нужен установленный)\n    python release.py --pynifly <папка>    взять аддон отсюда, а не искать\n    python release.py --stage-only         разложить папку выпуска и не паковать\n    python release.py --list               что войдёт в архив, ничего не делая"
+  "release.usage": "Сборка выпуска: самодостаточный архив верстака.\n\n    python release.py                      собрать в build\\ и запаковать\n    python release.py --version 0.7.0      номер выпуска в имя архива и в manifest.json\n    python release.py --no-python          без встроенного Python (нужен установленный)\n    python release.py --pynifly <папка>    взять аддон отсюда, а не искать\n    python release.py --stage-only         разложить папку выпуска и не паковать\n    python release.py --list               что войдёт в архив, ничего не делая"
 }

@@ -11,11 +11,14 @@ go in a major release, and nowhere else.
 
 Эта страница на русском: [CHANGELOG.ru.md](CHANGELOG.ru.md).
 
-## [0.9.0] — unreleased
+## [0.7.0] — unreleased
 
-First public release. Still `0.x` on purpose: everything below works and is covered by the test
-suite, but the shape of the command line and of the `--json` output has not yet met anyone
-else's habits. `1.0.0` follows once it has, and from then on it is frozen.
+First public release. The number is deliberately well short of `1.0.0`. Everything below works
+and is covered by the test suite, but the suite only proves the workbench agrees with itself:
+the shape of the command line and of the `--json` output has not yet met anyone else's habits,
+and nothing it writes has yet been through a Skyrim session. The releases between here and
+`1.0.0` are what that meeting costs. From `1.0.0` on, the command line and the `--json` output
+are frozen.
 
 ### What it does
 
@@ -35,7 +38,11 @@ else's habits. `1.0.0` follows once it has, and from then on it is frozen.
 
 - Windows only. The workbench itself is plain Python, but the launch window is WinForms and
   PyNifly's parser is a Windows DLL.
-- A written `.nif` has so far been read back only by the same library that wrote it. An
-  independent reader has not yet confirmed it.
+- A written `.nif` has been read back by a second parser that does not use PyNifly — it walks
+  the published layout, and its block map adds up to the byte — but not yet by third-party
+  software such as NifSkope, and not yet by the game.
+- Nothing here simulates anything. The workbench reads geometry and writes settings; whether a
+  chain actually swings well is decided in the game. What it can say about a physics config is
+  whether the config points at things that exist — `physics --check` does that for both engines.
 - The physics configs are generated from measurements, not from play: they are a starting point
   a mod author checks, not a tuned result.

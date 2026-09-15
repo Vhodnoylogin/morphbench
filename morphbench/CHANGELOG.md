@@ -53,9 +53,12 @@ script.
 
 - Windows only. The workbench itself is plain Python, but the launch window is WinForms and
   PyNifly's parser is a Windows DLL.
-- A written `.nif` has been read back by a second parser that does not use PyNifly — it walks
-  the published layout, and its block map adds up to the byte — but not yet by third-party
-  software such as NifSkope, and not yet by the game.
+- What is written into a `.nif` has been read back by instruments other than the one that wrote
+  it. The bounding sphere: by a parser of our own that does not use PyNifly, and by **NifSkope**,
+  an independent implementation in C++, which shows the same 54.1682 in the same field. The
+  collision capsules: by that same parser, agreeing with the workbench on all 126 numbers to
+  within half a thousandth of a game unit. Neither has yet been opened **by the game**, and that
+  is the check nothing here can stand in for.
 - Nothing here simulates anything. The workbench reads geometry and writes settings; whether a
   chain actually swings well is decided in the game. What it can say about a physics config is
   whether the config points at things that exist — `physics --check` does that for both engines.

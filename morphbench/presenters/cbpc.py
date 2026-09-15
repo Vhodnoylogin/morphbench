@@ -138,7 +138,13 @@ def text(rows: list[dict], chains: list[dict], cfg, title: str | None = None) ->
 
 # ---- checking a ready file ---------------------------------------------------------------------
 _KNOWN_SECTIONS = {"options", "settings", "extraoptions", "playernodes", "affectednodes",
-                   "collidernodes", "configmap"}
+                   "collidernodes", "configmap", "playercollisioneventnodes"}
+#: Sections whose lines DECLARE names rather than point at the skeleton. The player's own nodes
+#: are made by CBPC, and the nodes a collision event may fire from are chosen by the user - in VR
+#: those are `LeftWandNode` and `RightWandNode`, which no skeleton file contains. Checking them
+#: against the skeleton would report the two wands on every install; the price is that a typo
+#: inside these two sections goes unnoticed, and that is the cheaper of the two mistakes.
+_DECLARING_SECTIONS = ("playernodes", "playercollisioneventnodes")
 _HEADER = re.compile(r"^\[(?P<name>.+)\]\s*(?::\s*[\d.]+)?$")
 _NODE_LINE = re.compile(r"^(?P<name>.*?)\s*(?:\((?P<refs>[^)]*)\))?\s*$")
 
@@ -176,8 +182,8 @@ def check(text_in: str, bones) -> list[dict]:
                             "problem": t("cbpc.noBone")})
             continue
         low = (section or "").lower()
-        if low == "playernodes":
-            known.add(line)                              # player nodes are not skeleton bones
+        if low in _DECLARING_SECTIONS:
+            known.add(line)                              # these nodes are not skeleton bones
         elif low in ("affectednodes", "collidernodes"):
             m = _NODE_LINE.match(line)
             names = [m.group("name")] + [r.strip().lstrip("@") for r in (m.group("refs") or "").split(",") if r.strip()]
@@ -197,6 +203,17 @@ def check(text_in: str, bones) -> list[dict]:
         elif section and low not in _KNOWN_SECTIONS:
             if "=" in line and "," not in line:
                 continue                    # a line of settings, not a shape
+            node = _NODE_LINE.match(line)
+            declared = node.group("name") if node else ""
+            if declared in known:
+                # A bone's own section holds shapes, so a line naming another bone is not a
+                # broken shape - it is a node declaration that has drifted out of its section.
+                # Files assembled out of two configs lose the `[AffectedNodes]` heading between
+                # the halves, and then everything after it is registered nowhere.
+                out.append({"kind": "node", "name": declared,
+                            "where": t("cbpc.atSection", line=no, section=section),
+                            "problem": t("cbpc.strayNode")})
+                continue
             halves = [h.strip() for h in line.split("|")]
             for half in halves:
                 pieces = [p.strip() for p in half.split("&")]

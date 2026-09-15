@@ -11,6 +11,7 @@
   "cbpc.partCollision": "CBPCollisionConfig_*.txt: collisions",
   "cbpc.partConfig": "CBPConfig_*.txt: how the group swings",
   "cbpc.partMaster": "CBPCMasterConfig_*.txt, section [ConfigMap]: bone = group",
+  "cbpc.strayNode": "a node declaration inside a bone's own section: the [AffectedNodes] or [ColliderNodes] heading above it looks lost",
   "cbpc.title": "morphbench: CBPC settings",
   "cbpc.titleFor": "morphbench: CBPC settings for %(title)s"
 }

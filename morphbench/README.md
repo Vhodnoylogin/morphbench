@@ -126,7 +126,7 @@ One line each; every option and every `--json` shape is in [docs/cli.md](docs/cl
 | `budget` | at what value each slider crosses the tearing threshold |
 | `layers` | whether cover shapes — a second skin, a seam patch — follow the skin under them, and which of them are obliged to |
 | `binding` | which bones own what a morph moves, and which bones it leaves half behind |
-| `bounds` | the bounding sphere in the file against the one the morphed geometry needs; `--write` puts corrected spheres in a new file |
+| `bounds` | the bounding sphere in the file against the one the morphed geometry needs; `--out` puts corrected spheres in a new file |
 | `colliders`, `fit` | the invisible collision capsules from the skeleton: where they sit, how much skin is left outside, and fitting them to the skin |
 | `chains`, `physics` | bone chains for swinging physics, and the settings files for SMP or CBPC — including `--check`, which reads a finished file back and verifies it against the skeleton and the mesh |
 | `focus` | where the camera would look at a bone, a morph or a part, in numbers — and, with no key, everything it could be aimed at |

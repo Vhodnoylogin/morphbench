@@ -286,7 +286,7 @@ python mb.py bounds body.nif
 |---|---|---|
 | `--shape` | a part name | one part; all of them otherwise |
 | `--margin` | a number | the margin over the radius needed, as a factor; `boundsMargin` (1.01) by default |
-| `--write` | a path | write the corrected spheres into a **new** mesh file |
+| `--out` | a path | write the corrected spheres into a **new** mesh file (`--write` still accepted) |
 | `--shrink` | — | when writing, also pull spheres in to the size needed; without it a sphere is only ever widened |
 
 Writing over the source is refused: the mesh belongs to someone else's mod, and edits travel
@@ -295,7 +295,7 @@ wider than needed is kept — a wide sphere is sometimes deliberate, for fur und
 physics, and the core has no way of knowing that. `--shrink` says you mean it.
 
 ```
-python mb.py bounds body.nif --write "out\body.nif"
+python mb.py bounds body.nif --out "out\body.nif"
 ```
 
 `--json` gives `{shape, block, vertices, morphs, needed, file, reach, excess, state, single,
@@ -304,7 +304,7 @@ the sphere in the file under the worst set of sliders, `excess` is how much furt
 than the radius as a fraction, `state` names the set to blame and `single` the one slider
 that carries it furthest alone. `overCap` counts vertices touched by more sliders than
 `boundsCornerCap` — those are estimated rather than walked exactly, and as long as it is
-zero the answer is exact. `--write` returns `{saved, shapes, kept, rows}`.
+zero the answer is exact. `--out` returns `{saved, shapes, kept, rows}`.
 
 What the numbers mean and why the walk is exact: [physics.md](physics.md).
 
@@ -355,15 +355,15 @@ python mb.py fit body.nif --skeleton skeleton.nif --slider CLAWTorsoBreastSize=1
 | `--percentile` | a number | the share of points that must fall inside the radius; `colliderFitPercentile` (90) by default |
 | `--bundle` | a number | seat a bundle of N capsules instead of one: the cloud of skin is cut into pieces |
 | `--split` | `axis` or `kmeans` | how to cut it — slices along the bone's axis, or clusters by proximity; `bundleSplit` by default |
-| `--save` | a path | write a **new** skeleton file with the capsules as they now stand |
+| `--out` | a path | write a **new** skeleton file with the capsules as they now stand (`--save` still accepted) |
 | `--ppb` | — | also print the settings lines for Precision Physic Bodies |
 | `--slider` | `NAME=NUMBER` | a slider value; repeatable — this is the pose being fitted to |
 | `--only` | names, comma-separated | which parts of the mesh count as skin |
 | `--entry`, `--root` | | take the mesh from the catalogue instead of a path |
 
 A percentile rather than the furthest point, because one vertex sticking out would blow the
-capsule up on its own. `--save` always writes a new file, for the same reason `bounds
---write` does. `--ppb` is there because PPB re-reads its `PPB_tuning.txt` about once a
+capsule up on its own. `--out` always writes a new file, for the same reason `bounds
+--out` does. `--ppb` is there because PPB re-reads its `PPB_tuning.txt` about once a
 second while the game runs, so the lines can be tried live without restarting anything; PPB
 names its knobs by body slot and has none for a tail or for fingers, so those bones are
 skipped rather than given an invented name.

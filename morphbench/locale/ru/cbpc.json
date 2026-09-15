@@ -11,6 +11,7 @@
   "cbpc.partCollision": "CBPCollisionConfig_*.txt: столкновения",
   "cbpc.partConfig": "CBPConfig_*.txt: качание группы",
   "cbpc.partMaster": "CBPCMasterConfig_*.txt, раздел [ConfigMap]: кость = группа",
+  "cbpc.strayNode": "объявление узла внутри раздела самой кости: похоже, потерян заголовок [AffectedNodes] или [ColliderNodes] над ней",
   "cbpc.title": "morphbench: настройки CBPC",
   "cbpc.titleFor": "morphbench: настройки CBPC для %(title)s"
 }

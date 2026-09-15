@@ -140,7 +140,7 @@ def write_nif(pynifly, path, shapes: dict, game: str = "SKYRIM") -> Path:
     return path
 
 
-def write_skeleton(pynifly, path, bones: dict) -> Path:
+def write_skeleton(pynifly, path, bones: dict, parents: dict | None = None) -> Path:
     """A tiny skeleton written by the standard PyNifly: a node per bone, each carrying a body
     with a single capsule.
 
@@ -148,17 +148,24 @@ def write_skeleton(pynifly, path, bones: dict) -> Path:
     Havok units). This is how writing bundles is checked: PyNifly creates the skeleton, the
     bench edits it and writes it back, PyNifly reads it again. Any refusal from the API is
     a skipped suite, not a failure.
+
+    `parents` - bone name -> the name of the bone it hangs from, for the callers that need a
+    real chain rather than a handful of separate nodes. Left out, every node hangs from the
+    root as before, and a bone named as a parent before it is written itself hangs there too.
     """
     path = Path(path)
+    parents = parents or {}
     try:
         from pyn.nifdefs import TransformBuf, bhkCapsuleShapeProps, bhkRigidBodyProps  # noqa: WPS433
         nif = pynifly.NifFile()
         nif.initialize("SKYRIMSE", str(path))
+        made: dict[str, object] = {}
         for name, (dz, (p1, p2, r)) in bones.items():
             xf = TransformBuf()
             xf.set_identity()
             xf.translation = (0.0, 0.0, float(dz))
-            node = nif.add_node(name, xf, parent=nif.rootNode)
+            node = nif.add_node(name, xf, parent=made.get(parents.get(name)) or nif.rootNode)
+            made[name] = node
             col = node.add_collision(None)
             rb = bhkRigidBodyProps()
             rb.collisionFilter_layer, rb.collisionResponse = 8, 1

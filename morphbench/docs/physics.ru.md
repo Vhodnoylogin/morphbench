@@ -83,7 +83,7 @@ python mb.py bounds body.nif
 Запись исправленных шаров:
 
 ```
-python mb.py bounds body.nif --write fixed-body.nif
+python mb.py bounds body.nif --out fixed-body.nif
 ```
 
 Шар — поле постоянного размера внутри блока части, поэтому это правка на месте: все остальные
@@ -137,7 +137,7 @@ python mb.py colliders body.nif --skeleton skeleton.nif --clearance
 **Сажать по коже.**
 
 ```
-python mb.py fit body.nif --skeleton skeleton.nif --slider CLAWTorsoGirth=0.5 --save new-skeleton.nif
+python mb.py fit body.nif --skeleton skeleton.nif --slider CLAWTorsoGirth=0.5 --out new-skeleton.nif
 ```
 
 Ради этого верстак вообще берётся за колайдеры. Тело он деформирует сам и знает каждую вершину
@@ -174,11 +174,11 @@ python mb.py fit body.nif --skeleton skeleton.nif --slider CLAWTorsoGirth=0.5 --
 сразу:
 
 ```
-python mb.py fit body.nif --skeleton skeleton.nif --find Head --bundle 14 --split kmeans --save new-skeleton.nif
+python mb.py fit body.nif --skeleton skeleton.nif --find Head --bundle 14 --split kmeans --out new-skeleton.nif
 ```
 
 ```
-python mb.py fit body.nif --skeleton skeleton.nif --find "L Foot" --bundle 3 --split axis --save new-skeleton.nif
+python mb.py fit body.nif --skeleton skeleton.nif --find "L Foot" --bundle 3 --split axis --out new-skeleton.nif
 ```
 
 `--split axis` режет облако ломтиками равной численности вдоль оси кости — это для конечностей.
@@ -190,7 +190,7 @@ python mb.py fit body.nif --skeleton skeleton.nif --find "L Foot" --bundle 3 --s
 с 66% кожи снаружи штатной капсулы XP32 до 28% связкой из 14, а стопа — с 98% до 36% тремя
 ломтиками.
 
-Результат уходит двумя дверями. `--save` пишет новый файл скелета — всегда новый, по той же
+Результат уходит двумя дверями. `--out` пишет новый файл скелета — всегда новый, по той же
 причине, по какой новыми пишутся меши: прочитанный скелет принадлежит чужому моду. `--ppb`
 печатает строки для Precision Physic Bodies, который перечитывает свой `PPB_tuning.txt`
 примерно раз в секунду прямо во время игры, — посадку можно примерить вживую, ничего

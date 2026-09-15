@@ -31,6 +31,22 @@ def load_nifly(cfg: Config):
     return pynifly
 
 
+def open_nif(pynifly, path):
+    """PyNifly's own refusal, turned into one of ours.
+
+    A file that is not a mesh - truncated, renamed by hand, still downloading, or simply a
+    text file someone called `.nif` - makes PyNifly raise the bare `Exception` class. Nobody
+    can catch that by type without catching everything, so it travelled all the way up and
+    reached the user as a traceback. Every entry point answers a refusal with one line and
+    code 2, and "this file is not a mesh" is a refusal like any other: the only thing wrong
+    is the file the user named.
+    """
+    try:
+        return pynifly.NifFile(str(path))
+    except Exception as e:                  # noqa: BLE001 - PyNifly raises the base class
+        raise ValueError(t("model.notAMesh", path=path, error=e)) from e
+
+
 def vertex_normals(verts: np.ndarray, tris: np.ndarray) -> np.ndarray:
     """The normal at every vertex: the sum of the normals of the adjoining triangles, each
     weighted by its area, brought to unit length. A vertex with no triangles points up."""
@@ -220,7 +236,7 @@ class BodyModel:
         path = Path(path)
         if not file_exists(path):
             raise FileNotFoundError(t("model.noMeshFile", path=path))
-        nif = pynifly.NifFile(str(path))
+        nif = open_nif(pynifly, path)
         shapes: dict[str, Shape] = {}
         for s in nif.shapes:
             verts = np.asarray(s.verts, dtype=np.float32).reshape(-1, 3)

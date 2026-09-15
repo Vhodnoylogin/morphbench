@@ -34,6 +34,21 @@ are frozen.
   whole build rather than one mod's folder. Launching it twice does not start a second server:
   the second launch hands its path to the first.
 
+### The shape of the answers
+
+This is the part other people build on, so it is written down rather than left to habit, and
+`tests/test_contract.py` holds it in place: a key that moves fails a test rather than a stranger's
+script.
+
+- **Three exit codes.** `0` — the command answered. `2` — a refusal: one line on stderr and
+  nothing at all on stdout, so a caller can tell a refusal from an empty answer. `3` — findings,
+  which only `physics --check` produces, and which mean the settings file points at something the
+  skeleton or the mesh does not have. A file that is not a mesh, a mesh with no morph file beside
+  it, a mesh that is not open yet: all of these are refusals, not faults of the program.
+- **One word for writing.** Every command that writes takes `--out`. `bounds --write` and
+  `fit --save` go on working, because links and scripts written before the spelling was unified
+  should not become wrong.
+
 ### Known limits
 
 - Windows only. The workbench itself is plain Python, but the launch window is WinForms and

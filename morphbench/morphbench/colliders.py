@@ -35,7 +35,7 @@ import numpy as np
 
 from .config import Config
 from .environment import file_exists, same_file
-from .model import load_nifly
+from .model import load_nifly, open_nif
 from .i18n import t
 
 #: Havok measures lengths in its own units; the game in its own. This is a property of the
@@ -357,7 +357,7 @@ class ColliderSet:
         path = Path(path)
         if not file_exists(path):
             raise FileNotFoundError(t("colliders.noSkeletonFile", path=path))
-        nif = pynifly.NifFile(str(path))
+        nif = open_nif(pynifly, path)
         names = cls._enum_names()
         bodies: dict[str, CollisionBody] = {}
         matrices: dict[str, np.ndarray] = {}
@@ -641,7 +641,7 @@ class ColliderSet:
             raise ValueError(t("colliders.nothingChanged"))
         pynifly = load_nifly(cfg or Config())
         from pyn.nifdefs import bhkCapsuleShapeProps, bhkListShapeProps  # noqa: WPS433
-        nif = pynifly.NifFile(str(self.path))
+        nif = open_nif(pynifly, self.path)
         for bone in changed:
             body = self.bodies[bone]
             node = nif.nodes[bone]

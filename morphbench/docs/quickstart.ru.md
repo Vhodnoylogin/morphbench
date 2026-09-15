@@ -272,7 +272,7 @@ python mb.py bounds malebody_1.nif
 **3. Записать исправленные шары — в новый файл.**
 
 ```
-python mb.py bounds malebody_1.nif --write malebody_1-fixed.nif
+python mb.py bounds malebody_1.nif --out malebody_1-fixed.nif
 ```
 
 Исходник принадлежит чужому моду и не переписывается никогда; всё, кроме шаров, копируется байт
@@ -300,11 +300,11 @@ python mb.py colliders malebody_1.nif --skeleton skeleton.nif --clearance
 **6. Посадить капсулы по коже.** Этим двум — связкой, а не одной капсулой:
 
 ```
-python mb.py fit malebody_1.nif --skeleton skeleton.nif --find Head --bundle 14 --split kmeans --save skeleton-fitted.nif
+python mb.py fit malebody_1.nif --skeleton skeleton.nif --find Head --bundle 14 --split kmeans --out skeleton-fitted.nif
 ```
 
 ```
-python mb.py fit malebody_1.nif --skeleton skeleton.nif --find "L Foot" --bundle 3 --split axis --save skeleton-fitted.nif
+python mb.py fit malebody_1.nif --skeleton skeleton.nif --find "L Foot" --bundle 3 --split axis --out skeleton-fitted.nif
 ```
 
 `--split axis` режет кожу ломтиками вдоль кости, что подходит конечностям; `kmeans` режет

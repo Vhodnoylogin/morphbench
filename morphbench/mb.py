@@ -28,7 +28,12 @@ from morphbench.i18n import t, use         # noqa: E402
 from presenters import ppb, text             # noqa: E402
 
 # Refusals of the facade: the command line shows these as one line, not as a traceback.
-_REFUSALS = (ValueError, PermissionError, FileNotFoundError, KeyError)
+#: What counts as "the user named something impossible" rather than a fault of the
+#: program. RuntimeError is in the list because the facade raises it for exactly that
+#: - no mesh open, no morph file beside it, no skeleton, everything hidden - and
+#: `presenters/serve.py` has always answered those with 400 rather than a stack trace.
+#: The command line said the same thing with a traceback until this was noticed.
+_REFUSALS = (ValueError, PermissionError, FileNotFoundError, KeyError, RuntimeError)
 
 
 def _bench(args) -> MorphBench:
@@ -657,7 +662,10 @@ def main(argv=None) -> int:
     p.add_argument("--shape", default=None, help=t("cli.opt.bounds.shape"))
     p.add_argument("--margin", type=float, default=None,
                    help=t("cli.opt.bounds.margin"))
-    p.add_argument("--write", default=None, help=t("cli.opt.bounds.write"))
+    # `--out` is the spelling every other writing command uses; `--write` is kept because
+    # links and scripts written before it was unified still say so.
+    p.add_argument("--out", "--write", dest="write", default=None,
+                   help=t("cli.opt.bounds.write"))
     p.add_argument("--shrink", action="store_true",
                    help=t("cli.opt.bounds.shrink"))
     p = add("colliders", cmd_colliders, nif_required=False,
@@ -681,7 +689,8 @@ def main(argv=None) -> int:
                    help=t("cli.opt.fit.bundle"))
     p.add_argument("--split", choices=("axis", "kmeans"), default=None,
                    help=t("cli.opt.fit.split"))
-    p.add_argument("--save", default=None, help=t("cli.opt.fit.save"))
+    # As with `bounds`: `--out` everywhere, `--save` still accepted.
+    p.add_argument("--out", "--save", dest="save", default=None, help=t("cli.opt.fit.save"))
     p.add_argument("--ppb", action="store_true",
                    help=t("cli.opt.fit.ppb"))
     p.add_argument("--slider", action="append", default=[])

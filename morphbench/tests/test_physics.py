@@ -368,6 +368,42 @@ MBTail.stiffness 0.03
                     .replace("1,2,3 | 1,2,3\n", "").replace("[Nobody]\n0,0,0,1\n", "")
         self.assertEqual(cbpc.check(clean, self.BONES), [])
 
+    def test_cbpc_event_nodes_declare_rather_than_point(self):
+        """`[PlayerCollisionEventNodes]` names nodes, and in VR two of them are the wands.
+
+        Found by running the check over the settings files the build already carries: every
+        install of CBPC produced fifteen findings on a file that is correct, because the
+        section was unknown here and its contents were read as broken shapes. A checker that
+        cries wolf on a stock file teaches people to ignore it.
+        """
+        from presenters import cbpc
+        text = """[Settings]
+MinimumCollisionDuration = 0.3
+[PlayerCollisionEventNodes]
+LeftWandNode
+RightWandNode
+NPC Head [Head]
+"""
+        self.assertEqual(cbpc.check(text, self.BONES), [])
+
+    def test_cbpc_node_line_inside_a_bone_section_is_named_as_such(self):
+        """Two configs joined by hand lose the `[AffectedNodes]` heading between the halves.
+
+        What follows is then registered nowhere, and calling it a broken shape hides the
+        cause. The finding stays - it is a real defect - but it says what was actually seen.
+        """
+        from presenters import cbpc
+        text = """[AffectedNodes]
+TailBone01
+[NPC Head [Head]]
+0.0,3.0,2.0,7.0 | 0.0,3.0,2.0,7.0
+
+TailBone02
+"""
+        rows = cbpc.check(text, self.BONES)
+        self.assertEqual([(r["kind"], r["name"]) for r in rows], [("node", "TailBone02")])
+        self.assertIn("AffectedNodes", rows[0]["problem"])
+
     def test_facade_skeleton_bones(self):
         import tempfile
         from common import bench, bone, grid, model

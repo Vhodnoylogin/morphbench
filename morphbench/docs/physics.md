@@ -88,7 +88,7 @@ is the useful number when a whole set is obviously overblown.
 Writing the corrected spheres:
 
 ```
-python mb.py bounds body.nif --write fixed-body.nif
+python mb.py bounds body.nif --out fixed-body.nif
 ```
 
 The sphere is a fixed-size field inside the shape's block, so this is an edit in place: every
@@ -147,7 +147,7 @@ through the body there touching nothing. "Outside 62% of the skin, furthest 14.0
 **Fit them to the skin.**
 
 ```
-python mb.py fit body.nif --skeleton skeleton.nif --slider CLAWTorsoGirth=0.5 --save new-skeleton.nif
+python mb.py fit body.nif --skeleton skeleton.nif --slider CLAWTorsoGirth=0.5 --out new-skeleton.nif
 ```
 
 This is the reason the bench touches colliders at all. It deforms the body itself and knows every
@@ -186,11 +186,11 @@ the axis comes out arbitrary and the capsule lands as a sausage past the muzzle 
 under the arch. Those are fitted with several capsules at once:
 
 ```
-python mb.py fit body.nif --skeleton skeleton.nif --find Head --bundle 14 --split kmeans --save new-skeleton.nif
+python mb.py fit body.nif --skeleton skeleton.nif --find Head --bundle 14 --split kmeans --out new-skeleton.nif
 ```
 
 ```
-python mb.py fit body.nif --skeleton skeleton.nif --find "L Foot" --bundle 3 --split axis --save new-skeleton.nif
+python mb.py fit body.nif --skeleton skeleton.nif --find "L Foot" --bundle 3 --split axis --out new-skeleton.nif
 ```
 
 `--split axis` cuts the cloud into slices of equal count along the bone's axis, which suits
@@ -202,7 +202,7 @@ and do not need to be — a blow does not care which capsule of the bundle it la
 no skin was left outside. On the werewolf the head went from 66% of its skin outside the stock
 XP32 capsule to 28% with a bundle of 14, and the foot from 98% to 36% with three slices.
 
-Results leave by two doors. `--save` writes a new skeleton file — always new, for the same reason
+Results leave by two doors. `--out` writes a new skeleton file — always new, for the same reason
 meshes are: the skeleton you read belongs to somebody else's mod. `--ppb` prints lines for
 Precision Physic Bodies, which re-reads its `PPB_tuning.txt` about once a second while the game
 is running, so a fit can be tried live without restarting anything. PPB names its knobs by body

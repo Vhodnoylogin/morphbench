@@ -278,7 +278,7 @@ is 27.7, around a different centre. Lines that are fine simply have no `<- widen
 **3. Write the corrected spheres — into a new file.**
 
 ```
-python mb.py bounds malebody_1.nif --write malebody_1-fixed.nif
+python mb.py bounds malebody_1.nif --out malebody_1-fixed.nif
 ```
 
 The source belongs to somebody else's mod and is never overwritten; everything but the spheres is
@@ -308,11 +308,11 @@ cannot cover it.
 **6. Seat the capsules on the skin.** For those two, as a bundle rather than one capsule:
 
 ```
-python mb.py fit malebody_1.nif --skeleton skeleton.nif --find Head --bundle 14 --split kmeans --save skeleton-fitted.nif
+python mb.py fit malebody_1.nif --skeleton skeleton.nif --find Head --bundle 14 --split kmeans --out skeleton-fitted.nif
 ```
 
 ```
-python mb.py fit malebody_1.nif --skeleton skeleton.nif --find "L Foot" --bundle 3 --split axis --save skeleton-fitted.nif
+python mb.py fit malebody_1.nif --skeleton skeleton.nif --find "L Foot" --bundle 3 --split axis --out skeleton-fitted.nif
 ```
 
 `--split axis` cuts the skin into slices along the bone, which suits limbs; `kmeans` cuts it into

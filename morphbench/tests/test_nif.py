@@ -150,6 +150,61 @@ class TestReadingSurvivesTheLibrary(unittest.TestCase):
         self.assertIn("getUVs", str(caught.exception))       # the library's own words kept
         self.assertIs(caught.exception.__cause__, native)    # and the failure itself kept
 
+    def test_a_shape_without_texture_coordinates_is_read_all_the_same(self):
+        """Geometry that is never drawn carries no texture coordinates, and the format lets
+        it: `BS Vector Flags` has the bit clear. `blood_dripping.nif` of OVirginity Reflowered
+        is such a file - its one shape is the mesh a particle system emits from, positions and
+        triangles and nothing else - and nifly hands back a null pointer for the array that is
+        not there. Asking for what a sound file never had must not cost the file its answer:
+        the workbench keeps the coordinates and looks at nothing else in them."""
+        from morphbench import model as module
+
+        class Shape:
+            name, id, properties = "testmitGeo:0", 4, None
+            verts = [(0.0, 0.0, 0.0), (1.0, 0.0, 0.0), (0.0, 1.0, 0.0)]
+            tris = [(0, 1, 2)]
+            normals, bone_weights, textures = None, {}, {}
+
+            @property
+            def uvs(self):
+                raise Exception("Error calling nifly getUVs: exception: access violation")
+
+        class Nif:
+            shapes = [Shape()]
+
+        path = Path(self.tmp.name) / "drops.nif"
+        path.write_bytes(bytes(64))
+        original = module.open_nif
+        module.open_nif = lambda pynifly, where: Nif()
+        try:
+            body = BodyModel.from_nif(path, self.cfg)
+        finally:
+            module.open_nif = original
+        shape = body.shape("testmitGeo:0")
+        self.assertIsNone(shape.uvs)
+        self.assertEqual(shape.vertex_count, 3)
+        self.assertEqual(shape.triangle_count, 1)
+
+    def test_a_refusal_with_no_words_still_names_the_format(self):
+        """nifly refuses a file of a foreign generation with an empty message, and empty
+        brackets tell nobody anything. The first line of a NIF is plain text and says what
+        the library will not: BodySlide keeps an Oblivion-era skeleton among its resources,
+        and naming its version is the whole of the explanation."""
+        from morphbench.model import open_nif
+
+        class Library:
+            @staticmethod
+            def NifFile(where):
+                raise Exception("''")       # the two characters nifly actually gives back
+
+        path = Path(self.tmp.name) / "skeleton_ob.nif"
+        path.write_bytes(b"Gamebryo File Format, Version 20.0.0.5" + bytes([10]) + bytes(32))
+        with self.assertRaises(ValueError) as caught:
+            open_nif(Library, path)
+        said = str(caught.exception)
+        self.assertIn("20.0.0.5", said)
+        self.assertNotIn("''", said)        # and the quoted nothing does not travel with it
+
     def test_our_own_refusal_is_not_dressed_up_as_the_library(self):
         """The guard sits around someone else's code, so it must not relabel ours: a refusal
         raised inside comes out as it went in, with its own type and its own text."""

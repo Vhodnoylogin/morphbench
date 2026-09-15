@@ -47,10 +47,11 @@ script.
   it, a mesh that is not open yet: all of these are refusals, not faults of the program.
 - **Somebody else's mesh does not bring the program down.** 600 files of the build - doors,
   trees, effects, armour stands, things nobody wrote the workbench for - were read, listed and
-  measured for their spheres: 598 answers and 2 refusals of one line each. A shape with no
-  vertices is an answer and not a refusal: nothing of it leaves any sphere, and the other
-  shapes of the same file answer as usual. A file the reading library itself stumbles on is a
-  refusal carrying the library's own words in brackets, not a stack trace out of a DLL.
+  measured for their spheres: 599 answers and one refusal, and that one is right - a file of
+  the Oblivion era, and the refusal names its format version instead of leaving the brackets
+  empty. Two kinds of shape that used to end the reading are answers now: one with no vertices
+  at all, and one with no texture coordinates - the geometry a particle system emits from,
+  four such files in this build - since nothing of the workbench looks at coordinates.
 - **One word for writing.** Every command that writes takes `--out`. `bounds --write` and
   `fit --save` go on working, because links and scripts written before the spelling was unified
   should not become wrong.

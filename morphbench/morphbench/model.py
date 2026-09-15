@@ -45,7 +45,14 @@ def open_nif(pynifly, path):
     try:
         return pynifly.NifFile(str(path))
     except Exception as e:                  # noqa: BLE001 - PyNifly raises the base class
-        raise ValueError(t("model.notAMesh", path=path, error=e)) from e
+        # The library's own words first, and the header line beside them: nifly refuses a
+        # file of the wrong generation with an empty message, and empty brackets help nobody.
+        # PyNifly's refusal of a foreign generation is the two characters `''` - a quoted
+        # empty string, not an empty one - so the quotes come off before it is judged empty.
+        said = [part for part in (str(e).strip().strip("'\"").strip(), header_line(path))
+                if part]
+        raise ValueError(t("model.notAMesh", path=path,
+                           error="; ".join(said) or type(e).__name__)) from e
 
 
 @contextmanager
@@ -71,6 +78,45 @@ def reading_nif(path):
         raise                               # already one of ours, already a line
     except Exception as e:                  # noqa: BLE001 - PyNifly raises the base class
         raise ValueError(t("model.unreadable", path=path, error=e)) from e
+
+
+def header_line(path) -> str:
+    """The first line of a NIF: plain text naming the format and its version.
+
+    It is there to be read without a library - that is what it is for - and it says what no
+    refusal from nifly says. A skeleton of BodySlide's own resources is refused with an empty
+    message, and the empty brackets tell the user nothing; the line says
+    `Gamebryo File Format, Version 20.0.0.5` - an Oblivion-era file, four years older than
+    anything nifly reads. An empty answer here means the file does not begin like a NIF at
+    all, which is an answer as well.
+    """
+    try:
+        with open(path, "rb") as fh:
+            head = fh.readline(120)
+    except OSError:
+        return ""
+    text = head.decode("ascii", "replace").strip()
+    return text if text.startswith(("Gamebryo", "NetImmerse")) else ""
+
+
+def texture_coordinates(shape):
+    """The texture coordinates of a shape - or none, when it has none.
+
+    Geometry that is never drawn carries no texture coordinates, and the format allows their
+    absence: `BS Vector Flags` simply has the bit clear. The mesh a particle system emits
+    from is such geometry - positions and triangles and nothing else. nifly hands back a null
+    pointer for the missing array and the wrapper walks into it, so asking a perfectly sound
+    file for coordinates it never had ended in an access violation out of a DLL.
+
+    The workbench keeps the coordinates and looks at nothing else in them, so nothing is lost
+    by answering "it has none". The catch is around one optional field, not around the
+    reading: anything else that goes wrong still travels up to `reading_nif`.
+    """
+    try:
+        uvs = shape.uvs
+    except Exception:                       # noqa: BLE001 - nifly walks off a null pointer
+        return None
+    return np.asarray(uvs, dtype=np.float32).reshape(-1, 2) if uvs else None
 
 
 def vertex_normals(verts: np.ndarray, tris: np.ndarray) -> np.ndarray:
@@ -270,7 +316,7 @@ class BodyModel:
                 tris = np.asarray(s.tris, dtype=np.int32).reshape(-1, 3)
                 normals = (np.asarray(s.normals, dtype=np.float32).reshape(-1, 3)
                            if s.normals else None)
-                uvs = np.asarray(s.uvs, dtype=np.float32).reshape(-1, 2) if s.uvs else None
+                uvs = texture_coordinates(s)
                 raw = s.bone_weights or {}
                 bones = {name: Bone(name, dict(pairs)) for name, pairs in raw.items()}
                 textures = [tex for tex in (s.textures.values()

@@ -156,6 +156,10 @@ What the bench measures and what each setting means is in [docs/physics.md](docs
 | `morphbench.json` | settings, written on first run from built-in defaults; every machine has its own, and new keys are added to an old file automatically |
 | `LICENSE` | the GNU GPL version 3 |
 
+`morphbench\`, `presenters\`, `web\`, `launcher\` and `tests\` each carry a short README of their
+own, in both languages: what the layer is, what it may depend on, and what must never import it.
+Open the folder and the boundary is right there.
+
 The release archive additionally carries `python\`, `vendor\` (numpy, pillow, PyNifly) and
 `THIRD-PARTY.md`. It carries no tests, no launcher sources and no `release.py`.
 

@@ -132,9 +132,14 @@ through a variable is invisible to `grep` and to the catalogue check; and a tran
 never a default argument value, because defaults are evaluated at import, before the language of
 the run is known (see the `empty` parameter of `presenters.text.table`).
 
-**`use(...)` is the first line of `main()` in `mb.py`.** argparse builds its help text at parser
-*construction*, not at printing. Settle the language after the parser is built and `--help` comes
-out in whatever language happened to be loaded first. For the same reason `i18n.CATALOGUE` reads
+**`use(...)` runs at the top of `main()` in `mb.py`, before the parser is built.** argparse builds
+its help text at parser *construction*, not at printing. Settle the language after the parser is
+built and `--help` comes out in whatever language happened to be loaded first. Same reason the
+`COMMANDS` table in that file holds help **keys** and not texts: the table is built at import,
+when the language is still unknown, and `Command.add_to` asks for the text at the moment argparse
+wants it. That is also why the keys of the table are handed to the catalogue check through
+`mb.catalogue_keys()` - they are spelled out literally in the table, but a search for `t("...")`
+would not see them. For the same reason `i18n.CATALOGUE` reads
 `MORPHBENCH_LANG` at first import and not only when somebody calls `use()`: until a setting is
 read the catalogue is already answering questions, and which language it answers in must not
 depend on which module was imported first.
@@ -212,8 +217,14 @@ a malformed locale file, a key left as an English sentence.
 | [tests/README.md](tests/README.md) | what each suite covers and what it needs |
 
 Every document above exists twice: `NAME.md` in English and `NAME.ru.md` in Russian, same content,
-same headings, same order. Change one and change the other in the same commit. The one exception is
-`tests/README.md`, which is English only.
+same headings, same order. Change one and change the other in the same commit. There is no
+exception, `tests/README.md` included; this file is not in the table, for the reason its own
+opening gives.
+
+Each layer also carries a short pair of its own — `morphbench\`, `presenters\`, `web\`,
+`launcher\`, `tests\`. They say what the layer is, what it may depend on and what must never
+import it, and they exist because the boundaries above are addressed to an assistant while the
+person who opens one of those folders is not reading this file.
 
 The reasoning behind individual decisions lives where the decision does — in the module docstrings.
 `morphbench/api.py`, `morphbench/i18n.py`, `morphbench/journal.py`, `morphbench/environment.py`,

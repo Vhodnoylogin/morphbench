@@ -2,7 +2,10 @@
   "#": "Base language. Every key in use must have a text here: other languages fall back to it.",
   "#keys": "A key is a latin label, never a sentence. Substitution is by name: %(name)s.",
   "#adding": "A new section goes into a NEW FILE in this folder - no existing file is rewritten.",
-  "#section": "Settings: what is said when the path to somebody else's library is wrong, or the library is nowhere to be found. The names of the settings themselves are keys of morphbench.json - they are read by the code and are not texts.",
+  "#section": "Settings: what is said when the path to somebody else's library is wrong, or the library is nowhere to be found, or the settings file itself cannot be read or written. The names of the settings themselves are keys of morphbench.json - they are read by the code and are not texts.",
   "config.pyniflyBadPath": "the pynifly path in morphbench.json does not exist: %(path)s",
-  "config.pyniflyMissing": "PyNifly add-on not found; name its folder with the pynifly key in %(config)s"
+  "config.pyniflyMissing": "PyNifly add-on not found; name its folder with the pynifly key in %(config)s",
+  "config.unreadable": "%(path)s could not be read (%(error)s); this run works from the built-in defaults and the file is left as it is",
+  "config.notObject": "%(path)s does not hold a set of settings but something else; this run works from the built-in defaults and the file is left as it is",
+  "config.notWritten": "%(path)s could not be written (%(error)s); this run works from the built-in defaults and keeps no settings file"
 }

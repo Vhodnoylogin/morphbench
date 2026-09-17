@@ -9,6 +9,12 @@ Keys the old file has never heard of are written into it from the defaults; the 
 user set are left alone. That rewrite on start-up looks like the program overwriting a file
 it does not own - it is not. It only fills in what a newer version added, so that everything
 adjustable stays visible in the file instead of hiding in the code.
+
+Neither reading nor writing that file may cost the run. It is the one file the design
+invites the user to edit by hand, so a missing comma in it is an ordinary event, not an
+exceptional one - and a release unpacked into Program Files or opened from a read-only
+share cannot be written to at all. Both end the same way: the defaults are built into the
+program, this run works from them, and what happened is noted for the journal.
 """
 from __future__ import annotations
 
@@ -203,19 +209,61 @@ class Config:
 
     def __init__(self, path: Path | None = None):
         self.path = Path(path) if path else _FILE
+        #: What went wrong with the file, as finished lines. They cannot be said from here:
+        #: the journal is built FROM the settings, so at this moment there is nothing to say
+        #: them into. They wait, and `journal.from_config` empties them into the first
+        #: journal that appears. Once per run, because the file is written at most once:
+        #: either it was missing and got the defaults, or it was read and may need the new
+        #: keys - never both.
+        self.notes: list[str] = []
         if not self.path.exists():
-            self.path.write_text(json.dumps(DEFAULTS, indent=2, ensure_ascii=False),
-                                 encoding="utf-8")
-        raw = json.loads(self.path.read_text(encoding="utf-8-sig"))
-        self._values = {**DEFAULTS, **raw}
-        if any(key not in raw for key in DEFAULTS):
-            # The file is older than the program: write the new keys in, so that what is
-            # adjustable can be seen.
-            self.path.write_text(json.dumps(self._values, indent=2, ensure_ascii=False),
-                                 encoding="utf-8")
+            self._write(DEFAULTS)
+        raw = self._read()
+        self._values = {**DEFAULTS, **(raw or {})}
         # The language of the messages is applied here: the settings are read by everyone who
         # does anything at all, and this is the earliest point at which the language is known.
+        # Before the rewrite below on purpose - a failure of that write is a message too, and
+        # it has to come out in the language this run speaks.
         use(self._values.get("language", "auto"))
+        if raw is not None and any(key not in raw for key in DEFAULTS):
+            # The file is older than the program: write the new keys in, so that what is
+            # adjustable can be seen.
+            self._write(self._values)
+
+    # ---- the file, which is allowed to be broken and to be unwritable -------------------
+    def _read(self) -> dict | None:
+        """The settings file as a dictionary, or None when nothing was read out of it.
+
+        None is not the same as an empty file. It says the file was not read, so the rewrite
+        that fills in new keys leaves it alone: rewriting a file that failed to parse would
+        throw away the very values somebody was editing when they broke it.
+        """
+        if not self.path.exists():
+            return None
+        try:
+            raw = json.loads(self.path.read_text(encoding="utf-8-sig"))
+        except (OSError, ValueError) as e:
+            self.notes.append(t("config.unreadable", path=self.path, error=e))
+            return None
+        if not isinstance(raw, dict):
+            # A list or a bare number is valid JSON and would fall over on the merge above
+            # instead - the same hand edit reaching the user as a different traceback.
+            self.notes.append(t("config.notObject", path=self.path))
+            return None
+        return raw
+
+    def _write(self, values: dict) -> None:
+        """The settings out to the file, or a note saying they stayed in memory only.
+
+        Losing the file costs this run nothing but the file: every value is in `DEFAULTS`.
+        A workbench that cannot print its own help because the folder it was unpacked into
+        is read-only would be absurd.
+        """
+        try:
+            self.path.write_text(json.dumps(values, indent=2, ensure_ascii=False),
+                                 encoding="utf-8")
+        except OSError as e:
+            self.notes.append(t("config.notWritten", path=self.path, error=e))
 
     def __getitem__(self, key: str):
         return self._values[key]

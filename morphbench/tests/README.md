@@ -1,5 +1,7 @@
 # Checks
 
+Русская версия этого файла — [README.ru.md](README.ru.md).
+
 ```
 python tests/run.py                 every suite in turn, one summary line at the end
 python tests/run.py test_tri.py     one suite, by a file name pattern

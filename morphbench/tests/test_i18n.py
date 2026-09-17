@@ -192,6 +192,12 @@ class TestShippedLocales(unittest.TestCase):
         for folder in ("morphbench", "presenters", "."):
             for path in sorted((root / folder).glob("*.py")):
                 used |= set(call.findall(path.read_text(encoding="utf-8")))
+        # The command line keeps the keys of its thirty-odd help lines in a table instead of
+        # in `t()` calls - the table is built at import, before the language is known - so it
+        # hands them over itself. Without this the one file holding the most keys would be
+        # the one file the search above cannot see.
+        import mb  # noqa: E402 - common put the program root on sys.path
+        used |= set(mb.catalogue_keys())
         self.assertTrue(used, "not one key was found in the code - the check is broken")
         self.assertEqual(used - self.keys["en"], set(), "the code has keys with no text")
 

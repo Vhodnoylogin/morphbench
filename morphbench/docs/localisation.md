@@ -113,7 +113,7 @@ way to find where a line lives.
 | `cbpc.json` | CBPC physics settings: the header written into the files, and the verdicts of checking a ready one. |
 | `cli.json` | The command line — the usage text, every `--help` line, column headings and refusals. The largest file by far. |
 | `colliders.json` | Collision capsules: reading them out of the skeleton, fitting them to the skin, writing them back. |
-| `config.json` | Settings: a wrong path to PyNifly, or PyNifly nowhere to be found. |
+| `config.json` | Settings: a wrong path to PyNifly, PyNifly nowhere to be found, or `morphbench.json` itself unreadable or unwritable. |
 | `core.json` | Refusals from the core: every shape hidden, an unknown physics engine, an empty set of sliders. |
 | `environment.json` | MO2, usvfs and the game roots. Empty today — the layer answers yes or no and hands back paths, and whoever calls it writes the message. The file exists so the first text of the section has a home. |
 | `journal.json` | The log: an unknown level, a sink that dropped out, a stream that is not there. The level names themselves (`debug`, `info`, `warn`, `error`) are settings, not texts, and stay English in every language. |

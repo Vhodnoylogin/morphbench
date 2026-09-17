@@ -2,4 +2,26 @@
 # the lines are then run in fragments. Batch files get CRLF, on every machine.
 *.cmd text eol=crlf
 *.bat text eol=crlf
-*.ico filter=lfs diff=lfs merge=lfs -text
+
+# Binary files of the module go through Git LFS: git keeps a pointer of a few lines, the
+# file itself lies beside it in the LFS store. Without this the history swells - git holds
+# a whole copy of a binary on every change and shows no diff.
+#
+# The cost, stated because it decides what belongs here: LFS does NOT compress one version
+# against another. Every edit is stored whole. So this list holds what a recipe cannot
+# express and what changes rarely - not the output of every build. Build products of this
+# module (morphbench.exe, the launcher's .png preview, the release archive) are named in
+# .gitignore and never reach git at all, with or without a rule here.
+#
+# The list is the formats the workbench itself reads and writes. The .ico is the one that
+# exists today: those bytes travel inside morphbench.exe, so the recipe cannot rebuild the
+# exe without them. The rest are here as kinds, before the first file of that kind appears,
+# because a rule applied only once it hurts is a rule nobody applies - a mesh or a morph
+# file carried by tests\ as a fixture would otherwise be committed whole, over and over.
+#
+# The locale files, dependencies.json and web\ are NOT here on purpose: they are text, and
+# they have to diff and merge like any other source.
+*.ico   filter=lfs diff=lfs merge=lfs -text
+*.nif   filter=lfs diff=lfs merge=lfs -text
+*.tri   filter=lfs diff=lfs merge=lfs -text
+*.png   filter=lfs diff=lfs merge=lfs -text

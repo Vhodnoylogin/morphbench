@@ -8,6 +8,12 @@ The usage text the user sees is not here: it lives under the key `cli.usage` in
 `locale/<language>/cli.json`, like every other string this program prints. So does every
 argparse help line. The language is settled at the top of `main()` - before the parser is
 built, because the help is put together at construction, not at printing.
+
+The commands themselves are a table, `COMMANDS`, at module level: a name, the key of its
+help, the function it dispatches to, what it does about a mesh, and its arguments. `main()`
+only loops over it. Adding a command is one entry rather than a few lines inside a function
+that no check could reach - and the table can be read on its own, which is how the catalogue
+check gets at the keys of the help lines (`catalogue_keys`).
 """
 from __future__ import annotations
 
@@ -25,6 +31,7 @@ import errno                                  # noqa: E402
 from morphbench import MorphBench            # noqa: E402
 from morphbench.config import Config       # noqa: E402
 from morphbench.i18n import t, use         # noqa: E402
+from morphbench.journal import Journal, StreamSink   # noqa: E402
 from presenters import ppb, text             # noqa: E402
 
 # Refusals of the facade: the command line shows these as one line, not as a traceback.
@@ -584,185 +591,263 @@ def _hand_over(bench: MorphBench, link, args) -> int:
     return 0
 
 
+#: What a command does about a mesh. `MESH_NONE` is not "optional with no default": those
+#: commands take no mesh path, no `--tri` and no `--skeleton` at all.
+MESH_REQUIRED = "required"
+MESH_OPTIONAL = "optional"      # `--entry`, or a skeleton alone, can stand instead of a path
+MESH_NONE = "none"
+
+
+class Arg:
+    """One argument of a command, as data. `flags` and `options` are argparse's own and are
+    passed through untouched; the help is held as a KEY.
+
+    A key and not a text, because this table is built when the module is imported - long
+    before `main()` settles the language - and a text made then would come out in whichever
+    language happened to be loaded first. `add_to` asks for the text at the moment argparse
+    wants it. The key is still spelled out literally here, one line per argument, so a grep
+    for it finds this table; what the catalogue check reads is `catalogue_keys()`.
+    """
+
+    __slots__ = ("flags", "help_key", "options")
+
+    def __init__(self, *flags, help_key: str | None = None, **options):
+        self.flags = flags
+        self.help_key = help_key
+        self.options = options
+
+    def add_to(self, parser) -> None:
+        options = dict(self.options)
+        if self.help_key:
+            options["help"] = t(self.help_key)
+        parser.add_argument(*self.flags, **options)
+
+
+class Command:
+    """One subcommand as data: its name, the key of its one-line help, the function it hands
+    the parsed arguments to, what it does about a mesh, and its own arguments.
+
+    Adding a command is one entry in `COMMANDS` below. It used to be a few lines inside a
+    closure of `main()`, which meant the whole command set could only be reached by running
+    the program end to end; a table at module level can be read, counted and checked.
+    """
+
+    __slots__ = ("name", "help_key", "handler", "mesh", "args")
+
+    def __init__(self, name: str, help_key: str, handler, mesh: str = MESH_REQUIRED,
+                 args=()):
+        self.name = name
+        self.help_key = help_key
+        self.handler = handler
+        self.mesh = mesh
+        self.args = tuple(args)
+
+    def add_to(self, sub) -> None:
+        parser = sub.add_parser(self.name, help=t(self.help_key))
+        if self.mesh != MESH_NONE:
+            parser.add_argument("nif", nargs=None if self.mesh == MESH_REQUIRED else "?",
+                                default=None)
+            parser.add_argument("--tri", default=None)
+            parser.add_argument("--skeleton", default=None, help=t("cli.opt.top.skeleton"))
+            self._json(parser)
+        for arg in self.args:
+            arg.add_to(parser)
+        if self.mesh == MESH_NONE:
+            # Last, because that is where a command without a mesh preamble has always
+            # printed it, and the order of the options in `--help` is the order they are
+            # added in.
+            self._json(parser)
+        parser.set_defaults(func=self.handler)
+
+    @staticmethod
+    def _json(parser) -> None:
+        # No default: otherwise --json put BEFORE the name of the command would be wiped.
+        parser.add_argument("--json", action="store_true", default=argparse.SUPPRESS)
+
+
+#: The view keys, shared by the three commands that produce a picture. `_apply_view` reads
+#: exactly these, and a command that has none of them simply leaves them unset.
+VIEW_ARGS = (
+    Arg("--entry", default=None, help_key="cli.opt.view.entry"),
+    Arg("--root", default=None, help_key="cli.opt.view.root"),
+    Arg("--out", required=True),
+    Arg("--view", default=None),
+    Arg("--colour", "--color", dest="colour", default="shade",
+        choices=["shade", "bone", "morph", "strain"]),
+    Arg("--morph", default=None),
+    Arg("--slider", action="append", default=[]),
+    Arg("--only", default=None),
+    Arg("--zoom", type=float, default=None),
+    Arg("--look", default=None, help_key="cli.opt.view.look"),
+    Arg("--pan", default=None, help_key="cli.opt.view.pan"),
+    Arg("--size", default=None),
+    Arg("--zoom-at", dest="zoom_at", default=None, help_key="cli.opt.view.zoomat"),
+    Arg("--light", choices=["camera", "world"], default=None, help_key="cli.opt.view.light"),
+    Arg("--light-dir", dest="light_dir", default=None, help_key="cli.opt.view.lightdir"),
+    Arg("--light-power", dest="light_power", default=None,
+        help_key="cli.opt.view.lightpower"),
+    Arg("--focus-bone", dest="focus_bone", default=None),
+    Arg("--focus-morph", dest="focus_morph", default=None),
+    Arg("--focus-shape", dest="focus_shape", default=None),
+    Arg("--colliders", action="store_true", help_key="cli.opt.view.colliders"),
+    Arg("--bumper", action="store_true", help_key="cli.opt.view.bumper"),
+)
+
+#: Every command of the workbench, in the order `--help` lists them.
+COMMANDS = (
+    Command("summary", "cli.cmd.summary", cmd_summary),
+    Command("shapes", "cli.cmd.shapes", cmd_shapes),
+    Command("bones", "cli.cmd.bones", cmd_bones, args=(
+        Arg("--shape", default=None),
+        Arg("--find", default=None),
+    )),
+    Command("morphs", "cli.cmd.morphs", cmd_morphs, args=(
+        Arg("--morph", default=None),
+        Arg("--shape", default=None),
+    )),
+    Command("empty", "cli.cmd.empty", cmd_empty),
+    Command("missing", "cli.cmd.missing", cmd_missing, args=(
+        Arg("names", nargs="+"),
+    )),
+    Command("strain", "cli.cmd.strain", cmd_strain, args=(
+        Arg("--morph", default=None),
+        Arg("--amount", type=float, default=1.0),
+        Arg("--threshold", type=float, default=None, help_key="cli.opt.strain.threshold"),
+        Arg("--slider", action="append", default=[], help_key="cli.opt.strain.slider"),
+        Arg("--pairs", action="store_true", help_key="cli.opt.strain.pairs"),
+        Arg("--top", type=int, default=10, help_key="cli.opt.strain.top"),
+        Arg("--by", choices=["max", "gain"], default="max", help_key="cli.opt.strain.by"),
+    )),
+    Command("budget", "cli.cmd.budget", cmd_budget, args=(
+        Arg("--threshold", type=float, default=None, help_key="cli.opt.budget.threshold"),
+    )),
+    Command("layers", "cli.cmd.layers", cmd_layers, args=(
+        Arg("--morph", required=True),
+        Arg("--base", default=None, help_key="cli.opt.layers.base"),
+        Arg("--adjacent", action="store_true", help_key="cli.opt.layers.adjacent"),
+    )),
+    Command("binding", "cli.cmd.binding", cmd_binding, args=(
+        Arg("--shape", default=None, help_key="cli.opt.binding.shape"),
+        Arg("--morph", required=True),
+    )),
+    Command("chains", "cli.cmd.chains", cmd_chains, args=(
+        Arg("--engine", choices=("smp", "cbpc"), default=None,
+            help_key="cli.opt.chains.engine"),
+        Arg("--only", default=None, help_key="cli.opt.chains.only"),
+        Arg("--assign", default=None, help_key="cli.opt.chains.assign"),
+    )),
+    Command("physics", "cli.cmd.physics", cmd_physics, args=(
+        Arg("--engine", choices=("smp", "cbpc"), required=True,
+            help_key="cli.opt.physics.engine"),
+        Arg("--assign", default=None, help_key="cli.opt.physics.assign"),
+        Arg("--out", default=None, help_key="cli.opt.physics.out"),
+        Arg("--check", default=None, help_key="cli.opt.physics.check"),
+        Arg("--percentile", type=float, default=None, help_key="cli.opt.physics.percentile"),
+        Arg("--slider", action="append", default=[]),
+        Arg("--only", default=None, help_key="cli.opt.physics.only"),
+    )),
+    Command("bounds", "cli.cmd.bounds", cmd_bounds, args=(
+        Arg("--shape", default=None, help_key="cli.opt.bounds.shape"),
+        Arg("--margin", type=float, default=None, help_key="cli.opt.bounds.margin"),
+        # `--out` is the spelling every other writing command uses; `--write` is kept
+        # because links and scripts written before it was unified still say so.
+        Arg("--out", "--write", dest="write", default=None, help_key="cli.opt.bounds.write"),
+        Arg("--shrink", action="store_true", help_key="cli.opt.bounds.shrink"),
+    )),
+    Command("colliders", "cli.cmd.colliders", cmd_colliders, mesh=MESH_OPTIONAL, args=(
+        Arg("--find", default=None, help_key="cli.opt.colliders.find"),
+        Arg("--clearance", action="store_true", help_key="cli.opt.colliders.clearance"),
+    )),
+    Command("focus", "cli.cmd.focus", cmd_focus, args=(
+        Arg("--bone", default=None, help_key="cli.opt.focus.bone"),
+        Arg("--morph", default=None),
+        Arg("--shape", default=None),
+    )),
+    Command("fit", "cli.cmd.fit", cmd_fit, mesh=MESH_OPTIONAL, args=(
+        Arg("--entry", default=None),
+        Arg("--root", default=None),
+        Arg("--find", default=None, help_key="cli.opt.fit.find"),
+        Arg("--percentile", type=float, default=None, help_key="cli.opt.fit.percentile"),
+        Arg("--bundle", type=int, default=None, help_key="cli.opt.fit.bundle"),
+        Arg("--split", choices=("axis", "kmeans"), default=None,
+            help_key="cli.opt.fit.split"),
+        # As with `bounds`: `--out` everywhere, `--save` still accepted.
+        Arg("--out", "--save", dest="save", default=None, help_key="cli.opt.fit.save"),
+        Arg("--ppb", action="store_true", help_key="cli.opt.fit.ppb"),
+        Arg("--slider", action="append", default=[]),
+        Arg("--only", default=None),
+    )),
+    Command("render", "cli.cmd.render", cmd_render, mesh=MESH_OPTIONAL, args=VIEW_ARGS),
+    Command("sheet", "cli.cmd.sheet", cmd_sheet, mesh=MESH_OPTIONAL, args=VIEW_ARGS + (
+        Arg("--views", default=None),
+        Arg("--prefix", default="view"),
+    )),
+    Command("web", "cli.cmd.web", cmd_web, mesh=MESH_OPTIONAL, args=VIEW_ARGS),
+    # Commands that need no mesh: the surroundings, the catalogue, the page with the list.
+    Command("env", "cli.cmd.env", cmd_env, mesh=MESH_NONE),
+    Command("catalog", "cli.cmd.catalog", cmd_catalog, mesh=MESH_NONE, args=(
+        Arg("root", nargs="?", default=None, help_key="cli.opt.catalog.root"),
+        Arg("--all", action="store_true", help_key="cli.opt.catalog.all"),
+        Arg("--find", default=None, help_key="cli.opt.catalog.find"),
+    )),
+    Command("serve", "cli.cmd.serve", cmd_serve, mesh=MESH_NONE, args=(
+        Arg("--root", default=None, help_key="cli.opt.serve.root"),
+        Arg("--nif", default=None, help_key="cli.opt.serve.nif"),
+        Arg("--tri", default=None),
+        Arg("--host", default=None, help_key="cli.opt.serve.host"),
+        Arg("--port", type=int, default=None, help_key="cli.opt.serve.port"),
+        Arg("--all", action="store_true", help_key="cli.opt.serve.all"),
+        Arg("--no-browser", dest="no_browser", action="store_true",
+            help_key="cli.opt.serve.nobrowser"),
+        Arg("--parent", type=int, default=None, help_key="cli.opt.serve.parent"),
+        Arg("--status", action="store_true", help_key="cli.opt.serve.status"),
+        Arg("--stop", action="store_true", help_key="cli.opt.serve.stop"),
+    )),
+)
+
+
+def catalogue_keys() -> list[str]:
+    """Every localisation key the command table names.
+
+    The rule of this module is that a key is spelled out in the `t()` call, so that a grep
+    and the catalogue check both see it. The table keeps its keys as data instead, because
+    it is built before the language is known - so it hands them over here, and the check
+    reads them from a table rather than from a regular expression over the source.
+    """
+    keys = []
+    for command in COMMANDS:
+        keys.append(command.help_key)
+        keys += [arg.help_key for arg in command.args if arg.help_key]
+    return keys
+
+
+def _report_settings(cfg: Config) -> None:
+    """Whatever the settings collected while being read, said once before anything else.
+
+    Through a journal, because that is the module that decides how a record looks - but
+    with a stream sink only: a command that answers in a second has no business opening a
+    log file of its own, and the file a broken `morphbench.json` names may be the very
+    thing that cannot be written.
+    """
+    if not cfg.notes:
+        return
+    journal = Journal([StreamSink(sys.stderr, "error")], "mb")
+    for note in cfg.notes:
+        journal.error(note)
+
+
 def main(argv=None) -> int:
     # Language is settled BEFORE the parser is built: argparse help is text too,
     # and it is put together at parser construction, not at printing.
-    use(Config().get("language", "auto"))
+    cfg = Config()
+    use(cfg.get("language", "auto"))
+    _report_settings(cfg)
     ap = argparse.ArgumentParser(prog="mb", description=t("cli.usage"),
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--json", action="store_true", help=t("cli.opt.top.json"))
     sub = ap.add_subparsers(dest="cmd", required=True)
-
-    def add(name, fn, nif_required=True, **kw):
-        p = sub.add_parser(name, **kw)
-        p.add_argument("nif", nargs=None if nif_required else "?", default=None)
-        p.add_argument("--tri", default=None)
-        p.add_argument("--skeleton", default=None,
-                       help=t("cli.opt.top.skeleton"))
-        # No default: otherwise --json put BEFORE the name of the command would be wiped.
-        p.add_argument("--json", action="store_true", default=argparse.SUPPRESS)
-        p.set_defaults(func=fn)
-        return p
-
-    add("summary", cmd_summary, help=t("cli.cmd.summary"))
-    add("shapes", cmd_shapes, help=t("cli.cmd.shapes"))
-    p = add("bones", cmd_bones, help=t("cli.cmd.bones"))
-    p.add_argument("--shape", default=None)
-    p.add_argument("--find", default=None)
-    p = add("morphs", cmd_morphs, help=t("cli.cmd.morphs"))
-    p.add_argument("--morph", default=None)
-    p.add_argument("--shape", default=None)
-    add("empty", cmd_empty, help=t("cli.cmd.empty"))
-    p = add("missing", cmd_missing, help=t("cli.cmd.missing"))
-    p.add_argument("names", nargs="+")
-    p = add("strain", cmd_strain, help=t("cli.cmd.strain"))
-    p.add_argument("--morph", default=None)
-    p.add_argument("--amount", type=float, default=1.0)
-    p.add_argument("--threshold", type=float, default=None,
-                   help=t("cli.opt.strain.threshold"))
-    p.add_argument("--slider", action="append", default=[],
-                   help=t("cli.opt.strain.slider"))
-    p.add_argument("--pairs", action="store_true",
-                   help=t("cli.opt.strain.pairs"))
-    p.add_argument("--top", type=int, default=10, help=t("cli.opt.strain.top"))
-    p.add_argument("--by", choices=["max", "gain"], default="max",
-                   help=t("cli.opt.strain.by"))
-    p = add("budget", cmd_budget,
-            help=t("cli.cmd.budget"))
-    p.add_argument("--threshold", type=float, default=None,
-                   help=t("cli.opt.budget.threshold"))
-    p = add("layers", cmd_layers, help=t("cli.cmd.layers"))
-    p.add_argument("--morph", required=True)
-    p.add_argument("--base", default=None, help=t("cli.opt.layers.base"))
-    p.add_argument("--adjacent", action="store_true",
-                   help=t("cli.opt.layers.adjacent"))
-    p = add("binding", cmd_binding, help=t("cli.cmd.binding"))
-    p.add_argument("--shape", default=None, help=t("cli.opt.binding.shape"))
-    p.add_argument("--morph", required=True)
-    p = add("chains", cmd_chains, help=t("cli.cmd.chains"))
-    p.add_argument("--engine", choices=("smp", "cbpc"), default=None,
-                   help=t("cli.opt.chains.engine"))
-    p.add_argument("--only", default=None, help=t("cli.opt.chains.only"))
-    p.add_argument("--assign", default=None,
-                   help=t("cli.opt.chains.assign"))
-    p = add("physics", cmd_physics,
-            help=t("cli.cmd.physics"))
-    p.add_argument("--engine", choices=("smp", "cbpc"), required=True,
-                   help=t("cli.opt.physics.engine"))
-    p.add_argument("--assign", default=None,
-                   help=t("cli.opt.physics.assign"))
-    p.add_argument("--out", default=None, help=t("cli.opt.physics.out"))
-    p.add_argument("--check", default=None,
-                   help=t("cli.opt.physics.check"))
-    p.add_argument("--percentile", type=float, default=None,
-                   help=t("cli.opt.physics.percentile"))
-    p.add_argument("--slider", action="append", default=[])
-    p.add_argument("--only", default=None, help=t("cli.opt.physics.only"))
-    p = add("bounds", cmd_bounds, help=t("cli.cmd.bounds"))
-    p.add_argument("--shape", default=None, help=t("cli.opt.bounds.shape"))
-    p.add_argument("--margin", type=float, default=None,
-                   help=t("cli.opt.bounds.margin"))
-    # `--out` is the spelling every other writing command uses; `--write` is kept because
-    # links and scripts written before it was unified still say so.
-    p.add_argument("--out", "--write", dest="write", default=None,
-                   help=t("cli.opt.bounds.write"))
-    p.add_argument("--shrink", action="store_true",
-                   help=t("cli.opt.bounds.shrink"))
-    p = add("colliders", cmd_colliders, nif_required=False,
-            help=t("cli.cmd.colliders"))
-    p.add_argument("--find", default=None, help=t("cli.opt.colliders.find"))
-    p.add_argument("--clearance", action="store_true",
-                   help=t("cli.opt.colliders.clearance"))
-    p = add("focus", cmd_focus, help=t("cli.cmd.focus"))
-    p.add_argument("--bone", default=None, help=t("cli.opt.focus.bone"))
-    p.add_argument("--morph", default=None)
-    p.add_argument("--shape", default=None)
-
-    p = add("fit", cmd_fit, nif_required=False,
-            help=t("cli.cmd.fit"))
-    p.add_argument("--entry", default=None)
-    p.add_argument("--root", default=None)
-    p.add_argument("--find", default=None, help=t("cli.opt.fit.find"))
-    p.add_argument("--percentile", type=float, default=None,
-                   help=t("cli.opt.fit.percentile"))
-    p.add_argument("--bundle", type=int, default=None,
-                   help=t("cli.opt.fit.bundle"))
-    p.add_argument("--split", choices=("axis", "kmeans"), default=None,
-                   help=t("cli.opt.fit.split"))
-    # As with `bounds`: `--out` everywhere, `--save` still accepted.
-    p.add_argument("--out", "--save", dest="save", default=None, help=t("cli.opt.fit.save"))
-    p.add_argument("--ppb", action="store_true",
-                   help=t("cli.opt.fit.ppb"))
-    p.add_argument("--slider", action="append", default=[])
-    p.add_argument("--only", default=None)
-
-    # The keys are spelled out in the calls, not held in a variable: a key that only ever
-    # reaches `t()` through a variable is invisible to a grep and to the catalogue check.
-    for name, fn, hlp in (("render", cmd_render, t("cli.cmd.render")),
-                          ("sheet", cmd_sheet, t("cli.cmd.sheet")),
-                          ("web", cmd_web, t("cli.cmd.web"))):
-        p = add(name, fn, nif_required=False, help=hlp)
-        p.add_argument("--entry", default=None,
-                       help=t("cli.opt.view.entry"))
-        p.add_argument("--root", default=None, help=t("cli.opt.view.root"))
-        p.add_argument("--out", required=True)
-        p.add_argument("--view", default=None)
-        p.add_argument("--colour", "--color", dest="colour", default="shade",
-                       choices=["shade", "bone", "morph", "strain"])
-        p.add_argument("--morph", default=None)
-        p.add_argument("--slider", action="append", default=[])
-        p.add_argument("--only", default=None)
-        p.add_argument("--zoom", type=float, default=None)
-        p.add_argument("--look", default=None,
-                       help=t("cli.opt.view.look"))
-        p.add_argument("--pan", default=None,
-                       help=t("cli.opt.view.pan"))
-        p.add_argument("--size", default=None)
-        p.add_argument("--zoom-at", dest="zoom_at", default=None,
-                       help=t("cli.opt.view.zoomat"))
-        p.add_argument("--light", choices=["camera", "world"], default=None,
-                       help=t("cli.opt.view.light"))
-        p.add_argument("--light-dir", dest="light_dir", default=None,
-                       help=t("cli.opt.view.lightdir"))
-        p.add_argument("--light-power", dest="light_power", default=None,
-                       help=t("cli.opt.view.lightpower"))
-        p.add_argument("--focus-bone", dest="focus_bone", default=None)
-        p.add_argument("--focus-morph", dest="focus_morph", default=None)
-        p.add_argument("--focus-shape", dest="focus_shape", default=None)
-        p.add_argument("--colliders", action="store_true",
-                       help=t("cli.opt.view.colliders"))
-        p.add_argument("--bumper", action="store_true",
-                       help=t("cli.opt.view.bumper"))
-        if name == "sheet":
-            p.add_argument("--views", default=None)
-            p.add_argument("--prefix", default="view")
-
-    # Commands that need no mesh: the surroundings, the catalogue, the page with the list.
-    p = sub.add_parser("env", help=t("cli.cmd.env"))
-    p.add_argument("--json", action="store_true", default=argparse.SUPPRESS)
-    p.set_defaults(func=cmd_env)
-    p = sub.add_parser("catalog", help=t("cli.cmd.catalog"))
-    p.add_argument("root", nargs="?", default=None,
-                   help=t("cli.opt.catalog.root"))
-    p.add_argument("--all", action="store_true", help=t("cli.opt.catalog.all"))
-    p.add_argument("--find", default=None, help=t("cli.opt.catalog.find"))
-    p.add_argument("--json", action="store_true", default=argparse.SUPPRESS)
-    p.set_defaults(func=cmd_catalog)
-    p = sub.add_parser("serve", help=t("cli.cmd.serve"))
-    p.add_argument("--root", default=None, help=t("cli.opt.serve.root"))
-    p.add_argument("--nif", default=None, help=t("cli.opt.serve.nif"))
-    p.add_argument("--tri", default=None)
-    p.add_argument("--host", default=None, help=t("cli.opt.serve.host"))
-    p.add_argument("--port", type=int, default=None, help=t("cli.opt.serve.port"))
-    p.add_argument("--all", action="store_true", help=t("cli.opt.serve.all"))
-    p.add_argument("--no-browser", dest="no_browser", action="store_true",
-                   help=t("cli.opt.serve.nobrowser"))
-    p.add_argument("--parent", type=int, default=None,
-                   help=t("cli.opt.serve.parent"))
-    p.add_argument("--status", action="store_true", help=t("cli.opt.serve.status"))
-    p.add_argument("--stop", action="store_true", help=t("cli.opt.serve.stop"))
-    p.add_argument("--json", action="store_true", default=argparse.SUPPRESS)
-    p.set_defaults(func=cmd_serve)
+    for command in COMMANDS:
+        command.add_to(sub)
 
     args = ap.parse_args(argv)
     try:

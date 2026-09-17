@@ -235,6 +235,10 @@ def from_config(cfg, prefix: str = "", stream=None) -> Journal:
 
     A bad level in the settings must not cost the program its journal altogether: the sink
     is created at its default threshold and the substitution is announced in the first line.
+
+    Whatever the settings themselves collected while being read comes out here too. They
+    had nowhere to report to at the time - this journal is built from them - so they kept
+    their notes until a journal existed.
     """
     journal = Journal(prefix=prefix)
     notes = []
@@ -254,6 +258,10 @@ def from_config(cfg, prefix: str = "", stream=None) -> Journal:
             base = getattr(cfg, "path", None)
             path = (Path(base).parent if base else Path.cwd()) / path
         journal.add(FileSink(path, threshold("logFileLevel", "debug")))
+    # The settings speak for themselves: their notes are finished, translated lines and are
+    # not about the journal, so they are not wrapped in journal.configProblem.
+    for note in getattr(cfg, "notes", ()):
+        journal.error(note)
     for note in notes:
         journal.error(t("journal.configProblem", problem=note))
     return journal

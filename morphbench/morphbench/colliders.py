@@ -420,7 +420,12 @@ class ColliderSet:
                 out.extend(cls._capsules_of(bone, child, len(out)))
             return out
         if kind == "bhkConvexTransformShape":
-            return cls._capsules_of(bone, getattr(shape, "shape", None), index)
+            # A shape moved inside its body. PyNifly calls what it wraps `child`; the transform
+            # is Havok's, so its translation is in Havok units like the shape's own numbers.
+            inner = cls._capsules_of(bone, getattr(shape, "child", None), index)
+            m = np.asarray(shape.transform, dtype=np.float32).reshape(4, 4)
+            m[:3, 3] *= HAVOK_SCALE
+            return [c.transformed(m) for c in inner]
         return []
 
     @staticmethod

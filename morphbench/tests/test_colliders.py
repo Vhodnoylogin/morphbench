@@ -313,6 +313,61 @@ class TestSaveThroughPyNifly(unittest.TestCase):
 
 
 # ---- editing a file in place -------------------------------------------------------------
+class TestTransformWrapper(unittest.TestCase):
+    """A capsule wrapped in bhkConvexTransformShape: read through the wrapper, moved by it.
+
+    No skeleton of the build has such a body, so the file is written by PyNifly - which
+    checks that the bench reads the wrapper the way PyNifly writes it, not more than that."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.cfg = common.config(self.tmp.name)
+        self.pynifly = common.load_pynifly(self.cfg)
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def write(self) -> Path:
+        path = Path(self.tmp.name) / "wrapped.nif"
+        try:
+            from pyn.nifdefs import (TransformBuf, bhkCapsuleShapeProps,  # noqa: WPS433
+                                     bhkConvexTransformShapeProps, bhkRigidBodyProps)
+            nif = self.pynifly.NifFile()
+            nif.initialize("SKYRIMSE", str(path))
+            xf = TransformBuf()
+            xf.set_identity()
+            node = nif.add_node("B", xf, parent=nif.rootNode)
+            body_ = self.pynifly.bhkRigidBody.New(file=nif, properties=bhkRigidBodyProps(),
+                                                  parent=node.add_collision(None))
+            wrap = bhkConvexTransformShapeProps()
+            # A quarter turn about Z and one Havok unit along X; stored by columns, the way
+            # PyNifly's own getter reads it back.
+            m = [[0, -1, 0, 1], [1, 0, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]]
+            for r in range(4):
+                for c in range(4):
+                    wrap.transform[c][r] = float(m[r][c])
+            outer = body_.add_shape(wrap)
+            inner = bhkCapsuleShapeProps()
+            inner.bhkRadius = inner.radius1 = inner.radius2 = 0.1
+            inner.point1, inner.point2 = (0.0, 0.0, 0.0), (1.0, 0.0, 0.0)
+            outer.add_shape(inner)
+            nif.save()
+            del nif
+        except Exception as e:  # noqa: BLE001 - what is under test is the reading, not PyNifly
+            raise unittest.SkipTest("PyNifly could not write a wrapped capsule (%s: %s)"
+                                    % (type(e).__name__, e))
+        return path
+
+    def test_the_wrapped_capsule_is_read_and_moved(self):
+        rig_ = ColliderSet.from_nif(self.write(), self.cfg)
+        caps = rig_.body("B").capsules
+        self.assertEqual(len(caps), 1)
+        s = 69.99125
+        np.testing.assert_allclose(caps[0].p1, (s, 0.0, 0.0), atol=1e-3)
+        np.testing.assert_allclose(caps[0].p2, (s, s, 0.0), atol=1e-3)
+        self.assertAlmostEqual(caps[0].radius, 0.1 * s, places=3)
+
+
 def tiny_nif(block_sizes: list[int], roots: int = 1) -> bytes:
     """A NIF header of exactly the shape NifPatch reads, and empty blocks behind it."""
     out = bytearray(b"Gamebryo File Format, Version 20.2.0.7\n")

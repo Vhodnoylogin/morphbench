@@ -137,9 +137,10 @@ departs from its node.
 
 Without that file the capsules stay on their nodes, and every command that shows them says in a
 line that the game may seat them differently. The usual cause is a `skeleton.nif` of one mod over
-the `skeleton.hkx` of another, which is what `--hkx` is for. The 64-bit files of Special Edition
-and VR are read and checked against the game; the 32-bit files of the original edition are read
-by the same rules, and none has been tried yet.
+the `skeleton.hkx` of another, which is what `--hkx` is for. Both widths of the file are read:
+the 64-bit files of Special Edition and VR, checked against the game, and the 32-bit files of
+the original edition, checked against the skeletons BodySlide ships for it — their ragdoll comes
+out the same as the 64-bit one to the last digit.
 
 There are three things the bench does with what it finds.
 

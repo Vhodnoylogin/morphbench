@@ -6,9 +6,9 @@ checks. The packfile is put together byte by byte instead: two skeletons, a mapp
 them and a ragdoll instance, laid out as hk_2010.2.0-r1 lays them, in both widths of a
 pointer. The offsets below are taken from the class definitions and not from the module under
 test, so a slip in one is not repeated in the other. The 64-bit ones are those of the game's
-own files (they were checked against XP32's skeletons when this was written); the 32-bit ones
-follow from the same definitions and have not met a real file. The container is PyNifly's
-reader, so the cases that open a file skip without it.
+own files (they were checked against XP32's skeletons when this was written), the 32-bit ones
+those of the original edition (checked against the skeletons BodySlide ships for it). The
+container is PyNifly's reader, so the cases that open a file skip without it.
 
 The rest needs no file at all: bodies built in memory are stood on a ragdoll built in memory,
 and the expectations are worked out by hand.

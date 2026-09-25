@@ -21,9 +21,10 @@ reading of the format here. Nothing in PyNifly decodes the three classes this mo
 so their fields are read here: the skeleton (the names of its bones), the mapper (the pairs
 and their transforms) and the ragdoll instance (which skeleton is the ragdoll). They are laid
 out as hk_2010.2.0-r1 lays them, the version every edition of Skyrim ships, and the offsets
-are worked out from the size of a pointer: the 64-bit files of Special Edition and VR are
-checked against the game, the 32-bit files of the original edition follow the same rules and
-have not met a real file yet.
+are worked out from the size of a pointer. The 64-bit files of Special Edition and VR are
+checked against the game. The 32-bit files of the original edition are checked against the
+skeletons BodySlide ships for it (`res\skeleton_*_sk.hkx`): they read whole, and the ragdoll of
+the female one equals that of XP32's 64-bit skeleton_female.hkx to the last digit.
 """
 from __future__ import annotations
 

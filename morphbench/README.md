@@ -3,7 +3,7 @@
 A workbench for meshes and named morphs of Skyrim, outside the game. It opens a `.nif`, reads the
 sliders from the `.tri` beside it, applies any set of values, and answers in numbers: what this
 slider tears, how far the geometry now reaches, whether the collision capsules still cover the
-skin, whether a bone chain has anything to swing. No game, no Blender, no window editor, no save
+skin. No game, no Blender, no window editor, no save
 to load. Seconds, not a play session.
 
 Русская версия этого файла — [README.ru.md](README.ru.md).
@@ -14,21 +14,19 @@ to load. Seconds, not a play session.
 meshes are generated, and it shows the result in its preview. What it does not do is tell you
 whether the result holds up: a slider that stretches a seam past tearing, a bounding sphere that
 was computed on the resting body and no longer contains the morphed one, a collision capsule that
-leaves two thirds of the skin outside it, a bone chain whose first link carries no skin at all.
+leaves two thirds of the skin outside it.
 
 Those faults share one property: they are invisible until you are in the game, and in the game
 they look like something else. A part that blinks out at certain angles. A hand that passes
-through a thigh. Ears that "don't swing" because one bone name in a config file has a typo, and
-neither physics engine says a word about it.
+through a thigh.
 
 morphbench reads the same files the game reads and says which of those is true right now. The
 point of the tool is to shorten the distance between a guess and its check: anything that can be
 seen without the game should be seen without the game.
 
 What it does **not** do: it does not author morphs, and it does not build bodies — that is
-BodySlide's job and there is no reason to repeat it. It writes only three things, and each of
-them into a new file or a settings file: corrected bounding spheres, fitted collision capsules,
-and physics configs for SMP and CBPC.
+BodySlide's job and there is no reason to repeat it. It writes only two things, and each of
+them into a new file: corrected bounding spheres and fitted collision capsules.
 
 ## What it needs
 
@@ -128,16 +126,11 @@ One line each; every option and every `--json` shape is in [docs/cli.md](docs/cl
 | `binding` | which bones own what a morph moves, and which bones it leaves half behind |
 | `bounds` | the bounding sphere in the file against the one the morphed geometry needs; `--out` puts corrected spheres in a new file |
 | `colliders`, `fit` | the invisible collision capsules from the skeleton: where they sit, how much skin is left outside, and fitting them to the skin |
-| `chains`, `physics` | bone chains for swinging physics, and the settings files for SMP or CBPC — including `--check`, which reads a finished file back and verifies it against the skeleton and the mesh |
 | `focus` | where the camera would look at a bone, a morph or a part, in numbers — and, with no key, everything it could be aimed at |
 | `render`, `sheet`, `web` | a PNG frame, a set of views, the browser viewer |
 | `env`, `catalog`, `serve` | whether we are under MO2, what meshes lie under a root, the page with the list |
 
-Two honest limits. `physics` writes the settings, but hooking the file up to the mod is still done
-by hand: the `defaultBBPs.xml` entry that binds an SMP config to a mesh shape, and the race
-condition on a CBPC group. And SMP does not take capsules from bones at all — its collisions come
-from mesh shapes — so fitted capsules are not carried into an SMP config, only shape names are.
-What the bench measures and what each setting means is in [docs/physics.md](docs/physics.md).
+What the bench measures and what each number means is in [docs/physics.md](docs/physics.md).
 
 ## The folder
 
@@ -145,7 +138,7 @@ What the bench measures and what each setting means is in [docs/physics.md](docs
 |---|---|
 | `mb.py` | the command line — one client of the facade like everything else |
 | `morphbench\` | the core: geometry, morphs, measurement. It does not draw, does not open windows and does not know the word "pixel" |
-| `presenters\` | the layers that show what the core computed: console tables, PNG, the page, and the settings formats of PPB, SMP and CBPC |
+| `presenters\` | the layers that show what the core computed: console tables, PNG, the page, and the settings format of PPB |
 | `web\` | the viewer page as real files — `page.html`, `style.css`, `js\*.js`; `presenters\assets.py` either serves them one by one or folds them into one self-contained file, and the load order is declared once in `PageAssets.SCRIPTS` |
 | `locale\` | the texts. A language is a **folder** (`locale\en\`, `locale\ru\`) holding any number of section files, merged when read |
 | `docs\` | the documents listed below |
@@ -189,7 +182,7 @@ from `dependencies.json`.
 | [docs/quickstart.md](docs/quickstart.md) | the first hour: install, open a mesh, read the answer, launch from MO2 |
 | [docs/cli.md](docs/cli.md) | every command of `mb.py`, every option, and what `--json` returns |
 | [docs/page.md](docs/page.md) | the viewer in the browser: what each panel does and what the picture means |
-| [docs/physics.md](docs/physics.md) | what the bench measures — reach spheres, collision capsules, bone chains — and the SMP and CBPC settings it writes |
+| [docs/physics.md](docs/physics.md) | what the bench measures — reach spheres and collision capsules |
 | [docs/localisation.md](docs/localisation.md) | how the texts are laid out and how to add a language |
 | [docs/building.md](docs/building.md) | building `morphbench.exe` and the release archive: what is bundled and under what licence |
 | [CLAUDE.md](CLAUDE.md) | the manifest for an AI assistant handed this folder and no history |

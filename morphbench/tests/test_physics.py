@@ -226,76 +226,30 @@ class TestSMP(Fixture):
         self.assertIn("nothing to write", out)
 
 
-class TestCommandLine(Fixture):
-    """`mb.py physics` and `chains --assign` against the facade in memory instead of files."""
+class TestWithheld(Fixture):
+    """The physics commands are built and are not offered, and this is what keeps that
+    true. `mb.py` still carries `cmd_chains`, `cmd_physics` and their rows in `COMMANDS`;
+    `WITHHELD` is the one thing that stops the parser from taking them. This class used to
+    drive `mb.py physics` and `chains --assign` end to end - those checks come back with
+    the commands, and everything below the facade is checked above regardless.
+    """
 
-    def main(self, argv) -> tuple[int, str, str]:
-        out, err = io.StringIO(), io.StringIO()
-        with mock.patch.object(mb, "MorphBench", lambda: self.bench), \
-                mock.patch.object(self.bench, "open", lambda *a, **k: {}), \
-                mock.patch.object(self.bench, "open_skeleton", lambda *a, **k: {}), \
-                contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
-            code = mb.main(list(argv))
-        return code, out.getvalue(), err.getvalue()
+    def test_the_parser_does_not_take_them(self):
+        for name in mb.WITHHELD:
+            with self.subTest(command=name):
+                out, err = io.StringIO(), io.StringIO()
+                with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+                    with self.assertRaises(SystemExit) as caught:
+                        mb.main([name, "memory.nif", "--engine", "smp"])
+                self.assertEqual(caught.exception.code, 2)
+                self.assertEqual(out.getvalue(), "")
 
-    def run_ok(self, argv) -> str:
-        code, out, err = self.main(argv)
-        self.assertEqual(code, 0, err)
-        return out
-
-    def test_physics_json(self):
-        data = json.loads(self.run_ok(["physics", "memory.nif", "--engine", "cbpc", "--json"]))
-        self.assertEqual(set(data), {"engine", "chains", "text"})
-        self.assertEqual(data["engine"], "cbpc")
-        by = {c["chain"]: c for c in data["chains"]}
-        self.assertEqual(set(by), {"TailBone", "NPC EarL Bone", "SpikeBone"})
-        self.assertTrue(by["NPC EarL Bone"]["written"])
-        self.assertEqual((by["TailBone"]["engine"], by["TailBone"]["written"]), ("smp", False))
-        self.assertEqual((by["SpikeBone"]["engine"], by["SpikeBone"]["written"]), (None, False))
-        self.assertIn("[AffectedNodes]", data["text"])
-
-    def test_physics_prints_the_text_without_out(self):
-        out = self.run_ok(["physics", "memory.nif", "--engine", "smp", "--skeleton", "s.nif"])
-        self.assertTrue(out.startswith("<?xml"))
-        ET.fromstring(out.encode("utf-8"))
-
-    def test_physics_out_and_assign(self):
-        path = Path(self.tmp.name) / "out" / "tail.xml"
-        data = json.loads(self.run_ok(["--json", "physics", "memory.nif", "--engine", "smp",
-                                       "--assign", "ear=smp,tail=cbpc", "--out", str(path)]))
-        self.assertEqual(Path(data["saved"]), path.resolve())
-        self.assertEqual(path.read_text(encoding="utf-8"), data["text"])
-        by = {c["chain"]: c for c in data["chains"]}
-        self.assertTrue(by["NPC EarL Bone"]["written"])
-        self.assertEqual((by["TailBone"]["engine"], by["TailBone"]["written"]), ("cbpc", False))
-        root = ET.fromstring(data["text"].encode("utf-8"))
-        self.assertEqual(root.find("bone").get("name"), "NPC Head [Head]")
-        printed = self.run_ok(["physics", "memory.nif", "--engine", "smp", "--out", str(path)])
-        self.assertIn("written", printed)
-
-    def test_physics_takes_sliders_and_only(self):
-        """The skin is what can be seen: hide the fur and the link has no fur among its parts."""
-        data = json.loads(self.run_ok(["physics", "memory.nif", "--engine", "smp", "--json",
-                                       "--only", "body"]))
-        self.assertNotIn('per-vertex-shape name="fur"', data["text"])
-
-    def test_chains_assign(self):
-        rows = json.loads(self.run_ok(["chains", "memory.nif", "--json", "--assign", "spike=smp"]))
-        by = {r["chain"]: r["engine"] for r in rows}
-        self.assertEqual(by, {"TailBone": "smp", "NPC EarL Bone": "cbpc", "SpikeBone": "smp"})
-
-    def test_refusals_are_one_line(self):
-        code, _, err = self.main(["physics", "memory.nif", "--engine", "smp", "--assign", "tail"])
-        self.assertEqual(code, 2)
-        self.assertIn("--assign", err)
-        code, _, err = self.main(["physics", "memory.nif", "--engine", "smp", "--assign", "tail=havok"])
-        self.assertEqual(code, 2)
-        self.assertIn("havok", err)
-        self.bench.rig = None
-        code, _, err = self.main(["physics", "memory.nif", "--engine", "cbpc"])
-        self.assertEqual(code, 2)
-        self.assertIn("skeleton", err)
-
+    def test_they_are_withheld_and_not_deleted(self):
+        """The difference matters: a deleted command loses its texts, its checks and the
+        reason it existed. A withheld one loses only its place in the parser."""
+        self.assertEqual(set(mb.WITHHELD), {"chains", "physics"})
+        self.assertLessEqual(set(mb.WITHHELD), {c.name for c in mb.COMMANDS})
+        self.assertFalse(set(mb.WITHHELD) & {c.name for c in mb.offered()})
 
 
 class TestCheck(unittest.TestCase):

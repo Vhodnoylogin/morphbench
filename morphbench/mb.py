@@ -806,6 +806,23 @@ COMMANDS = (
 )
 
 
+#: Commands that are built but not offered. The physics side of the workbench - bone chains and
+#: the SMP and CBPC settings worked out from them - is finished code with finished checks, but it
+#: goes out with the release that brings swinging physics to its first consumer, not with this
+#: one. Held back here rather than deleted, so that one truth stays in one place: `cmd_chains`,
+#: `cmd_physics`, `presenters\smp.py` and `presenters\cbpc.py` are untouched, their texts stay
+#: translated, and the checks over the facade go on running. To offer them again, empty this
+#: tuple - nothing else has to change. `catalogue_keys()` deliberately walks the whole table and
+#: not this filtered view: a withheld command keeps its help text, and a text that stops being
+#: checked is a text that rots.
+WITHHELD = ("chains", "physics")
+
+
+def offered():
+    """The commands the command line actually exposes: the table minus what is withheld."""
+    return tuple(c for c in COMMANDS if c.name not in WITHHELD)
+
+
 def catalogue_keys() -> list[str]:
     """Every localisation key the command table names.
 
@@ -846,7 +863,7 @@ def main(argv=None) -> int:
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--json", action="store_true", help=t("cli.opt.top.json"))
     sub = ap.add_subparsers(dest="cmd", required=True)
-    for command in COMMANDS:
+    for command in offered():
         command.add_to(sub)
 
     args = ap.parse_args(argv)

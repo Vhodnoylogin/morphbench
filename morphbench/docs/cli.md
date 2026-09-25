@@ -3,8 +3,8 @@
 BodySlide builds the body; morphbench checks what came out. It opens the `.nif` and the
 `.tri` beside it, applies the sliders itself, and answers in numbers: which sliders move
 nothing, where a morph tears the surface, whether the bounding sphere still covers the
-body at full amplitude, where the collision capsules stop touching the skin, and what the
-SMP or CBPC settings for the swinging bones should say. No game, no save, no load order —
+body at full amplitude, and where the collision capsules stop touching the skin. No game,
+no save, no load order —
 seconds, from a folder.
 
 `mb.py` is the whole of that. Two things are true of every command here:
@@ -55,8 +55,8 @@ skeleton — the capsules can be looked at with no body in front of them.
 
 **Exit codes.** `0` — the command answered. `2` — a refusal: the mesh is not there, the key
 was written wrong, the skeleton is missing. A refusal is one line on stderr (`command:
-what is wrong`), not a traceback, because a script has to be able to read it. `3` — only
-`physics --check`, and only when it found something: the file checks out clean at `0`.
+what is wrong`), not a traceback, because a script has to be able to read it. There is no
+third code: a command either answered or refused.
 
 **Language.** Messages, help and column headings come from `locale/<language>/`, chosen by
 the `language` setting (`auto` follows the system). The environment variable
@@ -374,81 +374,6 @@ that gave no skin points comes back as `{bone, points, fitted: false}`.
 
 ---
 
-## Swinging physics
-
-The full account of what the bench measures here — chains, breaks, the numbers that go into
-each engine — is in [physics.md](physics.md). This section is the commands.
-
-### `chains`
-
-Numbered chains of bones (`TailBone01`, `TailBone02`, …): how much skin hangs on each link,
-where the chain breaks, whether it is fit to be swung at all, and which engine it is given
-to.
-
-```
-python mb.py chains body.nif --skeleton skeleton.nif
-```
-
-| Option | Takes | What it does |
-|---|---|---|
-| `--engine` | `smp` or `cbpc` | only the chains given to that engine |
-| `--only` | names, comma-separated | which parts of the mesh to count skin from |
-| `--assign` | `tail=smp,ear=cbpc` | who a chain is given to for this run, over the `chainEngines` setting |
-
-A skeleton is not required — the chains are read from the bones the mesh is weighted to.
-With one open, the parent of each chain is known too, which is what a physics file needs.
-
-`--json` gives `{chain, engine, parent, links, vertices, break, anchors, gaps, tail, tip,
-fit}`; each link is `{bone, number, vertices, parent, shapes}`.
-
-### `physics`
-
-The settings of one swinging engine, in that engine's own format: SMP as XML, CBPC as the
-lines of its three files. Chains given to the other engine are not written — SMP and CBPC
-are different engines and one bone cannot be handed to both. The head of the text says which
-chain went where, and which went to nobody.
-
-```
-python mb.py physics body.nif --skeleton skeleton.nif --engine smp --out tail.xml
-```
-
-| Option | Takes | What it does |
-|---|---|---|
-| `--engine` | `smp` or `cbpc` | **required**: which engine to write for |
-| `--assign` | `tail=smp,ear=cbpc` | who a chain is given to for this run, over the settings |
-| `--out` | a path | write the text to a file; without it, print it |
-| `--check` | a path | check a ready file instead of writing one |
-| `--percentile` | a number | the share of points inside a capsule's radius; from the settings by default |
-| `--slider` | `NAME=NUMBER` | slider values the capsules are measured at; repeatable |
-| `--only` | names, comma-separated | which parts count as skin |
-
-A skeleton is required: without one there is nothing to hang a chain on.
-
-`--json` returns `{engine, chains, text}` and `saved` when `--out` was given. Each entry in
-`chains` is `{chain, engine, fit, break, vertices, written}` — `written` being whether it
-made it into the text.
-
-**Checking a file you already have:**
-
-```
-python mb.py physics body.nif --skeleton skeleton.nif --engine smp --check tail.xml
-```
-
-SMP passes a broken file over in silence — not a line in the log, simply nothing swings.
-This catches what the first typo costs: a bone the skeleton does not have, a joint onto a
-bone nobody declared, a mesh part that is not there, a collision between things nobody
-named, XML that does not parse. For CBPC it reads all three files' worth of sections in one
-pass: the nodes, the `[Bone]` headings with their spheres and capsules, the `Bone=Group`
-lines.
-
-The exit code is the point of this mode: **3** when there are findings, **0** when the file
-refers only to what exists. That makes it usable as a gate in a build script.
-
-`--json` returns `{file, engine, problems, ok}`, each problem being `{kind, name, where,
-problem}`.
-
----
-
 ## Looking at it
 
 ### `focus`
@@ -640,9 +565,8 @@ code, written from the built-in defaults on the first run. Nothing adjustable si
 code as a number. The keys the command line leans on are `strainThreshold`,
 `budgetResolution`, `sliderRange`, `boundsMargin`, `boundsTolerance`, `boundsCornerCap`,
 `baseShape`, `contactRadius`, `minContact`, `skeletonFile`, `colliderFitPercentile`,
-`bundleSplit`, `chainEngines`, `catalogRoot`, `serveHost`, `servePort`, `views` and
-`language`. An option always outranks the setting, and only for that run — `--assign` and
-`--percentile` do not write anything back to the file.
+`bundleSplit`, `catalogRoot`, `serveHost`, `servePort`, `views` and `language`. An option
+always outranks the setting, and only for that run — `--percentile` does not write anything
+back to the file.
 
-The full list, including every SMP and CBPC number, is in [physics.md](physics.md) and in
-the comments of `morphbench/config.py`, which are the authority.
+The full list is in the comments of `morphbench/config.py`, which are the authority.

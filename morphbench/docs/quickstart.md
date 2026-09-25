@@ -233,7 +233,7 @@ always be seen.
 The thresholds that the analyses use are in the same file and are explained where they are used:
 the strain and contact ones — `strainThreshold`, `budgetResolution`, `contactRadius`,
 `minContact` — with the commands that read them, in [cli.md](cli.md); the sphere margins, the
-percentiles, the bundle sizes and every SMP and CBPC number in [physics.md](physics.md).
+percentiles and the bundle sizes in [physics.md](physics.md).
 
 ## A worked example
 
@@ -320,35 +320,8 @@ the saved file gave 66% → 28% for the head and 98% → 36% for the foot. `--pp
 as lines for `PPB_tuning.txt`, which Precision Physic Bodies re-reads about once a second while the
 game is running.
 
-**7. Check what is meant to swing.** Ears, tails and breasts are not moved by the ragdoll capsules
-but by a second physics engine — Faster HDT-SMP or CBPC — and it moves *bones*, only where skin is
-actually weighted to them.
-
-```
-python mb.py chains malebody_1.nif --skeleton skeleton.nif
-```
-
-Each link reports how many vertices of which shapes it holds. A link with no skin at the start of a
-chain is an anchor (this is how 3BBB works — `Breast00` is driven by animation); in the middle it
-is a joint; at the end it is a tail that gets dropped. *No skin on any link* is the real break:
-there is nothing for the engine to move. The two engines must never be given the same bone, so
-every chain is assigned to one of them — `chainEngines` in the settings, or `--assign
-tail=cbpc,ear=smp` for one run.
-
-**8. Check the settings file you are about to ship.** Both engines are silent about mistakes: a
-typo in a bone name means nothing swings, with no error anywhere.
-
-```
-python mb.py physics malebody_1.nif --skeleton skeleton.nif --engine smp --check ears.xml
-```
-
-A clean file says it refers only to things that exist, and exits 0. A bad one prints a line per
-finding — kind, name, where, what is wrong — and exits 3, which is what a build script should watch
-for.
-
-That is the pass. It found a part that would blink, capsules that missed the body by most of its
-surface, and it would have caught a misspelt bone before the game ever loaded — from a folder of
-files, without launching Skyrim once.
+That is the pass. It found a part that would blink and capsules that missed the body by most of
+its surface — from a folder of files, without launching Skyrim once.
 
 ## Where it is still rough
 

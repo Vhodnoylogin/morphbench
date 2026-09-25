@@ -1,7 +1,7 @@
 # Localisation
 
 BodySlide builds the body; morphbench checks it — it reads what was built and says whether the
-morphs, the bounding spheres, the collision capsules and the physics settings hold up, outside the
+morphs, the bounding spheres and the collision capsules hold up, outside the
 game, in seconds. This page is about the words it says while doing that, and about how to make it
 say them in your language.
 

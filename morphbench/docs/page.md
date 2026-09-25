@@ -4,7 +4,7 @@ BodySlide builds the body; morphbench checks it. The viewer is the part of that 
 with your eyes: it opens the mesh that was actually built, puts every morph on a slider, and
 paints the vertices by bone, by morph offset or by edge strain — in a browser, in seconds,
 without loading a save. Everything the numbers say elsewhere in the tool (`shapes`, `strain`,
-`bounds`, `colliders`, `physics`) you can here point at.
+`bounds`, `colliders`) you can here point at.
 
 It shows. It does not edit: nothing on the page writes to your mesh, your morph file or your
 mod folder. The page is a window onto files that already exist.

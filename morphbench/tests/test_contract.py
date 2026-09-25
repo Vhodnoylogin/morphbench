@@ -10,11 +10,13 @@ A failure here is therefore not "the code is wrong". It is a question: was this 
 If it was, the table below moves and the release number's major part moves with it. If it
 was not, the code goes back.
 
-Three exit codes and nothing else:
+Two exit codes and nothing else:
 
     0   the command answered
     2   a refusal - one line on stderr, nothing on stdout
-    3   findings - only `physics --check`, when the settings point at something absent
+
+A third, 3 for findings, belongs to `physics --check` alone and is out of reach while the
+physics commands are withheld (`mb.WITHHELD`). It returns with them, and so does its row.
 
 Both fixtures are built here rather than borrowed from the build: a test that needs CBBE
 installed is not a test, it is a local habit.
@@ -164,11 +166,8 @@ class Contract(unittest.TestCase):
             ("layers", ["layers", "--json", n, "--morph", "Wide"]),
             ("binding", ["binding", "--json", n, "--morph", "Wide"]),
             ("bounds", ["bounds", "--json", n]),
-            ("chains", ["chains", "--json", n, "--skeleton", s]),
             ("colliders", ["colliders", "--json", n, "--skeleton", s]),
             ("fit", ["fit", "--json", n, "--skeleton", s]),
-            ("physics", ["physics", "--json", n, "--skeleton", s, "--engine", "smp"]),
-            ("physics", ["physics", "--json", n, "--skeleton", s, "--engine", "cbpc"]),
             ("focus", ["focus", "--json", n]),
             ("render", ["render", "--json", n, "--out", frame]),
             ("sheet", ["sheet", "--json", n, "--out", sheet]),
@@ -193,16 +192,16 @@ class Contract(unittest.TestCase):
         self.assertEqual(out, "")
         self.assertEqual(len(err.strip().splitlines()), 1, "a refusal is one line: %r" % err)
 
-    def test_findings_are_code_3_and_a_clean_check_is_0(self):
-        """`physics --check` is the only command that answers 3, and it means findings -
-        not a failure. A script tells them apart by the code alone."""
-        good = self.out / "good.xml"
-        good.write_text('<system><bone name="TailBone01"/></system>', encoding="utf-8")
-        bad = self.out / "bad.xml"
-        bad.write_text('<system><bone name="NoSuchBone"/></system>', encoding="utf-8")
-        base = ["physics", "--engine", "smp", "--skeleton", str(self.skeleton), str(self.nif)]
-        self.assertEqual(self.run_cli(base + ["--check", str(good)])[0], 0)
-        self.assertEqual(self.run_cli(base + ["--check", str(bad)])[0], 3)
+    def test_a_withheld_command_is_not_offered(self):
+        """`chains` and `physics` are built and held back (`mb.WITHHELD`), so the parser
+        turns them down like any word it does not know. This is what the check for code 3
+        used to be: findings were theirs alone, and the contract is two codes until they
+        come back."""
+        for name in mb.WITHHELD:
+            with self.subTest(command=name):
+                with self.assertRaises(SystemExit) as caught:
+                    self.run_cli([name, "--json", str(self.nif)])
+                self.assertEqual(caught.exception.code, 2)
 
     # ---- input nobody meant to hand it -------------------------------------------------
     def test_a_file_that_is_not_a_mesh_is_a_refusal(self):

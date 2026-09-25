@@ -11,7 +11,7 @@ a console table, a PNG, the page in a browser, a settings file in somebody else'
 | `raster.py` | a frame as PNG, and a contact sheet of several views (`pillow`) |
 | `web.py`, `assets.py` | the viewer page: the payload it is built from, and the files of `..\web\` either served one by one or folded into one self-contained file |
 | `serve.py` | the local server: the page with a list of meshes, and the HTTP API the launcher window drives |
-| `ppb.py`, `smp.py`, `cbpc.py` | the settings formats of other people's mods — PPB collision bodies, SMP and CBPC swinging physics |
+| `ppb.py`, `smp.py`, `cbpc.py` | the settings formats of other people's mods — PPB collision bodies, SMP and CBPC swinging physics. `smp` and `cbpc` are reached only by `mb.py physics`, which is withheld from this release (`mb.WITHHELD`): built, checked, not offered |
 
 ## May depend on
 

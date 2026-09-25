@@ -1,7 +1,7 @@
 # Building morphbench
 
 BodySlide builds the body; morphbench checks it — it reads what was built and says whether the
-morphs, the bounding spheres, the collision capsules and the physics settings hold up, outside the
+morphs, the bounding spheres and the collision capsules hold up, outside the
 game, in seconds. This page is for whoever produces the two things a user actually receives: the
 launch window `morphbench.exe`, and the release archive that carries the workbench with everything
 it needs inside it.
@@ -334,6 +334,6 @@ These are real and they are in the code as described.
 | [quickstart.md](quickstart.md) | the first hour: open a mesh, read the answer, launch from MO2 |
 | [cli.md](cli.md) | every command of `mb.py` and what `--json` returns |
 | [page.md](page.md) | the viewer in the browser |
-| [physics.md](physics.md) | what the bench measures and what it writes for SMP and CBPC |
+| [physics.md](physics.md) | what the bench measures: reach spheres and collision capsules |
 | [localisation.md](localisation.md) | how the texts are laid out and how to add a language |
 | [../CLAUDE.md](../CLAUDE.md) | the manifest for an assistant handed this folder and no history |

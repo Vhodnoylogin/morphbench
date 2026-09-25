@@ -24,9 +24,9 @@ are frozen.
 
 - **Reads** a `.nif` with the `.tri` beside it and answers in numbers: which sliders are dead,
   what a slider tears, how far the geometry reaches, how much of the skin a collision capsule
-  actually covers, which bone chains have anything to swing.
-- **Writes** three things, each into a new file or a settings file, never over what it read:
-  corrected bounding spheres, fitted collision capsules, and physics configs for SMP and CBPC.
+  actually covers.
+- **Writes** two things, each into a new file, never over what it read: corrected bounding
+  spheres and fitted collision capsules.
 - **Shows** the result three ways — a console table, a PNG frame, and a page in the browser with
   the sliders live. Every button on the page is a facade call with the same name, so any session
   is reproducible from the command line; the page prints that command line at the bottom.
@@ -40,11 +40,10 @@ This is the part other people build on, so it is written down rather than left t
 `tests/test_contract.py` holds it in place: a key that moves fails a test rather than a stranger's
 script.
 
-- **Three exit codes.** `0` — the command answered. `2` — a refusal: one line on stderr and
-  nothing at all on stdout, so a caller can tell a refusal from an empty answer. `3` — findings,
-  which only `physics --check` produces, and which mean the settings file points at something the
-  skeleton or the mesh does not have. A file that is not a mesh, a mesh with no morph file beside
-  it, a mesh that is not open yet: all of these are refusals, not faults of the program.
+- **Two exit codes.** `0` — the command answered. `2` — a refusal: one line on stderr and
+  nothing at all on stdout, so a caller can tell a refusal from an empty answer. A file that is
+  not a mesh, a mesh with no morph file beside it, a mesh that is not open yet: all of these are
+  refusals, not faults of the program.
 - **Somebody else's mesh does not bring the program down.** 600 files of the build - doors,
   trees, effects, armour stands, things nobody wrote the workbench for - were read, listed and
   measured for their spheres: 599 answers and one refusal, and that one is right - a file of
@@ -66,8 +65,8 @@ script.
   collision capsules: by that same parser, agreeing with the workbench on all 126 numbers to
   within half a thousandth of a game unit. Neither has yet been opened **by the game**, and that
   is the check nothing here can stand in for.
-- Nothing here simulates anything. The workbench reads geometry and writes settings; whether a
-  chain actually swings well is decided in the game. What it can say about a physics config is
-  whether the config points at things that exist — `physics --check` does that for both engines.
-- The physics configs are generated from measurements, not from play: they are a starting point
-  a mod author checks, not a tuned result.
+- **Swinging physics is not in this release.** Bone chains and the SMP and CBPC settings written
+  from them are built, checked and translated, and held out of the command line all the same:
+  they go out with the release that brings swinging physics to the mod they were written for.
+  Nothing here simulates anything either way — whether a chain swings well is decided in the
+  game, and no measurement outside it can say.

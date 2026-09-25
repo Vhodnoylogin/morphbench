@@ -13,9 +13,10 @@ for people is the part that comes in both languages.
 
 A workbench for Skyrim meshes and named morphs, run outside the game. It opens a `.nif`, reads the
 sliders from the `.tri` beside it, applies any set of values and answers in numbers: what a slider
-tears, how far the geometry now reaches, whether the collision capsules still cover the skin,
-whether a bone chain has anything to swing. It writes three things and each into a **new** file:
-corrected bounding spheres, fitted collision capsules, and SMP/CBPC physics settings.
+tears, how far the geometry now reaches, whether the collision capsules still cover the skin.
+It writes two things and each into a **new** file:
+corrected bounding spheres and fitted collision capsules. A third - the SMP and CBPC settings -
+is built but withheld from this release; see `mb.WITHHELD` below.
 
 It does not author morphs and does not build bodies. BodySlide does that; there is no reason to
 repeat it.
@@ -144,6 +145,18 @@ would not see them. For the same reason `i18n.CATALOGUE` reads
 read the catalogue is already answering questions, and which language it answers in must not
 depend on which module was imported first.
 
+**`mb.WITHHELD` holds two finished commands out of the parser, and the code behind them is
+not dead.** `chains` and `physics` - bone chains and the SMP/CBPC settings written from them -
+are complete, checked and translated. They are not offered in this release because the tool
+that consumes them is not finished; they go out with the one that brings swinging physics to
+its first consumer. `offered()` is what `main()` walks, `COMMANDS` is what `catalogue_keys()`
+walks, and the difference is deliberate: a withheld command keeps its help text, and a text
+that stops being checked rots. So do not delete `cmd_chains`, `cmd_physics`,
+`presenters\smp.py`, `presenters\cbpc.py`, `morphbench\chains.py`, their locale files or their
+suites because nothing reaches them - `WITHHELD` is what nothing reaches them through, and
+emptying that tuple brings all of it back at once. `tests/test_physics.py::TestWithheld` is
+the check that says so.
+
 **Other deliberate oddities, shorter:**
 
 | Looks wrong | Why it is right |
@@ -211,7 +224,7 @@ a malformed locale file, a key left as an English sentence.
 | [docs/quickstart.md](docs/quickstart.md) | the first hour: install, open a mesh, read the answer, launch from MO2 |
 | [docs/cli.md](docs/cli.md) | every `mb.py` command, every option, what `--json` returns |
 | [docs/page.md](docs/page.md) | the viewer in the browser: each panel and what the picture means |
-| [docs/physics.md](docs/physics.md) | reach spheres, collision capsules, bone chains, and the SMP and CBPC settings written |
+| [docs/physics.md](docs/physics.md) | reach spheres and collision capsules: what is measured and why |
 | [docs/localisation.md](docs/localisation.md) | how texts are laid out and how to add a language |
 | [docs/building.md](docs/building.md) | building `morphbench.exe` and the release archive; what is bundled and under what licence |
 | [tests/README.md](tests/README.md) | what each suite covers and what it needs |

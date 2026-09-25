@@ -320,6 +320,14 @@ the saved file gave 66% → 28% for the head and 98% → 36% for the foot. `--pp
 as lines for `PPB_tuning.txt`, which Precision Physic Bodies re-reads about once a second while the
 game is running.
 
+This pass was made before the bench read `skeleton.hkx`, and on a skeleton with none beside it:
+the capsules were measured and seated on their nodes. On this body that is not a detail — the
+ragdoll the game stands them on turns the head and the feet by a right angle, and the seated
+capsules came out of the game exactly that far off. The same commands now say so in a line on
+stderr; the pass is to be made with the `skeleton.hkx` the game actually uses named outright,
+`--hkx "...\skeleton.hkx"`, and then the head's numbers are about the capsule the game will have
+([physics.md](physics.md#collision-capsules-the-second-invisible-shell)).
+
 That is the pass. It found a part that would blink and capsules that missed the body by most of
 its surface — from a folder of files, without launching Skyrim once.
 

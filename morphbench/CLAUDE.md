@@ -48,7 +48,7 @@ file, and edits travel as a mod of their own.
 
 | Layer | Files | May depend on | Boundary |
 |---|---|---|---|
-| Core | `morphbench\` (`model`, `morphs`, `bounds`, `chains`, `colliders`, `analysis`, `catalog`, `view`, `nifpatch`) | numpy, PyNifly, `config`, `i18n`, `environment` | no drawing, no formats of other mods, no knowledge that a presenter exists |
+| Core | `morphbench\` (`model`, `morphs`, `bounds`, `chains`, `colliders`, `ragdoll`, `analysis`, `catalog`, `view`, `nifpatch`) | numpy, PyNifly, `config`, `i18n`, `environment` | no drawing, no formats of other mods, no knowledge that a presenter exists |
 | Facade | `morphbench/api.py` | the whole core | the only surface above the core; returns plain data (`json.dumps`-ready) plus numpy arrays for bulk geometry |
 | Presenters | `presenters\` (`text`, `raster`, `web`, `assets`, `serve`, `ppb`, `smp`, `cbpc`) | the facade only | no computation; a presenter that computes is a bug report against the facade |
 | Page | `web\page.html`, `web\style.css`, `web\js\*.js` | the payload `presenters/web.py` packs | mirrors the facade by name; no library, no font, no request that leaves the machine |
@@ -157,6 +157,18 @@ suites because nothing reaches them - `WITHHELD` is what nothing reaches them th
 emptying that tuple brings all of it back at once. `tests/test_physics.py::TestWithheld` is
 the check that says so.
 
+**`ColliderSet` keeps two frames per bone, and `fit` takes a `matrix`.** `matrix(bone)` is the
+node; `body_matrix(bone)` is where the game stands the bone's body - the node times the ragdoll
+offset read from skeleton.hkx (`ragdoll.py`). The capsules of the file are numbers in the
+second, and everything about the bodies goes through it: fitting, clearance, the capsule table,
+every picture. It looks like one frame too many only until a werewolf's head capsule comes out
+of the game turned by 90 degrees - which is what happened while there was one. The bumper is no
+ragdoll body and stays on its node. `chain_capsules` hands `matrix(link)` to `fit` on purpose:
+SMP and CBPC hang their capsules on the bone itself, and without the argument they would be
+seated on a ragdoll that has nothing to do with them.
+`tests/test_physics.py::TestFacade::test_chain_capsules_stay_on_the_node_whatever_the_ragdoll_says`
+is the check.
+
 **Other deliberate oddities, shorter:**
 
 | Looks wrong | Why it is right |
@@ -204,6 +216,11 @@ a malformed locale file, a key left as an English sentence.
   NIF bytes, deliberately tiny. Parsing the format is PyNifly's job; do not grow a second reader.
 - **A second NIF or TRI parser anywhere.** PyNifly's modules are the same ones that write these
   files. A reading of our own would drift away from the writing without saying so.
+- **A second Havok reader.** `ragdoll.py` takes the packfile container of skeleton.hkx -
+  sections, fixups, which object is of which class - from PyNifly's `pyn.havok_packfile` and
+  decodes on top only the three classes PyNifly does not: the skeleton, the mapper and the
+  ragdoll instance. It reads the size of an `hkArray` itself because PyNifly's helper knows only
+  the place a 64-bit file keeps it in; the rest of the container stays PyNifly's.
 - **`vendor\` in a release build.** Third-party sources travel as they were taken; edits belong
   upstream. The bundle list and the licences are stated in `dependencies.json` and produce
   `THIRD-PARTY.md`, which the GPL-3 obliges us to ship.

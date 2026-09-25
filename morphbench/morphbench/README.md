@@ -8,7 +8,7 @@ inside a presenter, it is missing from here — move it down rather than growing
 
 | Part | Files | What it is |
 |---|---|---|
-| Geometry and measurement | `model`, `morphs`, `bounds`, `chains`, `colliders`, `analysis`, `catalog`, `view`, `nifpatch` | the arithmetic: what a slider moves, what it tears, how far the geometry reaches, where a capsule sits, what the camera would see |
+| Geometry and measurement | `model`, `morphs`, `bounds`, `chains`, `colliders`, `ragdoll`, `analysis`, `catalog`, `view`, `nifpatch` | the arithmetic: what a slider moves, what it tears, how far the geometry reaches, where a capsule sits and where the game stands its body, what the camera would see |
 | Facade | `api.py` (`MorphBench`) | the single set of methods every layer above calls |
 | Infrastructure | `config.py`, `i18n.py`, `journal.py`, `environment.py` | settings, texts, the journal, and what the surroundings are — used by everyone, including each other |
 

@@ -30,14 +30,16 @@ python mb.py <command> <mesh.nif> [options]
 
 The morph file is picked up beside the mesh on its own — the same name, or the name without
 the weight suffix `_0`/`_1`. The skeleton is picked up the same way: `skeleton.nif` in the
-same folder (the name is the `skeletonFile` setting). Both can be named outright when they
-lie somewhere else.
+same folder (the name is the `skeletonFile` setting), and after it the `skeleton.hkx` of the
+same name beside the skeleton — where the game stands its bodies. All three can be named
+outright when they lie somewhere else.
 
 | Option | Takes | What it does |
 |---|---|---|
 | `nif` | a path | the mesh to open. Required, except on `colliders`, `fit`, `render`, `sheet` and `web` |
 | `--tri` | a path | the morph file, when it is not beside the mesh or is named differently |
 | `--skeleton` | a path | the skeleton the collision capsules are read from |
+| `--hkx` | a path | the `skeleton.hkx` the ragdoll is read from, when it is not beside the skeleton; see [Collision capsules](#collision-capsules) |
 | `--json` | — | the same answer as data instead of tables |
 
 `fit`, `render`, `sheet` and `web` also take the mesh from the catalogue instead of a path:
@@ -56,7 +58,9 @@ skeleton — the capsules can be looked at with no body in front of them.
 **Exit codes.** `0` — the command answered. `2` — a refusal: the mesh is not there, the key
 was written wrong, the skeleton is missing. A refusal is one line on stderr (`command:
 what is wrong`), not a traceback, because a script has to be able to read it. There is no
-third code: a command either answered or refused.
+third code: a command either answered or refused. A command that answered can still leave one
+line on stderr, in the same form: the capsules standing on their nodes for want of a
+`skeleton.hkx` ([Collision capsules](#collision-capsules)). Stdout is untouched by it.
 
 **Language.** Messages, help and column headings come from `locale/<language>/`, chosen by
 the `language` setting (`auto` follows the system). The environment variable
@@ -80,7 +84,9 @@ python mb.py summary body.nif
 ```
 
 No options of its own. `--json` returns one object: `nif`, `tri`, `triKind`, `shapes`,
-`vertices`, `bones`, `morphs`, `skeleton`, `colliders`, `bounds` (`min`/`max`).
+`vertices`, `bones`, `morphs`, `skeleton`, `colliders`, `ragdoll`, `bounds` (`min`/`max`).
+`ragdoll` is where the bodies were stood (see [Collision capsules](#collision-capsules)), or
+`null` with no skeleton open.
 
 ### `shapes`
 
@@ -312,6 +318,22 @@ What the numbers mean and why the walk is exact: [physics.md](physics.md).
 
 ## Collision capsules
 
+A body in `skeleton.nif` hangs on a node, but the game stands it on a bone of the ragdoll, and
+where that bone lies relative to the node is written in `skeleton.hkx`
+([physics.md](physics.md#collision-capsules-the-second-invisible-shell)). Every command here
+reads it — the `.hkx` of the skeleton's name beside the skeleton, or the one `--hkx` names —
+and looks, measures and fits where the game will put the capsules. When there is no such file,
+or it cannot be read, the capsules stay on their nodes and `colliders`, `fit` and a picture with
+`--colliders` say so in one line on stderr; the usual cause is a `skeleton.nif` of one mod over
+the `skeleton.hkx` of another:
+
+```
+python mb.py fit body.nif --skeleton "CLAW\...\skeleton.nif" --hkx "XP32\...\skeleton.hkx"
+```
+
+A file named with `--hkx` that is not there, or is not a skeleton of this kind, is a refusal:
+it was asked for by name.
+
 ### `colliders`
 
 The capsules in the skeleton: where they stand, what kind they are, and — with
@@ -333,8 +355,11 @@ and says so: it compares them with skin, so it needs a body.
 python mb.py colliders body.nif --skeleton skeleton.nif --clearance
 ```
 
-`--json` gives `{bone, kind, physics, capsules}`, and with `--clearance` a `clearance`
-object on each: `{bone, points, worst, deepest, mean, outside}`. A distance is negative
+`--json` gives `{bone, kind, physics, ragdoll, capsules}`, and with `--clearance` a
+`clearance` object on each: `{bone, points, worst, deepest, mean, outside}`. `ragdoll` is how
+far the game stands the body from its node — `{ragdollBone, turn, shift}`, the turn in degrees
+and the shift in game units — or `null` when no ragdoll bone is known for it; the table prints
+it beside the body wherever it is not zero. A distance is negative
 inside the capsule, so a large `outside` share and a large `worst` mean the capsule does
 not reach the skin and a hand will pass through the body; a very negative `deepest` means
 it sticks out of it.
@@ -368,9 +393,14 @@ second while the game runs, so the lines can be tried live without restarting an
 names its knobs by body slot and has none for a tail or for fingers, so those bones are
 skipped rather than given an invented name.
 
-`--json` returns `{fitted: [...]}` with `saved` and `ppb` beside it when those keys were
-given. A fitted row is `{bone, points, fitted, was, wasCount, now, count, capsules}`; a bone
-that gave no skin points comes back as `{bone, points, fitted: false}`.
+`--json` returns `{fitted: [...], ragdoll: {...}}` with `saved` and `ppb` beside them when
+those keys were given. A fitted row is `{bone, points, fitted, was, wasCount, now, count,
+capsules}`; a bone that gave no skin points comes back as `{bone, points, fitted: false}`. The
+capsules are in their body's own frame, as the file keeps them. `ragdoll` says which frame
+that was: `{state, file, reason, bones, unmatched}` — `state` is `read` (the ragdoll of `file`,
+`bones` of it), `absent` (no `.hkx` where `file` says it was looked for) or `unreadable`
+(`reason` says why), and `unmatched` lists bodies the ragdoll has no bone for, which stayed on
+their nodes.
 
 ---
 

@@ -113,15 +113,35 @@ body mesh but **in the skeleton file**, and there is nothing else to look at it 
 in the frame, and mesh editors show the skin only.
 
 A capsule is a segment with a thickness: two ends and a radius, held in the coordinates of its
-own bone. It is the shape almost every body uses; a sphere in the file is read as a capsule of no
-length, and a `bhkListShape` bundle is read as several capsules on one bone. The skeleton's
+own body. It is the shape almost every body uses; a sphere in the file is read as a capsule of no
+length, a `bhkListShape` bundle as several capsules on one bone, and a shape moved inside its
+body (`bhkConvexTransformShape`) as the shape it wraps, moved and turned. The skeleton's
 movement cylinder — the bumper a character shoves walls and other characters with — is kept apart
 from the bodies: it is four times the size of anything on the body, and in the common list it
 would hide precisely what you came to look at. It is drawn only when asked for, and it is never
 fitted.
 
 The skeleton named by `skeletonFile` is picked up from the mesh's own folder automatically;
-`--skeleton` names another. There are three things the bench does with what it finds.
+`--skeleton` names another.
+
+**Where a body stands** is not where its node stands. The game stands every body on a bone of
+the ragdoll — a skeleton of its own, one bone per body, kept in `skeleton.hkx` beside the `.nif`
+and driven from the animation — and where that bone lies relative to the node is written there
+and nowhere in the `.nif`. For most bones of a human skeleton the two coincide or nearly so; on
+XP32's female skeleton the feet are turned by 30° and the body shifted by almost 5 units, on the
+werewolf the head is turned by a right angle. A capsule seated on the node would land in the game
+turned and shifted by exactly that much, and a picture drawn on the node could not show it. So the
+bench reads the `.hkx` of the skeleton's name beside it — or the one `--hkx` names — and looks,
+measures and fits in the frame the game uses; `colliders` says for every body how far that frame
+departs from its node.
+
+Without that file the capsules stay on their nodes, and every command that shows them says in a
+line that the game may seat them differently. The usual cause is a `skeleton.nif` of one mod over
+the `skeleton.hkx` of another, which is what `--hkx` is for. The 64-bit files of Special Edition
+and VR are read and checked against the game; the 32-bit files of the original edition are read
+by the same rules, and none has been tried yet.
+
+There are three things the bench does with what it finds.
 
 **Look at them.** `--colliders` lays the capsules over the body as a translucent layer, in a
 rendered PNG and on the page alike. Where a capsule is inside the body it shows through the skin;

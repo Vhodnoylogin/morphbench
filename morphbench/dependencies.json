@@ -60,7 +60,7 @@
     {
       "name": "PyNifly",
       "kind": "folder",
-      "why": "reading and writing NIF and the TRI/TRIP morph files; the workbench has no parsers of its own for these formats and must not have any - a second reading of a format is one that can drift away from the first",
+      "why": "reading and writing NIF and the TRI/TRIP morph files, and reading the Havok packfile container skeleton.hkx is kept in; the workbench has no parsers of its own for these formats and must not have any - a second reading of a format is one that can drift away from the first. Of skeleton.hkx it decodes on top only the three classes PyNifly does not: the skeleton, the mapper and the ragdoll instance",
       "required": true,
       "bundle": true,
       "into": "vendor/io_scene_nifly",

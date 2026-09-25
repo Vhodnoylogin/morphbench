@@ -27,6 +27,12 @@ are frozen.
   actually covers.
 - **Writes** two things, each into a new file, never over what it read: corrected bounding
   spheres and fitted collision capsules.
+- **Stands the capsules where the game does.** A body in `skeleton.nif` hangs on a node, but
+  the game stands it on a bone of the ragdoll kept in `skeleton.hkx`, and on some bones the two
+  part by up to a right angle. The workbench reads that file — the container through PyNifly,
+  the skeleton, the mapper and the ragdoll on top — and fits, measures and draws every capsule
+  in the frame the game uses. Without the file it says so, on stderr and on the page, instead of
+  drawing on the nodes as if nothing were missing.
 - **Shows** the result three ways — a console table, a PNG frame, and a page in the browser with
   the sliders live. Every button on the page is a facade call with the same name, so any session
   is reproducible from the command line; the page prints that command line at the bottom.
@@ -65,6 +71,9 @@ script.
   collision capsules: by that same parser, agreeing with the workbench on all 126 numbers to
   within half a thousandth of a game unit. Neither has yet been opened **by the game**, and that
   is the check nothing here can stand in for.
+- The 32-bit `skeleton.hkx` of the original edition is read by the same rules as the 64-bit
+  files of Special Edition and VR, which were checked against the game; no real 32-bit file has
+  been tried yet.
 - **Swinging physics is not in this release.** Bone chains and the SMP and CBPC settings written
   from them are built, checked and translated, and held out of the command line all the same:
   they go out with the release that brings swinging physics to the mod they were written for.

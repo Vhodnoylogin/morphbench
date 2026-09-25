@@ -134,6 +134,12 @@ Present only when a skeleton is open — without one there is no such layer in t
 Two checkboxes: the capsules themselves, and the movement cylinder ("bumper") apart. The
 bumper box is disabled, with the reason on hover, when the skeleton has no cylinder.
 
+Under the skeleton's name a line says where the bodies stand. Quietly, when they stand on the
+ragdoll of `skeleton.hkx` — where the game stands them; in amber, when they stand on their
+nodes for want of that file or because it could not be read, with the reason, since such a
+picture looks just as sure of itself and the game may seat the capsules differently. See
+[physics.md](physics.md#collision-capsules-the-second-invisible-shell).
+
 ### Colour
 
 Four modes, and a morph picker that the last two use.
@@ -229,7 +235,7 @@ What goes in, and when:
 | `--only a,b` | some shapes are hidden |
 | `--zoom`, `--pan=dx,dy`, `--size WxH` | each differs from its default |
 | `--focus-bone`/`--focus-morph`/`--focus-shape` | something is aimed at |
-| `--skeleton … --colliders [--bumper]` | the capsule layer is on |
+| `--skeleton … [--hkx …] --colliders [--bumper]` | the capsule layer is on; `--hkx` when the bodies stand on a ragdoll, named outright wherever it was found |
 | `--light`, `--light-dir=…`, `--light-power=…` | the light differs from the settings |
 
 Two things about it worth knowing.

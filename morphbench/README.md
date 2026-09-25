@@ -60,8 +60,9 @@ python mb.py summary body.nif
 ```
 
 The morph file is picked up beside the mesh by name (`--tri` names it by hand), and so is
-`skeleton.nif` (`--skeleton` names it by hand). Every command takes `--json` and answers the same
-thing machine-readably.
+`skeleton.nif` (`--skeleton` names it by hand), and beside the skeleton its `skeleton.hkx`,
+where the game stands the bodies (`--hkx` names it by hand). Every command takes `--json` and
+answers the same thing machine-readably.
 
 The viewer as one self-contained HTML file, which opens from disk and needs no server:
 

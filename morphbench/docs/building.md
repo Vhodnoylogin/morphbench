@@ -320,20 +320,11 @@ The checks are not in `CONTENT`: they stay in the repository and do not ship in 
 
 ## Rough edges, stated plainly
 
-These are real, they are in the code as described, and none of them is fixed yet.
+These are real and they are in the code as described.
 
-* **The launcher does not look inside the bundled `python/` folder.** It checks
-  `MORPHBENCH_PYTHON`, then a `python` key in `morphbench.json`, then `PATH` (skipping the Windows
-  Store stub), then the registry, then `py.exe`. The workbench never writes a `python` key — it is
-  not among the defaults — so an unpacked release with bundled Python will find the bundled
-  interpreter only if someone sets one of those. Until that is changed, a release needs the
-  `python` key filled in, or `MORPHBENCH_PYTHON` set.
 * **Nothing here records the finished archive being unpacked and run on a machine with no Python
   and no Blender.** Self-contained is the design; treat the first archive you cut as something to
   test, not something to hand out.
-* **`launcher/morphbench.cs` is not in `CONTENT`.** The archive carries the built window but not
-  its source, and the GPL asks for the source of a binary that is handed over. Either add the
-  pattern, or ship a pointer to the repository with the release.
 
 ## Where to go next
 

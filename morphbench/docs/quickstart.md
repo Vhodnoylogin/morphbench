@@ -36,13 +36,11 @@ found at all, the answer is plain: *PyNifly add-on not found; name its folder wi
 **Blender itself is not needed** — `bpy` is never imported, only the add-on folder is read; that
 folder simply tends to live among Blender's add-ons.
 
-One rough edge worth knowing before it bites: `morphbench.exe` looks for python in the
-`MORPHBENCH_PYTHON` variable, then the `python` key in `morphbench.json`, then `PATH`, the
-registry, and `py.exe`. It does **not** yet notice the `python\` folder that sits inside the
-release archive next to it. On a machine with no Python installed, point it there by hand — set
-`MORPHBENCH_PYTHON` to the full path of `python\python.exe` in the unpacked folder, or write the
-same path into `morphbench.json` under `"python"`. Keys the program does not know are kept when the
-file is rewritten, so that line stays.
+`morphbench.exe` looks for python in this order: the `MORPHBENCH_PYTHON` variable, the
+`python` key in `morphbench.json`, the `python\` folder the release archive carries beside it,
+then `PATH`, the registry and `py.exe`. The bundled folder comes before `PATH` on purpose — it is
+what makes the archive answer the same way on every machine — and the two explicit overrides are
+there for the rare case of pointing it somewhere else. An unpacked release needs nothing set.
 
 ## Opening a mesh
 
@@ -354,8 +352,6 @@ files, without launching Skyrim once.
 
 ## Where it is still rough
 
-- The launch window does not find the `python\` folder bundled in the release archive by itself;
-  on a machine with no Python installed, point `MORPHBENCH_PYTHON` at it (see above).
 - `--diag` renders a fixed catalogue entry rather than something chosen from your build, so its
   PNG half may be empty while its JSON half still answers.
 - The single-file page has no `fetch`, no modules and no external links, and is built to open

@@ -28,7 +28,7 @@ MO2 подменяет файловую систему только процес
 
 Ни одного пути внутрь не вписано. Модуль лежит рядом с exe, или его папку дают доводом,
 или называет `MORPHBENCH_HOME`; python — это `MORPHBENCH_PYTHON`, ключ `python`
-в `morphbench.json`, `python.exe` в PATH (кроме заглушки из магазина Windows), ключ реестра
+в `morphbench.json`, встроенная папка `python\` рядом с mb.py, `python.exe` в PATH (кроме заглушки из магазина Windows), ключ реестра
 `PythonCore` или пускатель `py.exe`.
 
 ## Кто не вправе его импортировать

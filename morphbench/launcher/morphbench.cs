@@ -11,8 +11,9 @@
 // the same server the command line calls: `serve --status`, `serve`, `serve --stop`, `/api/root`,
 // open the page. Not a single path is written into it: the module is beside the exe (mb.py lives
 // there), or a folder given as an argument, or the MORPHBENCH_HOME variable; python is the
-// MORPHBENCH_PYTHON variable, the "python" key in morphbench.json, python.exe on PATH (bar the
-// Windows store stub), the PythonCore registry key, or the py.exe launcher.
+// MORPHBENCH_PYTHON variable, the "python" key in morphbench.json, the python\ folder the release
+// archive carries beside mb.py, python.exe on PATH (bar the Windows store stub), the PythonCore
+// registry key, or the py.exe launcher.
 //
 // Arguments: --start - bring the server up and open the page at once; --root <folder> - the
 // browse root for this run; <folder> - where mb.py lives.
@@ -294,6 +295,13 @@ static class Module
         if (IsFile(env)) return env;
         string fromConfig = PythonFromConfig(Path.Combine(home, "morphbench.json"));
         if (IsFile(fromConfig)) return fromConfig;
+        // The interpreter the release archive carries. It comes before PATH on purpose: bundling
+        // python is what makes the archive answer the same way on every machine, and a python
+        // found on PATH is somebody else's version with somebody else's packages. Only the two
+        // explicit overrides above outrank it. Absent from a working copy, where there is no
+        // python\ folder and the search simply goes on.
+        string bundled = Path.Combine(home, "python", "python.exe");
+        if (IsFile(bundled)) return bundled;
         string path = Environment.GetEnvironmentVariable("PATH") ?? "";
         foreach (string dir in path.Split(Path.PathSeparator))
         {

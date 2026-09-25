@@ -97,8 +97,8 @@ CONTENT = [
     "docs/*.md",
     # The source of the one compiled thing in the archive. GPL-3 lets the source be offered
     # from the same place as the binary rather than inside it, but "the same place" has to be
-    # somewhere the recipient can actually reach - and this repository is private. Forty
-    # kilobytes settle the question for good, and settle it for whoever mirrors the archive too.
+    # somewhere the recipient can actually reach, and an archive gets mirrored to places that
+    # carry no link back. Forty kilobytes settle the question for good, mirrors included.
     "launcher/*.cs",
     "launcher/*.cmd",
     "launcher/*.py",

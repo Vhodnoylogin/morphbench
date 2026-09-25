@@ -28,7 +28,7 @@ else of the workbench is reachable from here — the window is a client like any
 
 Not a single path is written into it. The module is beside the exe, or a folder given as an
 argument, or `MORPHBENCH_HOME`; python is `MORPHBENCH_PYTHON`, the `python` key in
-`morphbench.json`, `python.exe` on PATH (bar the Windows store stub), the `PythonCore` registry
+`morphbench.json`, the bundled `python\` folder beside mb.py, `python.exe` on PATH (bar the Windows store stub), the `PythonCore` registry
 key, or the `py.exe` launcher.
 
 ## Must never import it

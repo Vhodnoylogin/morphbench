@@ -186,6 +186,10 @@ def colliders(rows: list[dict]) -> str:
             _bone_label(row["bone"]), len(caps),
             t("text.capsuleOne") if len(caps) == 1 else t("text.capsuleMany"),
             ph.get("layer", "?"), ph.get("response", "?"))
+        away = row.get("ragdoll")
+        if away and (away["turn"] >= 0.1 or away["shift"] >= 0.01):
+            head += "   " + t("text.ragdollAway", turn="%.1f" % away["turn"],
+                              shift="%.2f" % away["shift"])
         fit = row.get("clearance")
         if fit:
             head += "   " + t("text.clearance", outside="%.0f" % (100.0 * fit["outside"]),

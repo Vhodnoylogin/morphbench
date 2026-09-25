@@ -1,0 +1,13 @@
+{
+  "#": "Ragdoll: reading skeleton.hkx for where the game stands the bodies of a skeleton.",
+  "ragdoll.badPair": "%(file)s maps bone %(a)d to bone %(b)d, past the end of a skeleton",
+  "ragdoll.bigEndian": "%(file)s is written for a big-endian console; only files of the PC editions are read",
+  "ragdoll.noFile": "no such file: %(file)s",
+  "ragdoll.noMapper": "%(file)s has a ragdoll but no mapping between it and the animation skeleton",
+  "ragdoll.noRagdoll": "%(file)s holds no ragdoll",
+  "ragdoll.noReader": "the PyNifly in use has no reader of Havok files (pyn/havok_packfile.py); a newer add-on has one",
+  "ragdoll.notHavok": "%(file)s is not a Havok packfile",
+  "ragdoll.pointer": "%(file)s has %(size)d-byte pointers; only 4 and 8 are known",
+  "ragdoll.unreadable": "%(file)s could not be read: %(error)s",
+  "ragdoll.version": "%(file)s is written by Havok %(version)s; the fields of a skeleton are known here for %(want)s"
+}

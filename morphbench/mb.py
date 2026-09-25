@@ -58,7 +58,34 @@ def _bench(args) -> MorphBench:
         raise ValueError(t("cli.err.noMesh"))
     if getattr(args, "skeleton", None):
         bench.open_skeleton(args.skeleton)
+    if getattr(args, "hkx", None):
+        bench.open_ragdoll(args.hkx)
     return bench
+
+
+def _ragdoll_note(args, bench: MorphBench) -> None:
+    """Say so when the capsules stand where the game may not stand them.
+
+    Once per run and on stderr, so that `--json` stays what it was. The capsules are shown all
+    the same: a guess that says it is a guess is more use than nothing to look at, and the
+    usual cause - a skeleton.nif of one mod over a skeleton.hkx of another - is one --hkx away.
+    """
+    state = bench.ragdoll()
+    if state is None or getattr(args, "ragdoll_noted", False):
+        return
+    args.ragdoll_noted = True
+    if state["state"] == "read":
+        if not state["unmatched"]:
+            return
+        message = t("cli.warn.ragdollUnmatched", file=state["file"],
+                    bones=", ".join(state["unmatched"]))
+    elif state["state"] == "unreadable":
+        message = t("cli.warn.ragdollUnreadable", reason=state["reason"])
+    elif state["file"]:
+        message = t("cli.warn.ragdollAbsent", file=state["file"])
+    else:
+        return
+    print("%s: %s" % (args.cmd, message), file=sys.stderr)
 
 
 def _numbers(text: str, key: str, low: int, high: int) -> list[float]:
@@ -270,6 +297,7 @@ def _apply_view(bench: MorphBench, args) -> None:
         if not bench.has_skeleton():
             raise ValueError(t("cli.err.collidersNoSkeleton", file=bench.cfg["skeletonFile"]))
         bench.show_colliders(True, bool(opt("bumper")))
+        _ragdoll_note(args, bench)
 
 
 def _assign(bench: MorphBench, args) -> None:
@@ -390,6 +418,7 @@ def cmd_colliders(args) -> int:
     bench = _bench(args)
     if not bench.has_skeleton():
         raise ValueError(t("cli.err.noSkeleton"))
+    _ragdoll_note(args, bench)
     rows = bench.colliders(args.find)
     if args.clearance:
         if not bench.is_open():
@@ -407,9 +436,10 @@ def cmd_fit(args) -> int:
     if not bench.has_skeleton():
         raise ValueError(t("cli.err.noSkeleton"))
     _apply_view(bench, args)
+    _ragdoll_note(args, bench)
     rows = bench.collider_fit(args.find, args.percentile, bundle=args.bundle or 1,
                               split=args.split)
-    result = {"fitted": rows}
+    result = {"fitted": rows, "ragdoll": bench.ragdoll()}
     if args.save:
         result["saved"] = bench.collider_save(args.save)
     if args.ppb:
@@ -649,6 +679,7 @@ class Command:
                                 default=None)
             parser.add_argument("--tri", default=None)
             parser.add_argument("--skeleton", default=None, help=t("cli.opt.top.skeleton"))
+            parser.add_argument("--hkx", default=None, help=t("cli.opt.top.hkx"))
             self._json(parser)
         for arg in self.args:
             arg.add_to(parser)

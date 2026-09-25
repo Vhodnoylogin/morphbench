@@ -248,7 +248,8 @@ class WebPage:
             "summary": summary,
             "names": {"nif": Path(summary["nif"]).name,
                       "tri": Path(summary["tri"]).name if summary["tri"] else None,
-                      "skeleton": Path(summary["skeleton"]).name if summary["skeleton"] else None},
+                      "skeleton": Path(summary["skeleton"]).name if summary["skeleton"] else None,
+                      "ragdoll": self._file_name(summary["ragdoll"])},
             "shapes": shapes,
             "morphs": morphs,
             "deltas": deltas,
@@ -258,10 +259,16 @@ class WebPage:
         }
 
     @staticmethod
+    def _file_name(ragdoll: dict | None) -> str | None:
+        """The name of the skeleton.hkx the bodies stand on, or of the one looked for."""
+        return Path(ragdoll["file"]).name if ragdoll and ragdoll.get("file") else None
+
+    @staticmethod
     def _no_body() -> dict:
         """The mesh is not open: an empty canvas, but the same shape of data, so that the
         script does not have to branch."""
-        return {"summary": None, "names": {"nif": None, "tri": None, "skeleton": None},
+        return {"summary": None, "names": {"nif": None, "tri": None, "skeleton": None,
+                                           "ragdoll": None},
                 "shapes": [], "morphs": [], "deltas": {}, "strain": {},
                 "targets": {"bones": [], "morphs": [], "shapes": []},
                 "colliders": None}

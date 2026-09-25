@@ -22,8 +22,9 @@ from unittest import mock
 import common
 from common import bench, bone, columns, grid, is_plain, main, model
 import mb
+from morphbench.ragdoll import RagdollMap
 from presenters import cbpc, smp
-from test_colliders import rig, shift
+from test_colliders import body, cap, rig, shift
 
 NX, NY = 10, 4
 
@@ -93,6 +94,17 @@ class TestFacade(Fixture):
         self.assertEqual(by["TailBone"]["parent"], "Tails")
         self.assertEqual(by["TailBone"]["links"][1]["shapes"], {"body": 8, "fur": 8})
         self.assertIsNone(by["SpikeBone"]["links"][0]["capsule"])   # four points in a line
+
+    def test_chain_capsules_stay_on_the_node_whatever_the_ragdoll_says(self):
+        # The swinging physics hang their capsules on the bone itself. A ragdoll that turns
+        # the ear's bone - with a body on it, so that there is something to stand - moves
+        # nothing here.
+        ear = "NPC EarL Bone01"
+        before = self.bench.chain_capsules("cbpc")[0]["links"][0]["capsule"]
+        self.bench.rig.bodies[ear] = body(ear, cap(ear))
+        turn = np.array([[0, -1, 0, 0], [1, 0, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]], float)
+        self.bench.rig.set_ragdoll(RagdollMap("memory.hkx", {ear: turn}))
+        self.assertEqual(self.bench.chain_capsules("cbpc")[0]["links"][0]["capsule"], before)
 
     def test_capsules_need_a_skeleton(self):
         self.bench.rig = None

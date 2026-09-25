@@ -29,6 +29,7 @@ the presentation layer.
 """
 from __future__ import annotations
 
+import struct
 from pathlib import Path
 
 import numpy as np
@@ -37,6 +38,7 @@ from .config import Config
 from .environment import file_exists, same_file
 from .model import load_nifly, open_nif, reading_nif
 from .i18n import t
+from .ragdoll import RagdollMap
 
 #: Havok measures lengths in its own units; the game in its own. This is a property of the
 #: NIF format, not a setting: it cannot be changed, it can only be used.
@@ -335,6 +337,13 @@ class ColliderSet:
     with - is kept apart from the bodies: it knows nothing of the shape of the body, it is
     four times bigger than any part of it, and in the common list it would cover up everything
     we came to look at.
+
+    A body does not stand where its node stands. The game stands it on a bone of the ragdoll,
+    and where that bone is relative to the node is written in skeleton.hkx, not in the .nif
+    (`ragdoll.RagdollMap`). So there are two frames per bone here: `matrix` - the node, which
+    the skin and the swinging physics hang on - and `body_matrix` - where the body stands, in
+    which its capsules are fitted, measured and drawn. Without skeleton.hkx the two are the
+    same, and `ragdoll_state` says that this is a guess.
     """
 
     def __init__(self, path, bodies: dict[str, CollisionBody],
@@ -348,10 +357,16 @@ class ColliderSet:
         # The tree of bones: who is whose parent. Needed to tell whose skin each body is
         # obliged to cover - see covered_bones.
         self.parents = dict(parents or {})
+        self.ragdoll: RagdollMap | None = None
+        self.body_matrices: dict[str, np.ndarray] = {}
+        self.ragdoll_state: dict = self._state("absent")
 
     # ---- reading: PyNifly and nothing else --------------------------------------------
     @classmethod
-    def from_nif(cls, path, cfg: Config | None = None) -> "ColliderSet":
+    def from_nif(cls, path, cfg: Config | None = None, hkx=None) -> "ColliderSet":
+        """The bodies of a skeleton file, stood where the game stands them: `hkx` names the
+        skeleton.hkx to take the ragdoll from - None looks beside the .nif, "" does not look
+        (see `read_ragdoll`)."""
         cfg = cfg or Config()
         pynifly = load_nifly(cfg)
         path = Path(path)
@@ -385,7 +400,64 @@ class ColliderSet:
                     bumper = entry
                 else:
                     bodies[name] = entry
-        return cls(path, bodies, matrices, bumper, parents)
+        rig = cls(path, bodies, matrices, bumper, parents)
+        rig.read_ragdoll(hkx, cfg)
+        return rig
+
+    # ---- where the bodies stand: the ragdoll ------------------------------------------
+    def read_ragdoll(self, hkx=None, cfg: Config | None = None) -> dict:
+        """Take the ragdoll from a skeleton.hkx and stand every body where the game does.
+
+        `hkx` names the file; None looks for the .hkx of the same name beside the skeleton,
+        and "" does not look. A file that cannot be read does not stop the capsules from being
+        looked at: they stay on their nodes, and `ragdoll_state` says why - that the picture
+        and the fit may differ from the game is something to say, not a reason to show nothing.
+        """
+        if hkx is None:
+            hkx = RagdollMap.beside(self.path)
+            if hkx is None:
+                return self.set_ragdoll(None, self._state("absent", self.path.with_suffix(".hkx")))
+        if not hkx:
+            return self.set_ragdoll(None)
+        try:
+            ragdoll = RagdollMap.from_hkx(hkx, cfg)
+        except (ValueError, OSError) as e:
+            return self.set_ragdoll(None, self._state("unreadable", hkx, str(e)))
+        except (struct.error, IndexError, KeyError) as e:
+            # A packfile cut short or bent out of shape runs the reading past its own fields.
+            return self.set_ragdoll(None, self._state(
+                "unreadable", hkx, t("ragdoll.unreadable", file=hkx, error=repr(e))))
+        return self.set_ragdoll(ragdoll)
+
+    def set_ragdoll(self, ragdoll: RagdollMap | None, state: dict | None = None) -> dict:
+        """Stand the bodies on the bones of this ragdoll - None stands them on their nodes.
+        The frames are worked out here once, not on every question about a capsule."""
+        self.ragdoll = ragdoll
+        self.body_matrices = {}
+        if ragdoll is None:
+            self.ragdoll_state = state or self._state("absent")
+            return self.ragdoll_state
+        unmatched = []
+        for bone in self.bodies:
+            offset = ragdoll.offset(bone)
+            if offset is None:
+                unmatched.append(bone)
+                continue
+            node = self.matrix(bone).astype(np.float64)
+            self.body_matrices[bone] = (node @ offset).astype(np.float32)
+        self.ragdoll_state = self._state("read", ragdoll.path, bones=len(ragdoll),
+                                         unmatched=unmatched)
+        return self.ragdoll_state
+
+    @staticmethod
+    def _state(state: str, path=None, reason: str | None = None, bones: int = 0,
+               unmatched: list[str] | None = None) -> dict:
+        """Where the bodies were stood, as data: `read` - on the ragdoll of `file`; `absent` -
+        on their nodes, there being no skeleton.hkx where `file` says it was looked for (None:
+        it was not looked for); `unreadable` - on their nodes, `reason` saying why.
+        `unmatched` are bodies the ragdoll has no bone for."""
+        return {"state": state, "file": str(path) if path else None, "reason": reason,
+                "bones": int(bones), "unmatched": list(unmatched or [])}
 
     @staticmethod
     def _matrix(buf) -> np.ndarray:
@@ -507,9 +579,21 @@ class ColliderSet:
         return sum(len(b.capsules) for b in self.bodies.values())
 
     def matrix(self, bone: str) -> np.ndarray:
-        """Where the bone stands in world coordinates. The identity when the skeleton has no
-        such bone."""
+        """Where the node of the bone stands in world coordinates - the frame the skin and the
+        swinging physics hang on. The identity when the skeleton has no such bone."""
         return self.matrices.get(bone, np.eye(4, dtype=np.float32))
+
+    def body_matrix(self, bone: str) -> np.ndarray:
+        """Where the game stands the body of this bone: on its ragdoll bone when skeleton.hkx
+        was read and names one, otherwise on the node. The capsules of the file are numbers in
+        this frame."""
+        m = self.body_matrices.get(bone)
+        return m if m is not None else self.matrix(bone)
+
+    def departure(self, bone: str) -> dict | None:
+        """How far the body of this bone stands from its node: the turn in degrees and the
+        shift in game units, with the name of the ragdoll bone. None without a ragdoll bone."""
+        return self.ragdoll.departure(bone) if self.ragdoll is not None else None
 
     def world_capsules(self, bones=None, bumper: bool = False) -> list[Capsule]:
         """The capsules in the same coordinates the mesh vertices lie in."""
@@ -518,7 +602,7 @@ class ColliderSet:
         for name, body in self.bodies.items():
             if want is not None and name not in want:
                 continue
-            m = self.matrix(name)
+            m = self.body_matrix(name)
             out.extend(c.transformed(m) for c in body.capsules)
         if bumper and self.bumper is not None:
             m = self.matrix(self.bumper.bone)
@@ -526,7 +610,7 @@ class ColliderSet:
         return out
 
     def local_capsules(self, bones=None) -> list[dict]:
-        """The capsules in the coordinates of their own bone - the way they lie in the file
+        """The capsules in the coordinates of their own body - the way they lie in the file
         and the way other programs' settings expect them. One dictionary per body: the bone,
         the kind and the capsules."""
         out = []
@@ -571,7 +655,7 @@ class ColliderSet:
         pts = np.asarray(points, dtype=np.float32).reshape(-1, 3)
         if pts.shape[0] == 0:
             return {"bone": bone, "points": 0}
-        caps = [c.transformed(self.matrix(bone)) for c in self.body(bone).capsules]
+        caps = [c.transformed(self.body_matrix(bone)) for c in self.body(bone).capsules]
         d = np.min(np.vstack([c.distance_to(pts) for c in caps]), axis=0)
         return {
             "bone": bone, "points": int(pts.shape[0]),
@@ -581,24 +665,26 @@ class ColliderSet:
             "outside": round(float((d > 0.0).mean()), 4),
         }
 
-    def fit(self, bone: str, points, percentile: float = 90.0) -> Capsule | None:
-        """A capsule fitted to the skin points - in bone coordinates, not applied yet.
+    def fit(self, bone: str, points, percentile: float = 90.0,
+            matrix: np.ndarray | None = None) -> Capsule | None:
+        """A capsule fitted to the skin points - in the body's coordinates, not applied yet.
 
         The points arrive in world space (the deformed body is what gives them), and the
-        capsule has to land in the coordinates of its own bone: that is where it is kept in
-        the skeleton file. Applying it is `apply_fit`, so that "before and after" can be
-        looked at without replacing anything.
+        capsule has to land in the coordinates its body stands in (`body_matrix`): that is how
+        its numbers are kept in the skeleton file and read by the game. Applying it is
+        `apply_fit`, so that "before and after" can be looked at without replacing anything.
+        `matrix` fits in another frame: the swinging physics hang capsules on the node itself.
         """
         pts = np.asarray(points, dtype=np.float32).reshape(-1, 3)
         if pts.shape[0] < 4:
             return None
-        inv = np.linalg.inv(self.matrix(bone))
-        local = np.hstack([pts, np.ones((pts.shape[0], 1), np.float32)]) @ inv.T
-        return Capsule.fit(local[:, :3], bone, 0, percentile)
+        frame = self.body_matrix(bone) if matrix is None else matrix
+        return Capsule.fit(self._local(pts, frame), bone, 0, percentile)
 
-    def _local(self, bone: str, points) -> np.ndarray:
+    @staticmethod
+    def _local(points, frame: np.ndarray) -> np.ndarray:
         pts = np.asarray(points, dtype=np.float32).reshape(-1, 3)
-        inv = np.linalg.inv(self.matrix(bone))
+        inv = np.linalg.inv(frame)
         return (np.hstack([pts, np.ones((pts.shape[0], 1), np.float32)]) @ inv.T)[:, :3]
 
     def fit_bundle(self, bone: str, points, count: int, method: str = "kmeans",
@@ -611,7 +697,7 @@ class ColliderSet:
         pts = np.asarray(points, dtype=np.float32).reshape(-1, 3)
         if pts.shape[0] < 4:
             return []
-        local = self._local(bone, pts)
+        local = self._local(pts, self.body_matrix(bone))
         out = []
         for chunk in split_points(local, count, method):
             if chunk.size < max(4, int(min_points)):
@@ -685,6 +771,7 @@ class ColliderSet:
             "bundles": sum(1 for b in self.bodies.values() if b.is_bundle),
             "bumper": self.bumper.bone if self.bumper else None,
             "bones": self.bone_names(),
+            "ragdoll": dict(self.ragdoll_state),
         }
 
     def as_dict(self) -> dict:

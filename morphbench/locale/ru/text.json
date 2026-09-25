@@ -66,6 +66,7 @@
   "text.capsuleOne": "капсула",
   "text.capsuleMany": "капсул",
   "text.clearance": "снаружи %(outside)s%% кожи, дальше всего %(worst)s",
+  "text.ragdollAway": "рэгдолл поворачивает его на %(turn)s° и сдвигает на %(shift)s от узла",
   "text.capsuleLine": "    #%(index)s  центр %(centre)s  длина %(length)s  радиус %(radius)s",
 
   "text.nothingToFit": "нечего сажать: ни одна кость не дала точек кожи",

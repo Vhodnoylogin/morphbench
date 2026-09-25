@@ -66,6 +66,7 @@
   "text.capsuleOne": "capsule",
   "text.capsuleMany": "capsules",
   "text.clearance": "%(outside)s%% of the skin outside, furthest %(worst)s",
+  "text.ragdollAway": "the ragdoll turns it %(turn)s° and shifts it %(shift)s from the node",
   "text.capsuleLine": "    #%(index)s  centre %(centre)s  length %(length)s  radius %(radius)s",
 
   "text.nothingToFit": "nothing to fit: no bone gave any skin points",

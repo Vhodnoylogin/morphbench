@@ -1,0 +1,13 @@
+{
+  "#": "Рэгдолл: чтение skeleton.hkx - где игра ставит тела скелета.",
+  "ragdoll.badPair": "%(file)s сопоставляет кость %(a)d с костью %(b)d - за концом скелета",
+  "ragdoll.bigEndian": "%(file)s записан для приставки с обратным порядком байтов; читаются только файлы редакций для ПК",
+  "ragdoll.noFile": "нет такого файла: %(file)s",
+  "ragdoll.noMapper": "в %(file)s есть рэгдолл, но нет сопоставления между ним и скелетом анимации",
+  "ragdoll.noRagdoll": "в %(file)s нет рэгдолла",
+  "ragdoll.noReader": "в этой версии PyNifly нет разборщика файлов Havok (pyn/havok_packfile.py); в более новой он есть",
+  "ragdoll.notHavok": "%(file)s - не файл Havok",
+  "ragdoll.pointer": "в %(file)s указатели по %(size)d байт; известны только 4 и 8",
+  "ragdoll.unreadable": "%(file)s не прочитан: %(error)s",
+  "ragdoll.version": "%(file)s записан Havok %(version)s; поля скелета здесь известны для %(want)s"
+}

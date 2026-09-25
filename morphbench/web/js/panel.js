@@ -70,9 +70,19 @@ class Panel {
       this.bumperBox = el("input", { type: "checkbox",
         on: { change: () => app.invoke("show_colliders", bench.view.colliders, this.bumperBox.checked) } });
       if (!bench.bumper_mesh()) { this.bumperBox.disabled = true; this.bumperBox.title = T.noBumper; }
+      // Where the bodies stand: on the ragdoll of skeleton.hkx, or on their nodes - said
+      // outright, because a picture drawn on the nodes looks just as sure of itself.
+      const rag = bench.summary.ragdoll || { state: "absent", file: null, unmatched: [] };
+      const ragText = rag.state === "read"
+        ? say(T.ragdollRead, { file: bench.names.ragdoll }) +
+          (rag.unmatched.length ? say(T.ragdollUnmatched, { bones: rag.unmatched.join(", ") }) : "")
+        : rag.state === "unreadable" ? say(T.ragdollUnreadable, { reason: rag.reason })
+        : rag.file ? say(T.ragdollAbsent, { file: bench.names.ragdoll }) : "";
+      const ragClass = rag.state === "read" && !rag.unmatched.length ? "muted" : "warn";
       root.appendChild(el("section", null, [el("h2", { text: T.secCapsules }),
         el("div", { class: "current" }, [el("span", { text: bench.names.skeleton }),
           el("span", { class: "muted", text: T.summaryCapsules + bench.summary.colliders })]),
+        el("div", { class: ragClass, text: ragText }),
         el("div", { class: "row", style: "margin-top:6px" }, [
           el("label", null, [this.colliderBox, T.lblCapsules]),
           el("label", null, [this.bumperBox, T.lblBumper])]),
@@ -345,9 +355,12 @@ class Panel {
       parts.push("--focus-" + state.focus.name.slice(0, i), q(state.focus.name.slice(i + 1)));
     }
     // The capsule layer: the skeleton is named outright, even though render would have found it
-    // beside the mesh on its own.
+    // beside the mesh on its own - and so is the ragdoll the bodies stand on, wherever it came from.
     if (state.colliders && bench.summary.skeleton) {
-      parts.push("--skeleton", q(bench.summary.skeleton), "--colliders");
+      parts.push("--skeleton", q(bench.summary.skeleton));
+      const rag = bench.summary.ragdoll;
+      if (rag && rag.state === "read") parts.push("--hkx", q(rag.file));
+      parts.push("--colliders");
       if (state.bumper) parts.push("--bumper");
     }
     const light = state.light;

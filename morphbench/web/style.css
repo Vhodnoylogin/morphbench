@@ -44,4 +44,5 @@
   pre { background: var(--bg); border: 1px solid var(--line); border-radius: 4px; padding: 6px 8px; margin: 4px 0;
         white-space: pre-wrap; word-break: break-all; font: 11.5px/1.35 Consolas, "Cascadia Mono", monospace; }
   .muted { color: var(--muted); font-size: 12px; }
+  .warn { color: var(--accent); font-size: 12px; }
   .err { color: #e07070; }

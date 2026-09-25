@@ -48,6 +48,7 @@ from .i18n import t
 from .environment import Environment, file_exists
 from .model import BodyModel, sphere_of, vertex_normals
 from .morphs import MorphSet
+from .ragdoll import RagdollMap
 from .view import ViewState
 
 
@@ -198,6 +199,7 @@ class MorphBench:
             "morphs": len(self.morph_set.names()) if self.morph_set else 0,
             "skeleton": str(self.rig.path) if self.rig else None,
             "colliders": self.rig.capsule_count() if self.rig else 0,
+            "ragdoll": self.ragdoll(),
             "bounds": {"min": [round(float(x), 1) for x in lo],
                        "max": [round(float(x), 1) for x in hi]},
         }
@@ -438,7 +440,9 @@ class MorphBench:
             links = []
             for link in row["links"]:
                 pts = self.skin_points(link["bone"], min_weight, shapes)
-                cap = self.rig.fit(link["bone"], pts, pct)
+                # On the node, not where a ragdoll body would stand: the swinging physics
+                # hang their capsules on the bone itself.
+                cap = self.rig.fit(link["bone"], pts, pct, self.rig.matrix(link["bone"]))
                 links.append({**link, "points": int(pts.shape[0]),
                               "capsule": None if cap is None else cap.as_dict()})
             first = links[0]["bone"] if links else None
@@ -561,6 +565,23 @@ class MorphBench:
         self.rig = ColliderSet.from_nif(path, self.cfg)
         return self.rig.summary()
 
+    def open_ragdoll(self, path) -> dict:
+        """Take the ragdoll of the open skeleton from a skeleton.hkx named outright.
+
+        A body stands where the game stands it - on a bone of the ragdoll, written in
+        skeleton.hkx - and opening a skeleton reads the .hkx of the same name beside it on its
+        own. This is for when it lies elsewhere: a skeleton.nif of one mod whose skeleton.hkx
+        comes from another. A file named outright and not readable is a refusal, not a note:
+        it was asked for.
+        """
+        self._require_rig()
+        return self.rig.set_ragdoll(RagdollMap.from_hkx(path, self.cfg))
+
+    def ragdoll(self) -> dict | None:
+        """Where the bodies were stood: on the ragdoll of which skeleton.hkx, or on their
+        nodes and why (`ColliderSet.ragdoll_state`). None with no skeleton open."""
+        return dict(self.rig.ragdoll_state) if self.rig is not None else None
+
     def has_skeleton(self) -> bool:
         return self.rig is not None
 
@@ -577,19 +598,21 @@ class MorphBench:
         return self.rig.find(needle) if needle else self.rig.bone_names()
 
     def colliders(self, needle: str | None = None) -> list[dict]:
-        """The capsules as numbers: where they stand in world coordinates, of what kind, and
-        what they are to the engine."""
+        """The capsules as numbers: where they stand in world coordinates, of what kind, what
+        they are to the engine, and how far the game stands the body from its node
+        (`ragdoll`: the turn and the shift; None when no ragdoll bone is known)."""
         self._require_rig()
         out = []
         for bone in self.collider_bones(needle):
             body = self.rig.body(bone)
-            caps = [c.transformed(self.rig.matrix(bone)) for c in body.capsules]
+            caps = [c.transformed(self.rig.body_matrix(bone)) for c in body.capsules]
             out.append({"bone": bone, "kind": body.kind, "physics": body.physics,
+                        "ragdoll": self.rig.departure(bone),
                         "capsules": [c.as_dict() for c in caps]})
         return out
 
     def collider_local(self, needle: str | None = None) -> list[dict]:
-        """The same capsules in their own bone's frame - the way they lie in the file. That is
+        """The same capsules in their own body's frame - the way they lie in the file. That is
         the form the settings files of other programs expect; folding such rows into a file is
         a presenter's job."""
         self._require_rig()
@@ -733,7 +756,8 @@ class MorphBench:
 
     def collider_set(self, bone: str, index: int = 0, p1=None, p2=None,
                      radius: float | None = None) -> dict:
-        """Editing one capsule by numbers: the ends and the radius in its own bone's frame."""
+        """Editing one capsule by numbers: the ends and the radius in its own body's frame, the
+        way the file keeps them."""
         self._require_rig()
         caps = self.rig.body(bone).capsules
         if not 0 <= index < len(caps):

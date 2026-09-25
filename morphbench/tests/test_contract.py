@@ -46,7 +46,7 @@ PAYLOAD = {
     "env": {"insideMo2", "dataRoot", "games", "catalogRoot", "candidates"},
     "catalog": {"index", "name", "file", "folder", "nif", "tri", "kind"},
     "summary": {"nif", "tri", "triKind", "skeleton", "shapes", "vertices", "bones",
-                "morphs", "bounds", "colliders"},
+                "morphs", "bounds", "colliders", "ragdoll"},
     "shapes": {"name", "vertices", "triangles", "bones", "morphs", "bounds"},
     "bones": {"bone", "vertices"},
     "morphs": {"morph", "shape", "vertices", "maxShift", "meanShift", "bounds"},
@@ -61,8 +61,8 @@ PAYLOAD = {
                "single", "singleReach", "overCap", "file", "morphs"},
     "chains": {"chain", "engine", "parent", "tip", "links", "vertices", "gaps",
                "anchors", "tail", "break", "fit"},
-    "colliders": {"bone", "kind", "capsules", "physics"},
-    "fit": {"fitted"},
+    "colliders": {"bone", "kind", "capsules", "physics", "ragdoll"},
+    "fit": {"fitted", "ragdoll"},
     "physics": {"engine", "chains", "text"},
     "focus": {"bones", "morphs", "shapes"},
     "render": {"saved", "view", "sliders"},
@@ -183,7 +183,7 @@ class Contract(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertEqual(json.loads(out), ["NoSuch"])
 
-    # ---- the three exit codes ----------------------------------------------------------
+    # ---- the two exit codes ------------------------------------------------------------
     def test_a_refusal_is_code_2_with_an_empty_stdout(self):
         """Whoever reads the output must be able to tell a refusal from an empty answer:
         a refusal writes nothing at all where the JSON would be."""
@@ -202,6 +202,24 @@ class Contract(unittest.TestCase):
                 with self.assertRaises(SystemExit) as caught:
                     self.run_cli([name, "--json", str(self.nif)])
                 self.assertEqual(caught.exception.code, 2)
+
+    # ---- where the bodies stand ---------------------------------------------------------
+    def test_capsules_with_no_skeleton_hkx_say_so_and_still_answer(self):
+        """The bodies then stand on their nodes, which the game may not do: one line on
+        stderr says so and names the way out, and stdout stays the JSON of the contract."""
+        code, out, err = self.run_cli(["colliders", "--json", str(self.nif),
+                                       "--skeleton", str(self.skeleton)])
+        self.assertEqual(code, 0)
+        self.assertIsInstance(json.loads(out), list)
+        self.assertIn("skeleton.hkx", err)
+        self.assertIn("--hkx", err)
+        self.assertEqual(len(err.strip().splitlines()), 1, "said once: %r" % err)
+
+    def test_a_skeleton_hkx_named_outright_and_missing_is_a_refusal(self):
+        code, out, _err = self.run_cli(["colliders", "--json", str(self.nif),
+                                        "--skeleton", str(self.skeleton),
+                                        "--hkx", str(self.out / "nothing.hkx")])
+        self.assertEqual((code, out), (2, ""))
 
     # ---- input nobody meant to hand it -------------------------------------------------
     def test_a_file_that_is_not_a_mesh_is_a_refusal(self):

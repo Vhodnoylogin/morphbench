@@ -476,7 +476,8 @@ class MorphBench:
         for name in names:
             sh = self.model.shape(name)
             reach = self.reach(name)
-            needed = reach.needed(margin, start=None if sh.bound is None else sh.bound.centre)
+            needed = reach.needed(margin, start=None if sh.bound is None else sh.bound.centre,
+                                  cap=cap)
             spheres[name] = needed
             row = {"shape": name, "block": sh.block, "vertices": sh.vertex_count,
                    "morphs": len(reach.deltas), "needed": needed.as_dict()}
@@ -544,9 +545,16 @@ class MorphBench:
                 raise RuntimeError(t("core.boundsMismatch", block=sh.block, shape=sh.name,
                                      centre=centre, radius=radius))
             need = spheres[row["shape"]]
-            if not shrink and (row["ok"] or need.radius <= sh.bound.radius):
+            if not shrink and row["ok"]:
                 kept.append(row["shape"])
                 continue
+            if not shrink and need.radius <= sh.bound.radius:
+                # A smaller sphere around a different centre does not mean the file's
+                # sphere covers the mesh. Preserve its centre and widen it to its reach.
+                far, _, _ = self.reach(sh.name).reach_exact(sh.bound.centre,
+                                                        int(self.cfg["boundsCornerCap"]))
+                factor = float(self.cfg["boundsMargin"] if margin is None else margin)
+                need = Sphere(sh.bound.centre, max(sh.bound.radius, far * max(1.0, factor)))
             patch.write_bounds(sh.block, need.centre, need.radius)
             written.append(row["shape"])
         out = patch.save(path)

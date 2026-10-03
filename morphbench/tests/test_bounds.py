@@ -165,6 +165,17 @@ class TestReach(unittest.TestCase):
         self.assertEqual(list(r.states([0, 0, 0])), ["rest"])
         self.assertAlmostEqual(r.needed().radius, float(np.linalg.norm([1.5, 1.5, 0])), places=3)
 
+    def test_over_cap_never_understates_opposing_tangential_morphs(self):
+        rest = np.array([[10.0, 0.0, 0.0]], np.float32)
+        deltas = {"plus": np.array([[0, 10, 0]], np.float32),
+                  "minus": np.array([[0, -10, 0]], np.float32)}
+        reach = Reach(rest, deltas)
+        exact, _, _ = reach.reach_exact([0, 0, 0], cap=2)
+        bounded, _, over = reach.reach_exact([0, 0, 0], cap=1)
+        self.assertEqual(over, 1)
+        self.assertGreaterEqual(bounded + 1e-5, exact)
+        self.assertGreater(exact, 14.0)
+
 
 class TestFacadeBounds(unittest.TestCase):
     def setUp(self):
@@ -282,6 +293,20 @@ class TestBoundsPatch(unittest.TestCase):
         self.assertEqual(patch.read_bounds(2), ((5.0, 6.0, 7.0), 8.0))
         self.assertTrue(patch.consistent())
 
+    def test_save_refuses_existing_file_and_source_alias(self):
+        import os
+        patch = NifPatch(self.path)
+        before = self.path.read_bytes()
+        alias = Path(self.tmp.name) / "alias.nif"
+        os.link(self.path, alias)
+        other = Path(self.tmp.name) / "other.nif"
+        other.write_bytes(b"other mod")
+        for output in (alias, other):
+            with self.assertRaises(FileExistsError):
+                patch.save(output)
+        self.assertEqual(self.path.read_bytes(), before)
+        self.assertEqual(other.read_bytes(), b"other mod")
+
     def test_writes_in_place_and_refuses_other_blocks(self):
         patch = NifPatch(self.path)
         before = bytes(patch.raw)
@@ -341,6 +366,25 @@ class TestBoundsPatch(unittest.TestCase):
         self.assertEqual((out["shapes"], out["kept"]), ([], ["body"]))
         out = b.bounds_write(Path(self.tmp.name) / "shrunk.nif", shrink=True)
         self.assertEqual(out["shapes"], ["body"])
+
+    def test_wide_sphere_with_wrong_centre_is_repaired(self):
+        cfg = common.config(self.tmp.name)
+        pynifly = common.load_pynifly(cfg)
+        path = common.write_nif(pynifly, Path(self.tmp.name) / "offset.nif", {"body": {
+            "verts": [(0, 0, 0), (2, 0, 0), (0, 2, 0)], "tris": [(0, 1, 2)],
+            "uvs": [(0, 0), (1, 0), (0, 1)], "normals": [(0, 0, 1)] * 3}}, game="SKYRIMSE")
+        from morphbench import MorphBench
+        b = MorphBench(cfg)
+        b.open(path, tri="", skeleton="")
+        patch = NifPatch(path)
+        patch.write_bounds(b.model.shape("body").block, (100, 0, 0), 50)
+        source = patch.save(Path(self.tmp.name) / "bad-centre.nif")
+        b.open(source, tri="", skeleton="")
+        b.morph_set = morph_set(morph("Up", "body", [0], [(0, 0, 3)]))
+        result = b.bounds_write(Path(self.tmp.name) / "fixed-centre.nif")
+        self.assertEqual(result["shapes"], ["body"])
+        shape = pynifly.NifFile(result["saved"]).shapes[0]
+        self.assertGreater(float(shape.properties.boundingSphereRadius), 100.0)
 
     def test_bounds_write_makes_a_new_file_that_pynifly_reads_back(self):
         """Writing through the facade: a new file, the old one intact, and PyNifly reads

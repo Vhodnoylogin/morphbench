@@ -1,4 +1,8 @@
 {
+  "release.badVersion": "invalid version label: %(version)s",
+  "release.badStage": "unsafe staging folder: %(path)s",
+  "release.noLauncher": "morphbench.exe is missing; build launcher/build.cmd first",
+  "release.runtimeMismatch": "bundling Python %(version)s requires a 64-bit Windows builder running the same Python major/minor version",
   "#": "What release.py says while it builds the archive - read by whoever builds a release.",
   "release.archive": "archive: %(path)s (%(size).1f MB)",
   "release.copied": "copied %(count)s files of our own",

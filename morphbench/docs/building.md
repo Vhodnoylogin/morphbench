@@ -247,12 +247,12 @@ in reverse name order, so the newest Blender version wins.
 ### The packages and the embedded Python
 
 `numpy` and `pillow` are installed by the same `pip` you already have, but into the release folder
-rather than into the system: `pip install --target <stage>/vendor`. The `.dist-info` folders and
-`__pycache__` are removed afterwards — the release is not a place from which anything will be
-uninstalled.
+rather than into the system: `pip install --target <stage>/vendor`. `__pycache__` is removed;
+`.dist-info` stays, including the exact versions and the package licence files.
 
 One rule follows from this and is easy to get wrong: **run `release.py` with the same Python
-version you are bundling.** `pip --target` picks wheels for the interpreter that is running it, so
+major/minor version you are bundling, on 64-bit Windows.** The builder checks this before staging.
+`pip --target` picks wheels for the interpreter that is running it, so
 building with 3.13 while bundling embeddable 3.12 lays down compiled extensions the bundled
 interpreter cannot import.
 

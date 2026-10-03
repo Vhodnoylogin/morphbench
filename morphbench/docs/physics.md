@@ -55,7 +55,8 @@ direction out of the centre — quietly underestimates: two sliders together can
 further than either alone and further than the sign test predicts. On a tail that guess missed
 4.5% of reach beyond the sphere recorded in the file, which is exactly the margin that decides
 whether a part blinks. Vertices moved by more than `boundsCornerCap` sliders are still measured
-by the guess, because 2^k grows faster than patience does; their number comes back as `overCap`,
+by a conservative coordinate-box bound, because 2^k grows faster than patience does;
+their number comes back as `overCap`,
 and while `overCap` is zero the answer is exact.
 
 **Why the needed sphere is not simply generous.** The same sphere is what culls invisible
@@ -178,8 +179,8 @@ A capsule is fitted like this: the axis is the direction the cloud of skin point
 widest along — for an arm, a shin or a tail, the direction of the bone itself. The radius is not
 the largest distance to that axis but a percentile of it (`colliderFitPercentile`, 90 by
 default), because one vertex sticking out must not inflate a capsule over a whole limb. The ends
-then step back inwards by the radius, or the round caps would reach past the cloud by their own
-thickness and the capsule would come out longer than the body part it stands for. An outlier is
+then step inwards only as far as their hemispheres still contain the selected points. A cylinder
+needs its segment to reach the end rings; subtracting the radius leaves them outside. An outlier is
 thrown away **before** the axis is estimated, not after: a single vertex poking sideways spoils
 not only the radius — the percentile would have absorbed that — but the axis, and a limb's length
 turns into a capsule's width.
@@ -254,7 +255,8 @@ shape.
 Worth saying plainly, so the numbers are not trusted further than they go.
 
 - **The bounding-sphere walk is exact only while `overCap` is zero.** Vertices moved by more than
-  `boundsCornerCap` sliders fall back to an estimate, and that estimate is known to understate.
+  `boundsCornerCap` sliders use a conservative coordinate-box bound. It can overstate the reach,
+  but does not understate it; the written sphere can consequently be wider than necessary.
 - **Capsules the bench fits are only as good as what was visible when it fitted them.** The fit is
   taken at the slider values and the set of shown parts in force at that moment; change either
   and the right capsule changes with it.

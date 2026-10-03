@@ -145,7 +145,7 @@ class MorphSet:
             base = np.asarray(tri.morphs.get("Basis", tri.vertices),
                               dtype=np.float32).reshape(-1, 3)
             morphs = dict(tri.morphs)
-            for name, verts in (getattr(t, "modmorphs", None) or {}).items():
+            for name, verts in (getattr(tri, "modmorphs", None) or {}).items():
                 # A partial morph with the name of a full one goes beside it, not over it.
                 morphs[name if name not in morphs else name + " (mod)"] = verts
             epsilon = float(cfg["frtriEpsilon"])

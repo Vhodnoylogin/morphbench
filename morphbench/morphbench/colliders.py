@@ -85,8 +85,8 @@ class Capsule:
         along: for an arm, a shin or a tail that is the direction of the bone itself. The
         radius is not the largest distance to the axis but a percentile of it: one vertex
         sticking out must not inflate the capsule over a whole limb. The ends step back inwards
-        by the radius, or the caps would reach past the cloud by their own thickness and the
-        capsule would come out longer than the part of the body it stands for.
+        only as far as the hemispheres can still contain the selected skin points. Subtracting
+        the radius unconditionally would leave the end rings of a cylinder outside the caps.
 
         An outlier is thrown out BEFORE the axis is estimated: one vertex poking sideways
         spoils not only the radius - the percentile would have held that - but the axis
@@ -111,9 +111,13 @@ class Capsule:
         radius = float(np.percentile(across, float(percentile)))
         if radius <= 1e-4:
             return None
-        lo, hi = float(along.min()), float(along.max())
-        # Step inwards by the radius, but not into nothing: on a ball the axis is a point.
-        half = max(0.0, (hi - lo) * 0.5 - radius)
+        selected = across <= radius
+        slack = np.sqrt(np.maximum(0.0, radius * radius - across[selected] ** 2))
+        lo = float(np.min(along[selected] + slack))
+        hi = float(np.max(along[selected] - slack))
+        # Each retained point constrains the nearest end. Overlapping constraints need
+        # only a sphere; otherwise this is the shortest segment for the chosen radius.
+        half = max(0.0, (hi - lo) * 0.5)
         mid = centre + axis * ((hi + lo) * 0.5)
         return cls(bone, index, mid - axis * half, mid + axis * half, radius)
 
@@ -728,6 +732,11 @@ class ColliderSet:
         path = Path(path)
         if same_file(path, self.path):
             raise ValueError(t("colliders.noOverwriteSkeleton"))
+        import os
+        import tempfile
+        from .environment import file_exists, write_new_file
+        if file_exists(path) or os.path.lexists(path):
+            raise FileExistsError(t("model.outputExists", path=path))
         changed = self.changed_bodies()
         if not changed:
             raise ValueError(t("colliders.nothingChanged"))
@@ -747,9 +756,13 @@ class ColliderSet:
                 for cap in caps:
                     lst.add_shape(self._capsule_props(bhkCapsuleShapeProps, cap))
         path.parent.mkdir(parents=True, exist_ok=True)
-        nif.filepath = str(path)
-        nif.save()
-        return path
+        # The native writer cannot create exclusively. Let it write only in our private
+        # staging folder, then create the requested output exclusively (also against races).
+        with tempfile.TemporaryDirectory(prefix=".morphbench-", dir=path.parent) as folder:
+            staged = Path(folder) / "skeleton.nif"
+            nif.filepath = str(staged)
+            nif.save()
+            return write_new_file(path, staged.read_bytes())
 
     @staticmethod
     def _capsule_props(props_class, cap: Capsule):

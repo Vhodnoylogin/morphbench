@@ -309,8 +309,9 @@ singleReach, overCap, ok}` per part. `reach` is how far the geometry goes from t
 the sphere in the file under the worst set of sliders, `excess` is how much further that is
 than the radius as a fraction, `state` names the set to blame and `single` the one slider
 that carries it furthest alone. `overCap` counts vertices touched by more sliders than
-`boundsCornerCap` — those are estimated rather than walked exactly, and as long as it is
-zero the answer is exact. `--out` returns `{saved, shapes, kept, rows}`.
+`boundsCornerCap` — those receive a conservative bound rather than an exact walk. With
+`overCap` zero the answer is exact; otherwise `state: "worst"` can describe the bound,
+not a reproducible slider combination. `--out` returns `{saved, shapes, kept, rows}`.
 
 What the numbers mean and why the walk is exact: [physics.md](physics.md).
 

@@ -129,7 +129,7 @@ class Reach:
         are 2^N corners, but only the k sliders that touch a vertex act on it, so 2^k corners
         are tried per group of vertices sharing one set - on a body that is hundreds of groups
         of three to six sliders. Vertices touched by more than `cap` sliders are measured by
-        a rough guess along the direction (the "worst set"), and their number is returned
+        a conservative coordinate-box bound, and their number is returned
         third: as long as it is zero the answer is exact.
         """
         c = np.asarray(centre, dtype=np.float32).reshape(3)
@@ -149,12 +149,8 @@ class Reach:
         # pass over every vertex per group, and a body has thousands of groups.
         order = np.argsort(inverse, kind="stable")
         edges = np.searchsorted(inverse[order], np.arange(len(keys) + 1))
-        #: The "worst set" cloud does not depend on the group: it is the whole mesh, and
-        #: building it costs a hundred arrays the size of the mesh. It used to be built inside
-        #: the loop, once for every group past the cap - on a body of 97 sliders that is 1877
-        #: rebuilds, and they were 34 seconds of the 115 this method took. Once, here, and
-        #: only if a group past the cap actually turns up.
-        worst_all = None
+        # Over-cap groups are bounded directly; do not build every morph state again
+        # for every group in a large body.
         for g, key in enumerate(keys):
             idx = order[edges[g]:edges[g + 1]]
             cols = np.nonzero(key)[0]
@@ -163,9 +159,14 @@ class Reach:
                 continue
             if k > int(cap):
                 over += int(idx.size)
-                if worst_all is None:
-                    worst_all = self.states(c)["worst"]
-                r = float(np.linalg.norm(worst_all[idx] - c, axis=1).max())
+                # Bound each coordinate over every allowed slider value. The box may be
+                # wider than the true reachable cloud, but never understates its reach.
+                d = stack[idx][:, cols, :]
+                a, b = d * lo, d * hi
+                lower = self.rest[idx] - c + np.minimum(a, b).sum(axis=1)
+                upper = self.rest[idx] - c + np.maximum(a, b).sum(axis=1)
+                farthest = np.maximum(np.abs(lower), np.abs(upper))
+                r = float(np.linalg.norm(farthest, axis=1).max())
                 if r > best:
                     best, best_state = r, "worst"
                 continue
@@ -200,7 +201,8 @@ class Reach:
                 best, reach = name, r
         return best, reach
 
-    def needed(self, margin: float = 1.0, iterations: int = 100, start=None) -> Sphere:
+    def needed(self, margin: float = 1.0, iterations: int = 100, start=None,
+               cap: int = 12) -> Sphere:
         """The sphere covering every state, with `margin` to spare (a share of the radius,
         1 being none).
 
@@ -218,9 +220,9 @@ class Reach:
         sphere = enclosing_sphere(cloud, iterations, centre)
         # The radius comes not from the rough cloud but exactly, from the corners of the
         # slider cube.
-        exact, _, _ = self.reach_exact(sphere.centre)
+        exact, _, _ = self.reach_exact(sphere.centre, cap)
         if start is not None:
-            alt, _, _ = self.reach_exact(start)
+            alt, _, _ = self.reach_exact(start, cap)
             if alt < exact:
                 sphere, exact = Sphere(start, alt), alt
         return Sphere(sphere.centre, exact * max(1.0, float(margin)))

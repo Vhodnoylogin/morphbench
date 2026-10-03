@@ -27,6 +27,7 @@ not one real build folder anywhere.
 
 | Suite | Needs PyNifly | What it checks |
 |---|---|---|
+| `test_release.py` | no | truthful bundle manifests, version/runtime preflight, preservation of a previous stage on missing dependencies, launcher sources |
 | `test_tri.py` | yes | a real TRIP written by `TripFile` reads back through `MorphSet.from_file` to the precision of the int16 quantum; an FRTRI written by `TriFile` |
 | `test_nif.py` | yes | a tiny NIF made by PyNifly reads back through `BodyModel.from_nif`; `open()` finds the `.tri` lying beside it |
 | `test_morphs.py` | no | an empty morph, one declared but absent, `apply` with a fraction and with vertex numbers past the end of the mesh |

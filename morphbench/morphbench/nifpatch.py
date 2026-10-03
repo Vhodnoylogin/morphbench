@@ -114,7 +114,5 @@ class NifPatch:
                          float(centre[2]), float(radius))
 
     def save(self, path) -> Path:
-        path = Path(path)
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_bytes(bytes(self.raw))
-        return path
+        from .environment import write_new_file
+        return write_new_file(path, bytes(self.raw))

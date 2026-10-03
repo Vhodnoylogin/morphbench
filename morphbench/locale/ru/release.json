@@ -1,4 +1,8 @@
 {
+  "release.badVersion": "недопустимый номер версии: %(version)s",
+  "release.badStage": "небезопасная папка раскладки: %(path)s",
+  "release.noLauncher": "нет morphbench.exe; сначала соберите launcher/build.cmd",
+  "release.runtimeMismatch": "для вложения Python %(version)s нужен 64-битный Windows и сборщик на той же основной и младшей версии Python",
   "#": "Что говорит release.py, пока собирает архив. Ключи не трогать - переводятся правые части.",
   "release.archive": "архив: %(path)s (%(size).1f МБ)",
   "release.copied": "своё: %(count)s файлов",

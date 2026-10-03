@@ -203,6 +203,22 @@ class TestFrtriRoundTrip(unittest.TestCase):
             self.assertTrue(np.all(np.abs(np.asarray(vec, np.float64) - self.shift) <= tol),
                             "read %s, expected %s" % (vec, self.shift))
 
+    def test_partial_morphs_are_not_lost_or_overwrite_full_names(self):
+        from unittest import mock
+        from types import SimpleNamespace
+        moved = list(self.verts)
+        moved[1] = tuple(self.verts[1][k] + self.shift[k] for k in range(3))
+        # The library has already expanded partial morphs to absolute vertex clouds.
+        raw = SimpleNamespace(vertices=self.verts, morphs={"Smile": self.verts},
+                              modmorphs={"Smile": moved, "Blink": moved})
+        reader = SimpleNamespace(TriFile=SimpleNamespace(from_filepath=lambda _: raw))
+        with mock.patch("morphbench.morphs._module", return_value=reader):
+            result = MorphSet.from_file(self.path, self.cfg)
+        self.assertEqual(result.names(), ["Blink", "Smile", "Smile (mod)"])
+        self.assertTrue(result.get("face", "Smile").is_empty)
+        self.assertEqual(result.get("face", "Smile (mod)").indices.tolist(), [1])
+        self.assertTrue(np.allclose(result.get("face", "Blink").offsets, [self.shift]))
+
 
 if __name__ == "__main__":
     common.main()

@@ -22,6 +22,12 @@ are frozen.
 
 ### What it does
 
+- Offline audit on 2026-10-03: refuses existing NIF outputs, including hardlink aliases;
+  keeps cylinder end rings inside fitted capsules; retains partial FRTRI morphs; bounds
+  over the corner cap are conservative, and an undersized sphere with a wrong centre is repaired.
+- Release preflight checks the launcher, dependency contents and Python ABI before staging.
+  Bundle notices describe the actual selected contents; wheel metadata and licences are retained.
+
 - **Reads** a `.nif` with the `.tri` beside it and answers in numbers: which sliders are dead,
   what a slider tears, how far the geometry reaches, how much of the skin a collision capsule
   actually covers.

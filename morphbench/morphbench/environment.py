@@ -109,6 +109,21 @@ def same_file(a, b) -> bool:
     return _canonical(a) == _canonical(b)
 
 
+def write_new_file(path, data: bytes) -> Path:
+    """Write a new output, refusing existing files including aliases and virtual files."""
+    from .i18n import t
+    path = Path(path)
+    if file_exists(path) or os.path.lexists(path):
+        raise FileExistsError(t("model.outputExists", path=path))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        with open(path, "xb") as output:
+            output.write(data)
+    except FileExistsError as exc:
+        raise FileExistsError(t("model.outputExists", path=path)) from exc
+    return path
+
+
 def _canonical(path) -> str:
     """An absolute path written one way: no "..", one case, no trailing slash."""
     import os

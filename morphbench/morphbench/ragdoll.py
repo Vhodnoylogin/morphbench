@@ -1,4 +1,4 @@
-"""Where the game stands the bodies of a skeleton: the ragdoll bones of skeleton.hkx.
+r"""Where the game stands the bodies of a skeleton: the ragdoll bones of skeleton.hkx.
 
 A body in skeleton.nif hangs on a node, and the obvious reading - the one this workbench made
 until the game showed otherwise - is that the body stands where the node stands. The game does

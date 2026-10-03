@@ -109,8 +109,9 @@ class TestFit(unittest.TestCase):
         axis = axis / np.linalg.norm(axis)
         self.assertGreater(abs(float(axis[2])), 0.99)          # the axis was found along Z
         self.assertAlmostEqual(got.radius, 3.0, delta=0.2)
-        # The ends step inwards by the radius: the total length is the whole spread of the cloud.
-        self.assertAlmostEqual(got.total, 20.0, delta=0.6)
+        # A cylinder's end rings require the segment to reach their axial coordinates.
+        self.assertAlmostEqual(got.length, 20.0, delta=0.01)
+        self.assertLess(float(got.distance_to(tube(3.0, -10, 10)).max()), 1e-4)
         self.assertEqual((got.bone, got.index, got.block), ("B", 0, -1))
 
     def test_one_spike_moves_neither_axis_nor_radius(self):
@@ -248,9 +249,8 @@ class TestSplit(unittest.TestCase):
         self.assertEqual(len(pair), 2)
         cs.apply_fit("B", pair)
         together = cs.clearance("B", self.pts)
-        # One capsule on a corner: the far skin is 2.7 outside, and the capsule itself is
-        # inflated (deepest -6.8). Two: less than half a unit outside, and no inflation.
-        self.assertGreater(alone["worst"], 2.0)
+        # Two capsules cover the corner more closely and leave less empty space inside.
+        self.assertGreater(alone["worst"], together["worst"])
         self.assertLess(together["worst"], 0.8)
         self.assertLess(abs(together["deepest"]), abs(alone["deepest"]) / 3.0)
 
@@ -280,6 +280,21 @@ class TestSaveThroughPyNifly(unittest.TestCase):
         self.assertAlmostEqual(cs.body("B").capsules[0].radius, 0.02 * HAVOK_SCALE, places=3)
         self.assertAlmostEqual(float(cs.matrix("B")[2, 3]), 10.0, places=4)
         self.assertEqual(cs.body("A").capsules[0].material, 591247106)
+
+    def test_existing_output_and_hardlink_never_change(self):
+        import os
+        cs = ColliderSet.from_nif(self.path, self.cfg)
+        cs.apply_fit("A", cap("A", radius=4.0))
+        before = self.path.read_bytes()
+        unrelated = Path(self.tmp.name) / "unrelated.nif"
+        unrelated.write_bytes(b"somebody else's file")
+        alias = Path(self.tmp.name) / "alias.nif"
+        os.link(self.path, alias)
+        for output in (unrelated, alias):
+            with self.assertRaises(FileExistsError):
+                cs.save_as(output, self.cfg)
+        self.assertEqual(unrelated.read_bytes(), b"somebody else's file")
+        self.assertEqual(self.path.read_bytes(), before)
 
     def test_bundle_is_written_as_a_list_and_read_back(self):
         cs = ColliderSet.from_nif(self.path, self.cfg)

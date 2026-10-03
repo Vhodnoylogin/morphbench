@@ -103,6 +103,7 @@ CONTENT = [
     "launcher/*.cmd",
     "launcher/*.py",
     "launcher/*.manifest",
+    "launcher/*.ico",
 ]
 #: What we leave out even when it matched a pattern above.
 SKIP = ("__pycache__", ".pyc", "morphbench.json", "morphbench.log")
@@ -191,8 +192,10 @@ def vendor_packages(deps: list[dict], stage: Path) -> list[str]:
                             "--target", str(into)] + names)
     if code != 0:
         raise SystemExit(t("release.pipFailed", names=", ".join(names), code=code))
-    for junk in list(into.glob("*.dist-info")) + list(into.glob("__pycache__")):
-        shutil.rmtree(junk, ignore_errors=True)
+    # Wheel metadata includes licence files and the exact installed versions. It belongs
+    # with the distribution even when pip itself is not shipped.
+    for junk in into.rglob("__pycache__"):
+        shutil.rmtree(junk)
     return ["%s <- pip" % (into.relative_to(stage) / n) for n in names]
 
 
@@ -255,6 +258,12 @@ def main(argv=None) -> int:
     ap.add_argument("--list", action="store_true", help=t("release.optList"))
     args = ap.parse_args(argv)
 
+    # Versions are labels, never paths. Validate before any staging folder is removed.
+    if not re.fullmatch(r"[0-9][A-Za-z0-9._-]*", args.version):
+        ap.error(t("release.badVersion", version=args.version))
+    if not re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+", args.python_version):
+        ap.error(t("release.badVersion", version=args.python_version))
+
     home = HERE
     deps = load_manifest(home / "dependencies.json")
     files = own_files(home)
@@ -267,8 +276,32 @@ def main(argv=None) -> int:
                                   if dep.get("bundle") else t("release.listOutside")))
         return 0
 
+    runtime = [d for d in deps if d.get("bundle") and d.get("kind") == "runtime"]
+    bundles_python = bool(runtime and not args.no_vendor and not args.no_python)
+    if bundles_python:
+        version = tuple(int(n) for n in args.python_version.split("."))
+        if version[:2] != sys.version_info[:2] or sys.platform != "win32" or sys.maxsize <= 2**32:
+            ap.error(t("release.runtimeMismatch", version=args.python_version))
+    # A missing launcher used to silently produce an archive that could not be started.
+    if not (home / "morphbench.exe").is_file():
+        ap.error(t("release.noLauncher"))
+    # Discover the required external folder before discarding a previous stage.
+    if not args.no_vendor:
+        for dep in deps:
+            if dep.get("bundle") and dep.get("kind") == "folder":
+                folder = find_folder(dep, home, args.pynifly)
+                if folder is None:
+                    ap.error(t("release.noFolder", name=dep["name"], source=dep.get("source", "")))
+                for name in dep.get("keep", []):
+                    if not (folder / name).exists():
+                        ap.error(t("release.noPart", part=name, name=dep["name"], folder=folder))
+
     out = Path(args.out) if args.out else home / "build"
+    out = out.resolve()
     stage = out / ("morphbench-%s" % args.version)
+    if (stage.is_symlink() or stage.resolve().parent != out
+            or home.resolve().is_relative_to(stage.resolve())):
+        ap.error(t("release.badStage", path=stage))
     if stage.exists():
         shutil.rmtree(stage)
     stage.mkdir(parents=True)
@@ -286,17 +319,19 @@ def main(argv=None) -> int:
         for dep in deps:
             if dep.get("bundle") and dep.get("kind") == "folder":
                 laid.append(vendor_folder(dep, home, stage, args.pynifly))
-        runtime = [d for d in deps if d.get("bundle") and d.get("kind") == "runtime"]
-        if runtime and not args.no_python:
+        if bundles_python:
             laid.append(vendor_python(runtime[0], stage, args.python_version))
     for line in laid:
         print("  %s" % line)
 
-    third_party(deps, stage, args.version)
+    actual_deps = [dict(d, bundle=bool(d.get("bundle") and not args.no_vendor
+                                      and (d.get("kind") != "runtime" or bundles_python)))
+                   for d in deps]
+    third_party(actual_deps, stage, args.version)
     (stage / "manifest.json").write_text(json.dumps(
         {"name": "morphbench", "version": args.version, "license": "GPL-3.0",
-         "python": None if args.no_python else args.python_version,
-         "bundled": [d["name"] for d in deps if d.get("bundle")] if not args.no_vendor else []},
+         "python": args.python_version if bundles_python else None,
+         "bundled": [d["name"] for d in actual_deps if d.get("bundle")]},
         ensure_ascii=False, indent=2), encoding="utf-8")
 
     if args.stage_only:

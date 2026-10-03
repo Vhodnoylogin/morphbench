@@ -4,6 +4,14 @@ You have been handed this folder with no history. This file is what the history 
 you. It is not the README: [README.md](README.md) answers the user, this answers whoever is about
 to change the code.
 
+The standalone repository begins at this folder: `mb.py`, `release.py`, `docs/`, `launcher/`,
+`tests/`, `presenters/`, `locale/` and `web/` are at the repository root. `morphbench/` is the
+importable Python core; the former outer module wrapper has been removed.
+
+For automation of a running instance, prefer the documented HTTP API and the local MO2 bridge
+for launching under MO2. Use the UI for an operation absent from the API or to inspect the picture.
+Read [docs/http.md](docs/http.md) for supported routes; file-based batch computations use `mb.py`.
+
 This file has no Russian twin, on purpose: its reader is an assistant, and an assistant
 reads English. Two files that must never drift apart - and the section on what looks like a
 mistake is exactly what must never drift - would be a cost with no reader. The documentation

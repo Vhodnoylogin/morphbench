@@ -1,191 +1,42 @@
-# morphbench
-
-A workbench for meshes and named morphs of Skyrim, outside the game. It opens a `.nif`, reads the
-sliders from the `.tri` beside it, applies any set of values, and answers in numbers: what this
-slider tears, how far the geometry now reaches, whether the collision capsules still cover the
-skin. No game, no Blender, no window editor, no save
-to load. Seconds, not a play session.
+# `morphbench\` — the core and its facade
 
 Русская версия этого файла — [README.ru.md](README.ru.md).
 
-## Why this and not BodySlide
+Everything here deals in numbers: vertices, weights, offsets, spheres, capsules, camera state.
+Not a pixel, not a line of markup, not the word "colour". If something has to be worked out
+inside a presenter, it is missing from here — move it down rather than growing it up there.
 
-**BodySlide builds the body; morphbench checks it.** BodySlide is where sliders are authored and
-meshes are generated, and it shows the result in its preview. What it does not do is tell you
-whether the result holds up: a slider that stretches a seam past tearing, a bounding sphere that
-was computed on the resting body and no longer contains the morphed one, a collision capsule that
-leaves two thirds of the skin outside it.
-
-Those faults share one property: they are invisible until you are in the game, and in the game
-they look like something else. A part that blinks out at certain angles. A hand that passes
-through a thigh.
-
-morphbench reads the same files the game reads and says which of those is true right now. The
-point of the tool is to shorten the distance between a guess and its check: anything that can be
-seen without the game should be seen without the game.
-
-What it does **not** do: it does not author morphs, and it does not build bodies — that is
-BodySlide's job and there is no reason to repeat it. It writes only two things, and each of
-them into a new file: corrected bounding spheres and fitted collision capsules.
-
-## What it needs
-
-**From the release archive — nothing.** Everything is inside: the workbench itself, the launch
-window `morphbench.exe`, an embedded Python, `numpy`, `pillow` and the **PyNifly** add-on folder.
-Unpack and run. Blender is not needed and is not in the archive: morphbench never touches `bpy`,
-it only needs PyNifly's folder, which normally happens to live among Blender's add-ons.
-
-**From the sources**, in a working copy, you supply those yourself:
-
-| What | Why | Without it |
+| Part | Files | What it is |
 |---|---|---|
-| Python 3.12 | the workbench is written in it | nothing runs |
-| `numpy` | all the arithmetic over vertices | nothing runs |
-| `pillow` | writing frames to PNG | `render` and `sheet` stop; the browser page still works |
-| **PyNifly** add-on folder | reading and writing NIF and the TRI/TRIP morph files | no file can be opened |
-| .NET Framework 4 (`csc.exe`, stock on Windows) | building `morphbench.exe` | the command line still works; MO2 has no entry point |
+| Geometry and measurement | `model`, `morphs`, `bounds`, `chains`, `colliders`, `ragdoll`, `analysis`, `catalog`, `view`, `nifpatch` | the arithmetic: what a slider moves, what it tears, how far the geometry reaches, where a capsule sits and where the game stands its body, what the camera would see |
+| Facade | `api.py` (`MorphBench`) | the single set of methods every layer above calls |
+| Infrastructure | `config.py`, `i18n.py`, `journal.py`, `environment.py` | settings, texts, the journal, and what the surroundings are — used by everyone, including each other |
 
-PyNifly is found on its own in the Blender add-ons folder
-(`%APPDATA%\Blender Foundation\Blender\<version>\scripts\addons\io_scene_nifly`); if it lives
-elsewhere, the `pynifly` key in `morphbench.json` says where. morphbench has no NIF or TRI parser
-of its own and must not have one: PyNifly's modules are the same ones that write these files, so
-a second reading that could drift away from the first never appears.
+## May depend on
 
-## Starting it
+`numpy`, the **PyNifly** add-on (the only reader and writer of NIF and TRI there is, or may
+ever be, in this program), and the infrastructure files above. Infrastructure itself depends on
+the standard library and nothing else — it is imported by every layer, so anything it imported
+would be imported by every layer too.
 
-Everything runs from the module folder. A first look at a mesh:
+## Must never import it
 
-```
-python mb.py summary body.nif
-```
+**Nothing above the facade may reach past the facade.** A presenter, the page and `mb.py` call
+`MorphBench`; they do not import `model`, `morphs`, `colliders` or the rest. When a button can
+do something a call cannot, the facade is incomplete and the fix is a method in `api.py` —
+never logic grown inside a presenter.
 
-The morph file is picked up beside the mesh by name (`--tri` names it by hand), and so is
-`skeleton.nif` (`--skeleton` names it by hand), and beside the skeleton its `skeleton.hkx`,
-where the game stands the bodies (`--hkx` names it by hand). Every command takes `--json` and
-answers the same thing machine-readably.
+**Nothing here may import `presenters\` or read `web\`.** The core does not know that a way of
+showing its answers exists. That is the property the whole arrangement is built on: what can be
+driven without a window can be driven by a script.
 
-The viewer as one self-contained HTML file, which opens from disk and needs no server:
+## Two rules that hold in every file here
 
-```
-python mb.py web body.nif --out page.html
-```
+- **No adjustable number in the code.** It goes into `config.py` defaults, which write
+  `morphbench.json` on first run. Paths, sizes, angles, thresholds — settings, not constants.
+- **No text in the code.** Every string a person reads is a key into `..\locale\<lang>\*.json`,
+  reached through `t("some.key", name=value)`. A local variable is never called `t`.
 
-The same viewer with a list of meshes to switch between, on a local port:
-
-```
-python mb.py serve
-```
-
-`serve` is idempotent on purpose: if a server is already up at that address, a second `serve` does
-not start another one — it hands the running one the browse root and opens the page. Neither a
-person nor a script has to remember whether it is running.
-
-### From Mod Organizer 2, and why that matters
-
-MO2 does not copy mods into the game folder. It shows the game a merged `Data` — every mod of the
-build in one tree — and that merged view exists **only inside processes MO2 starts itself**
-(usvfs, its virtual file system). A program started any other way sees the bare `Data` on disk,
-where the meshes of the build simply are not.
-
-So to look at the build's meshes, morphbench has to be launched **by** MO2. That is what
-`morphbench.exe` is for: it is a small window with the state of the server, the browse root, and
-buttons to start it, stop it and open the page. It computes nothing — every button is the same
-call `serve` makes. Started from MO2, it starts the server as its own child, and that server sees
-the merged `Data`.
-
-1. Build the window once: `launcher\build.cmd`. The result lands beside `mb.py`.
-2. In MO2, add an executable: the binary is `morphbench.exe`; `--start` as an argument raises the
-   server and opens the page in one click. "Start in" is not needed.
-3. Run that entry from MO2. The window reports whether it is under MO2, and the page will not step
-   outside `Data`.
-
-**The window is a convenience, not a condition.** MO2 launches executables rather than scripts,
-which is the only reason it exists - but `python.exe` is an executable too. An entry whose
-**Binary** is `<path to morphbench>\python\python.exe` and whose **Arguments** are
-`mb.py serve` does the same job: MO2 injects usvfs into it exactly the same way, and the server
-sees the same merged `Data`. Set **Start in** to the morphbench folder for that variant. Anyone
-who would rather not run an unsigned binary downloaded from the internet can work this way and
-lose nothing but the buttons.
-
-Outside MO2 there is no default browse root and you name the folder yourself — on the page, with
-`--root`, or in `catalogRoot`. That is deliberate: a guessed root is how you end up browsing the
-`Data` of a different Skyrim install without noticing.
-
-Step-by-step, with what the answers look like, is in [docs/quickstart.md](docs/quickstart.md).
-
-## The commands
-
-One line each; every option and every `--json` shape is in [docs/cli.md](docs/cli.md).
-
-| Command | What it answers |
-|---|---|
-| `summary`, `shapes`, `bones`, `morphs` | what mesh is open: its shapes, its bones, what each slider moves |
-| `empty`, `missing` | sliders that are in the file and move nothing; sliders a recipe promised and the file does not have |
-| `strain` | where a morph tears the surface — one slider, a whole set (`--slider A=1 --slider B=1`), or every pair (`--pairs`) |
-| `budget` | at what value each slider crosses the tearing threshold |
-| `layers` | whether cover shapes — a second skin, a seam patch — follow the skin under them, and which of them are obliged to |
-| `binding` | which bones own what a morph moves, and which bones it leaves half behind |
-| `bounds` | the bounding sphere in the file against the one the morphed geometry needs; `--out` puts corrected spheres in a new file |
-| `colliders`, `fit` | the invisible collision capsules from the skeleton: where they sit, how much skin is left outside, and fitting them to the skin |
-| `focus` | where the camera would look at a bone, a morph or a part, in numbers — and, with no key, everything it could be aimed at |
-| `render`, `sheet`, `web` | a PNG frame, a set of views, the browser viewer |
-| `env`, `catalog`, `serve` | whether we are under MO2, what meshes lie under a root, the page with the list |
-
-What the bench measures and what each number means is in [docs/physics.md](docs/physics.md).
-
-## The folder
-
-| Path | What is there |
-|---|---|
-| `mb.py` | the command line — one client of the facade like everything else |
-| `morphbench\` | the core: geometry, morphs, measurement. It does not draw, does not open windows and does not know the word "pixel" |
-| `presenters\` | the layers that show what the core computed: console tables, PNG, the page, and the settings format of PPB |
-| `web\` | the viewer page as real files — `page.html`, `style.css`, `js\*.js`; `presenters\assets.py` either serves them one by one or folds them into one self-contained file, and the load order is declared once in `PageAssets.SCRIPTS` |
-| `locale\` | the texts. A language is a **folder** (`locale\en\`, `locale\ru\`) holding any number of section files, merged when read |
-| `docs\` | the documents listed below |
-| `launcher\` | `morphbench.cs` and `build.cmd` — the MO2 entry point; `make-icon.py` draws the window icon, whose `.ico` is versioned through Git LFS because those bytes travel inside the exe |
-| `tests\` | the checks; `python tests\run.py` runs them all |
-| `dependencies.json` | what third-party work goes inside the release, what it is needed for, and under which licence |
-| `release.py` | builds the release archive; it belongs to the repository and never travels inside the archive |
-| `morphbench.json` | settings, written on first run from built-in defaults; every machine has its own, and new keys are added to an old file automatically |
-| `LICENSE` | the GNU GPL version 3 |
-
-`morphbench\`, `presenters\`, `web\`, `launcher\` and `tests\` each carry a short README of their
-own, in both languages: what the layer is, what it may depend on, and what must never import it.
-Open the folder and the boundary is right there.
-
-The release archive additionally carries `python\`, `vendor\` (numpy, pillow, PyNifly) and
-`THIRD-PARTY.md`. It carries no tests, no launcher sources and no `release.py`.
-
-The line between the core and the presenters is hard, and there is a way to check it: if an action
-cannot be performed from the command line, the line was drawn wrong. Everything the viewer can do
-— turn the camera, pull a slider, colour vertices by bone, aim at a hand — is a method of the core
-that the button merely calls. The side benefit is the reason for the whole arrangement: what can
-be driven without a window can be driven by a script, with no person and no screen.
-
-## Licence
-
-morphbench is under the **GNU GPL version 3** — the full text is in [LICENSE](LICENSE). The choice
-was not free: morphs are read and written by PyNifly's modules, which carry a GPL-3 block, and a
-program that includes them is bound by the same licence when it is handed on.
-
-For anyone who wants to use it, the terms are the friendly ones. Use it for anything, including
-your own mods. Change it, for yourself or for everyone. Hand it on — with the source, under the
-same licence, with the copyright notices kept. What goes inside the release archive is decided by
-licence and not by convenience: PyNifly is GPL-3 like us, `numpy` is BSD-3, `pillow` is MIT-CMU,
-Python is PSF. `THIRD-PARTY.md`, which the GPL obliges us to ship beside a binary, is generated
-from `dependencies.json`.
-
-## Documents
-
-| Document | What is in it |
-|---|---|
-| [docs/quickstart.md](docs/quickstart.md) | the first hour: install, open a mesh, read the answer, launch from MO2 |
-| [docs/cli.md](docs/cli.md) | every command of `mb.py`, every option, and what `--json` returns |
-| [docs/page.md](docs/page.md) | the viewer in the browser: what each panel does and what the picture means |
-| [docs/physics.md](docs/physics.md) | what the bench measures — reach spheres and collision capsules |
-| [docs/localisation.md](docs/localisation.md) | how the texts are laid out and how to add a language |
-| [docs/building.md](docs/building.md) | building `morphbench.exe` and the release archive: what is bundled and under what licence |
-| [CLAUDE.md](CLAUDE.md) | the manifest for an AI assistant handed this folder and no history |
-
-Each of these exists twice, in English and in Russian: `NAME.md` and `NAME.ru.md`.
+The reasoning behind the individual decisions lives in the module docstrings — `api.py`,
+`i18n.py`, `journal.py` and `environment.py` each open with several paragraphs of *why*. Read
+the head of a file before changing its body.

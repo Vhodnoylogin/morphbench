@@ -11,6 +11,20 @@ go in a major release, and nowhere else.
 
 Эта страница на русском: [CHANGELOG.ru.md](CHANGELOG.ru.md).
 
+## [0.7.1] — unreleased
+
+- Offline audit on 2026-10-03: refuses existing NIF outputs, including hardlink aliases;
+  keeps cylinder end rings inside fitted capsules; retains partial FRTRI morphs; bounds
+  over the corner cap are conservative, and an undersized sphere with a wrong centre is repaired.
+- Release preflight checks the launcher, dependency contents and Python ABI before staging.
+  Bundle notices describe the actual selected contents; wheel metadata and licences are retained.
+- The standalone project starts at the repository root. Entry points, documentation, tests
+  and build scripts no longer require an outer `morphbench/` module folder. Python imports
+  and the release archive layout stay the same.
+- The local Windows bundle was checked on CLAW male/female NIF/TRI and XP32 HKX, including
+  new NIF output, PNG/HTML and a live MO2 launch with merged Data. Game validation remains open.
+- Documented the running server's HTTP API for automation.
+
 ## [0.7.0] — unreleased
 
 First public release. The number is deliberately well short of `1.0.0`. Everything below works
@@ -21,12 +35,6 @@ and nothing it writes has yet been through a Skyrim session. The releases betwee
 are frozen.
 
 ### What it does
-
-- Offline audit on 2026-10-03: refuses existing NIF outputs, including hardlink aliases;
-  keeps cylinder end rings inside fitted capsules; retains partial FRTRI morphs; bounds
-  over the corner cap are conservative, and an undersized sphere with a wrong centre is repaired.
-- Release preflight checks the launcher, dependency contents and Python ABI before staging.
-  Bundle notices describe the actual selected contents; wheel metadata and licences are retained.
 
 - **Reads** a `.nif` with the `.tri` beside it and answers in numbers: which sliders are dead,
   what a slider tears, how far the geometry reaches, how much of the skin a collision capsule

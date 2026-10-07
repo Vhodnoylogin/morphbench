@@ -1,10 +1,8 @@
-"""Colliders: the invisible bodies the game counts collisions against.
+"""Colliders: skeleton-file shapes and their coverage of selected mesh vertices.
 
-Besides the skin one can see, every character carries a second, invisible shell - a set of
-capsules, one per bone, joined by constraints. It is that shell which falls over when the
-character dies; it is by that shell the game tells where a blow landed and what a hand
-touched. It lives not in the body mesh but **in the skeleton file**, and there is nothing
-to see it with: it is not in the frame, and mesh editors show the skin only.
+Skeleton collision bodies, often capsules joined by constraints, are separate from the
+visible body mesh. This module reads their file-space shapes and placement, not the active
+Havok world. Runtime contact behavior also depends on actor state and interaction mods.
 
 This module reads the capsules out of the skeleton, moves them into the same coordinates the
 body vertices lie in, and hands them out as numbers - where a capsule stands and how big it
@@ -559,10 +557,10 @@ class ColliderSet:
         """The bones whose skin the body of this bone is obliged to cover.
 
         There are fewer bodies than bones: the fingers, the twist bones of the forearm and
-        the pelvis have no body of their own at all. Their skin does not disappear - its
-        collisions are counted by the nearest body ABOVE it in the tree. Which means that
+        the pelvis have no body of their own at all. For fitting their skin is assigned
+        to the nearest body ABOVE it in the tree. Which means that
         body must be fitted to the skin of all of its descendants that have no body of their
-        own either.
+        own either. This is a fitting assignment, not observed runtime collision ownership.
 
         Without this rule fitting misses systematically: a foot is fitted without the toes,
         the pelvis without the buttocks, the shoulder without its own skin, the part of it
@@ -652,9 +650,9 @@ class ColliderSet:
     def clearance(self, bone: str, points) -> dict:
         """How far the capsules of a bone are from the skin: least, most, and the share outside.
 
-        A negative distance is a point inside the capsule. So an `outside` close to zero says
-        the capsule covers the skin completely, and a large positive `worst` says it does not
-        reach the skin and a hand will pass straight through the body.
+        A negative distance is a point inside the capsules. `outside` is the fraction of
+        selected vertices outside (0..1), not surface area. A large positive `worst` is a
+        file-space coverage gap, not a prediction of live hand contact.
         """
         pts = np.asarray(points, dtype=np.float32).reshape(-1, 3)
         if pts.shape[0] == 0:

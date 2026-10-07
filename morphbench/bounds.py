@@ -1,15 +1,14 @@
-"""Bounding spheres: how the game decides whether a shape of the mesh is in view.
+"""Bounding spheres: file-space coverage of a mesh's configured morph range.
 
-Every shape carries a sphere in the file - a centre and a radius. It is built at export
-time from the body at rest, and morphs do not widen it: a detail a slider pushes outside
-the sphere counts as invisible and stops being drawn once the sphere leaves the frame -
-the shape blinks and vanishes depending on the angle.
+Every shape carries a sphere in the file - a centre and a radius. Morphs can move vertices
+outside that sphere. This module measures file-space reach; it does not observe whether
+the engine preserves or recomputes bounds, or whether a runtime shape is rendered.
 
 What is worked out here is the sphere covering **everything the shape can turn into**: rest,
 every slider at its maximum (and at its minimum, when the limit is negative), all the sliders
 at once, and the worst set for each vertex - those sliders that carry it away from the centre.
-The sphere is not blown up beyond what is needed: it also culls the invisible, and slack
-costs frames. Nothing here about rendering or about the file format: where the sphere sits
+The search avoids unnecessary slack, which can add rendering work if the engine uses that
+bound for culling. Nothing here about rendering or about the file format: where the sphere sits
 in the file is `NifPatch`'s business.
 """
 from __future__ import annotations
@@ -40,7 +39,7 @@ class Sphere:
 
 
 def enclosing_sphere(points: np.ndarray, iterations: int = 100, start=None) -> Sphere:
-    """The smallest sphere - to within a fraction of a percent - covering a cloud of points.
+    """Search for a tighter sphere covering a cloud, without an optimality guarantee.
 
     It starts from the middle of the bounding box (or from the centre the caller names);
     then the centre is dragged towards the farthest point in shrinking steps (the
@@ -71,12 +70,10 @@ def enclosing_sphere(points: np.ndarray, iterations: int = 100, start=None) -> S
 
 
 class Reach:
-    """What a shape can turn into: rest and every slider state worth checking. Morph
-    offsets add up, so the farthest a vertex can go is a corner of the cube of values;
-    there are 2^N corners, and only the ones bound to be farther than the rest are tried:
-    each slider on its own, all of them at once and the "worst set" for each vertex - the
-    sliders that carry it away from the centre. The radius at the end is measured over all
-    the points anyway.
+    """Reach over the configured additive morph range. Named sample states guide the
+    centre search; they are not an exhaustive set of slider combinations. reach_exact
+    evaluates corners per vertex group at a fixed centre, with a conservative coordinate
+    box for groups above the cap. needed uses that reach for its final radius.
 
     A shape with no vertices at all is a normal thing in someone else's mesh - a name kept
     for its properties, a stump left by an exporter - and it reaches nowhere. Every answer
@@ -209,8 +206,9 @@ class Reach:
         The worst set depends on the centre and the centre depends on the cloud, hence two
         passes: the cloud taken from the middle of the rest pose gives a centre, the cloud
         taken from that centre gives the final sphere. The radius is always measured over the
-        whole cloud. A `start` the caller names - the centre from the file, say - is tried as
-        a candidate: the sphere cannot come out worse than it.
+        whole cloud, then reach_exact covers the configured range at the chosen centre
+        (conservatively for over-cap vertices). A `start` the caller names is also evaluated;
+        the radius before margin cannot exceed the reach evaluated at that centre.
         """
         if self.rest.shape[0] == 0:
             return Sphere(np.zeros(3, np.float32), 0.0)

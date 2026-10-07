@@ -26,11 +26,11 @@ whether the result holds up: a slider that stretches a seam past tearing, a boun
 was computed on the resting body and no longer contains the morphed one, a collision capsule that
 leaves two thirds of the skin outside it.
 
-Those faults share one property: they are invisible until you are in the game, and in the game
-they look like something else. A part that blinks out at certain angles. A hand that passes
-through a thigh.
+These file defects can contribute to symptoms such as a part blinking out at certain angles
+or a hand passing through a thigh. Those symptoms also depend on the engine and interaction mods.
 
-morphbench reads the same files the game reads and says which of those is true right now. The
+morphbench measures the mesh, morph and skeleton files you select. It identifies insufficient
+file bounds and gaps in capsule coverage; it does not observe runtime culling or contacts. The
 point of the tool is to shorten the distance between a guess and its check: anything that can be
 seen without the game should be seen without the game.
 
@@ -145,6 +145,8 @@ One line each; every option and every `--json` shape is in [docs/cli.md](docs/cl
 | `env`, `catalog`, `serve` | whether we are under MO2, what meshes lie under a root, the page with the list |
 
 What the bench measures and what each number means is in [docs/physics.md](docs/physics.md).
+That page also explains how to verify generated files in a game test and which conclusions
+require runtime evidence.
 
 ## The folder
 

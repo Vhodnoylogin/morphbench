@@ -26,15 +26,14 @@ than buried in the code.
 
 ## Bounding spheres: why a part blinks out
 
-Every shape of a mesh carries a sphere in the file — a centre and a radius. The game uses it to
-decide whether the shape is in view at all: when the sphere is off screen, the shape is not
-drawn. The sphere is built at export time from the body **at rest**, and morphs do not widen it.
+Every shape of a mesh carries a sphere in the file — a centre and a radius. If it was exported
+for the body **at rest**, morphs may move vertices outside it. Morphbench checks that file-level
+coverage. It does not observe whether the engine preserves, transforms or recomputes the sphere.
 
-That is the whole of the defect. A detail a slider pushes outside the recorded sphere keeps being
-drawn while the sphere is on screen, and disappears the moment the sphere leaves it — while the
-detail itself is still in plain sight. From inside the game it looks like a part of the body
-blinking on and off depending on which way you turn: no error, no log line, and nothing visibly
-wrong with the mesh when you open it.
+An insufficient bound can contribute to premature culling: visible geometry may disappear as
+the camera turns. Establishing that cause requires a controlled game comparison and evidence
+of the loaded shape and its runtime bounds. A correct file sphere alone does not prove that
+the current engine/mod combination uses it for culling.
 
 ```
 python mb.py bounds body.nif
@@ -53,19 +52,20 @@ each group is walked corner by corner — on a body that is hundreds of groups o
 sliders, and it takes about a second. The cheap alternative — guess each slider's sign from the
 direction out of the centre — quietly underestimates: two sliders together can carry a vertex
 further than either alone and further than the sign test predicts. On a tail that guess missed
-4.5% of reach beyond the sphere recorded in the file, which is exactly the margin that decides
-whether a part blinks. Vertices moved by more than `boundsCornerCap` sliders are still measured
+4.5% of reach beyond the sphere recorded in the file, which can matter when investigating
+culling. Vertices moved by more than `boundsCornerCap` sliders are still measured
 by a conservative coordinate-box bound, because 2^k grows faster than patience does;
 their number comes back as `overCap`,
 and while `overCap` is zero the answer is exact.
 
-**Why the needed sphere is not simply generous.** The same sphere is what culls invisible
-geometry, so slack in it costs frames. The bench therefore fits the smallest sphere that covers
-the cloud, to within a fraction of a percent: the centre is dragged towards the farthest point in
-shrinking steps, the radius is taken over the whole cloud at every step so the sphere never stops
+**Why the needed sphere is not simply generous.** If the engine uses this bound for culling,
+slack can add rendering work. The bench searches for a tighter enclosing sphere: the centre is
+dragged towards the farthest point in shrinking steps, the radius is taken over the whole cloud at every step so the sphere never stops
 covering everything, and the centre already in the file is tried as one of the candidates — the
-answer cannot come out worse than what is there. The deliberate spare on top is `boundsMargin`,
-and nothing more.
+radius before margin cannot exceed the reach evaluated at that original centre. This finite
+centre search does not certify a globally minimal sphere or a fixed percentage of optimality.
+The final radius covers the configured morph range, using a conservative bound for over-cap
+vertices, with `boundsMargin` added on top.
 
 A row of the answer reads, for one shape: the radius in the file, how far the geometry reaches
 from the centre **in the file**, that reach as a percentage over the recorded radius, which set
@@ -107,11 +107,10 @@ sphere and the write would be a no-op dressed up as a fix.
 
 ## Collision capsules: the second, invisible shell
 
-Besides the skin you can see, a character carries a second shell: a set of capsules, one per
-bone, joined by constraints. That shell is what falls over when the character dies, and it is
-what the game consults to decide where a blow landed and what a hand touched. It lives not in the
-body mesh but **in the skeleton file**, and there is nothing else to look at it with — it is not
-in the frame, and mesh editors show the skin only.
+The skeleton file carries collision bodies, often capsules, joined by constraints. They are
+separate from the visible body mesh. Morphbench reads those file shapes and their placement;
+it does not sample the active Havok world. Which bodies participate in a live interaction also
+depends on actor state, collision filters and the installed interaction mods.
 
 A capsule is a segment with a thickness: two ends and a radius, held in the coordinates of its
 own body. It is the shape almost every body uses; a sphere in the file is read as a capsule of no
@@ -159,11 +158,13 @@ the head's capsule with it. Turn that off with `collidersFollowParts`.
 python mb.py colliders body.nif --skeleton skeleton.nif --clearance
 ```
 
-For each body this gives the share of skin left **outside** the capsule and how far the worst
-vertex has strayed from it. A negative distance is skin inside the capsule, so `outside` near
-zero means the capsule covers the skin completely, and a large `worst` means a hand passes
-through the body there touching nothing. "Outside 62% of the skin, furthest 14.0" is the answer to
-"will a punch land on this thigh", stated as two numbers instead of a hunch.
+For each body this gives the share of selected skin vertices left **outside** its capsules and
+the greatest signed distance. A negative distance is inside; a positive distance is outside.
+`outside` is a vertex-count fraction, not a surface-area fraction: JSON uses 0..1 and the text
+report displays a percentage, both rounded. Even a displayed zero does not prove complete
+coverage; the measurement samples vertices, not every surface point or animated pose. A large `worst`
+identifies a file-space coverage gap. Neither number proves where a hand or blow will contact
+the live actor.
 
 **Fit them to the skin.**
 
@@ -172,8 +173,8 @@ python mb.py fit body.nif --skeleton skeleton.nif --slider CLAWTorsoGirth=0.5 --
 ```
 
 This is the reason the bench touches colliders at all. It deforms the body itself and knows every
-vertex at any combination of sliders, so the fit can be computed exactly and in advance rather
-than guessed at in the game.
+vertex at the selected slider values. It computes a fit to those points before the game test;
+the fit is not a guarantee about every pose or live contact.
 
 A capsule is fitted like this: the axis is the direction the cloud of skin points is spread
 widest along — for an arm, a shin or a tail, the direction of the bone itself. The radius is not
@@ -193,8 +194,9 @@ Two rules decide which skin a capsule is fitted to, and both matter more than th
   fitted to the whole chain.
 - **Which skin a body answers for** is settled by the bone tree. There are fewer bodies than
   bones: fingers, the twist bones of the forearm and the pelvis have no body of their own. Their
-  skin does not disappear — its collisions are handled by the nearest body above them in the
-  tree, so that body has to be fitted to its own skin plus the skin of every bodyless descendant.
+  skin is assigned for fitting to the nearest body above them in the tree, so that body is
+  fitted to its own skin plus the skin of every bodyless descendant. This is a fitting rule,
+  not an observation of runtime collision ownership.
   Skip the rule and the fit misses systematically: a foot fitted without the toes, a pelvis
   without the buttocks, a shoulder without the part of it handed to the twist bones.
 
@@ -249,6 +251,44 @@ shape.
 | `boneMinVertices` | 8 | How many vertices a bone needs before it is judged at all. |
 | `colliderSegments` | 14 | How many slices the circle of a capsule is drawn with. |
 | `colliderColour`, `colliderOpacity` | `[90, 200, 255]`, 0.45 | The look of the layer over the body. |
+
+## Verifying generated files in the game
+
+Before a game test, retain the source files, generated output, settings, morph recipe and their
+hashes. Read the output back and check the intended change and preservation of other data.
+Install corrections as a separate mod. Verify its activation and the winning virtual paths for
+the actor's body, TRI, skeleton NIF and HKX. The selected disk file alone does not prove what
+MO2 presents to the game. Repeated Morphbench operations can use its [HTTP API](http.md);
+no viewer interaction is required for these file checks.
+
+Give each fixture actor a stable plugin/local reference identity, resolved to its actual runtime
+ID. Confirm its loaded third-person scene, equipment, weight, scale and morph values. Echoing a
+requested actor or expected weight is not a measurement. Use the same geometry and state for
+the comparison, changing only the intended bounds or capsule marker. A deliberately tiny sphere
+or oversized capsule is a diagnostic control, not a production recommendation.
+
+| Question | Evidence to collect | What that establishes |
+|---|---|---|
+| Did the fixture load? | Resolved actor identity, loaded scene and actual mesh/node selection | The intended actor and scene are available; not yet correctness of generated data |
+| What bounds does the engine expose? | Exact shape, perspective, world centre/radius, transform, scale, units and timestamp | Runtime bounds at that observation; they need not equal the file sphere |
+| Does the correction affect culling? | Repeatable camera path and actual rendered visibility for control/stock/corrected meshes under identical morphs and pose | A rendering difference for that case; node availability or a positive radius alone cannot establish it |
+| Where are the thigh bodies? | Named bone transforms and mapped Havok body UIDs, capture generation and phase before/after a bounded action | Placement and body identity where actually available; node transforms alone do not give capsule endpoints/radii |
+| Did the action occur? | Native completion and observed actor response, with source, target and argument recorded | The action and its observed effect; an accepted request alone is insufficient |
+| What contacts were captured? | Bounded samples with mapped bodies, signed separation/units, phase, speculative/disabled flags and drop/gap/truncation metadata | Recorded callback observations; presence alone does not prove touching or final solver use |
+
+Begin passive contact capture before the action, with explicit duration and sample limits. Retain
+the capture interval, sequence and generation so missing, stale or truncated evidence stays
+distinguishable. Compare samples only when their body mapping, coordinate frame and phase are
+known. A hand interaction additionally needs the actual tracked hand state and relevant mod
+response; a push/floor-contact capture does not test hand contact.
+
+Missing or unqualified observations block that part of the test. Preserve raw responses and
+mark coverage unavailable rather than inventing coordinates, returning the requested identity
+as if observed, or diagnosing a Morphbench defect from missing tooling. A readable positive
+world bound can pass a loading/readability check while culling and collision acceptance remain
+unassessed. A full test conclusion needs the declared subject checks, evidence coverage and
+restoration after the attempt ends. Tests run only under the owner's current launch authorization;
+file preparation does not authorize a game launch.
 
 ## What this does not tell you
 

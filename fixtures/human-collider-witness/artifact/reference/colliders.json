@@ -1,0 +1,2496 @@
+{
+  "control": {
+    "local": [
+      {
+        "bone": "NPC COM [COM ]",
+        "kind": "bhkRigidBody",
+        "physics": {
+          "layer": "BIPED",
+          "response": "SIMPLE_CONTACT",
+          "mass": 40.0,
+          "friction": 2.5,
+          "restitution": 0.8
+        },
+        "capsules": [
+          {
+            "bone": "NPC COM [COM ]",
+            "index": 0,
+            "p1": [
+              2.93,
+              0.0,
+              0.0
+            ],
+            "p2": [
+              -2.93,
+              0.0,
+              0.0
+            ],
+            "radius": 9.141,
+            "length": 5.86,
+            "total": 24.142
+          }
+        ]
+      },
+      {
+        "bone": "NPC L Thigh [LThg]",
+        "kind": "bhkRigidBody",
+        "physics": {
+          "layer": "BIPED",
+          "response": "SIMPLE_CONTACT",
+          "mass": 6.0,
+          "friction": 0.3,
+          "restitution": 0.8
+        },
+        "capsules": [
+          {
+            "bone": "NPC L Thigh [LThg]",
+            "index": 0,
+            "p1": [
+              -0.498,
+              -1.119,
+              24.963
+            ],
+            "p2": [
+              1.875,
+              -0.502,
+              -2.847
+            ],
+            "radius": 6.993,
+            "length": 27.918,
+            "total": 41.904
+          }
+        ]
+      },
+      {
+        "bone": "NPC L Calf [LClf]",
+        "kind": "bhkRigidBody",
+        "physics": {
+          "layer": "BIPED",
+          "response": "SIMPLE_CONTACT",
+          "mass": 6.0,
+          "friction": 0.3,
+          "restitution": 0.8
+        },
+        "capsules": [
+          {
+            "bone": "NPC L Calf [LClf]",
+            "index": 0,
+            "p1": [
+              0.277,
+              0.025,
+              25.708
+            ],
+            "p2": [
+              0.277,
+              0.025,
+              0.192
+            ],
+            "radius": 5.384,
+            "length": 25.516,
+            "total": 36.284
+          }
+        ]
+      },
+      {
+        "bone": "NPC L Foot [Lft ]",
+        "kind": "bhkRigidBody",
+        "physics": {
+          "layer": "BIPED",
+          "response": "SIMPLE_CONTACT",
+          "mass": 3.0,
+          "friction": 0.02,
+          "restitution": 0.8
+        },
+        "capsules": [
+          {
+            "bone": "NPC L Foot [Lft ]",
+            "index": 0,
+            "p1": [
+              -0.023,
+              -1.389,
+              9.748
+            ],
+            "p2": [
+              -0.023,
+              -1.389,
+              2.935
+            ],
+            "radius": 4.417,
+            "length": 6.813,
+            "total": 15.646
+          }
+        ]
+      },
+      {
+        "bone": "NPC R Thigh [RThg]",
+        "kind": "bhkRigidBody",
+        "physics": {
+          "layer": "BIPED",
+          "response": "SIMPLE_CONTACT",
+          "mass": 6.0,
+          "friction": 0.3,
+          "restitution": 0.8
+        },
+        "capsules": [
+          {
+            "bone": "NPC R Thigh [RThg]",
+            "index": 0,
+            "p1": [
+              0.486,
+              -1.118,
+              24.967
+            ],
+            "p2": [
+              -1.851,
+              -0.495,
+              -3.047
+            ],
+            "radius": 6.985,
+            "length": 28.119,
+            "total": 42.088
+          }
+        ]
+      },
+      {
+        "bone": "NPC R Calf [RClf]",
+        "kind": "bhkRigidBody",
+        "physics": {
+          "layer": "BIPED",
+          "response": "SIMPLE_CONTACT",
+          "mass": 6.0,
+          "friction": 0.3,
+          "restitution": 0.8
+        },
+        "capsules": [
+          {
+            "bone": "NPC R Calf [RClf]",
+            "index": 0,
+            "p1": [
+              -0.277,
+              0.025,
+              25.708
+            ],
+            "p2": [
+              -0.277,
+              0.025,
+              0.192
+            ],
+            "radius": 5.384,
+            "length": 25.516,
+            "total": 36.284
+          }
+        ]
+      },
+      {
+        "bone": "NPC R Foot [Rft ]",
+        "kind": "bhkRigidBody",
+        "physics": {
+          "layer": "BIPED",
+          "response": "SIMPLE_CONTACT",
+          "mass": 3.0,
+          "friction": 0.02,
+          "restitution": 0.8
+        },
+        "capsules": [
+          {
+            "bone": "NPC R Foot [Rft ]",
+            "index": 0,
+            "p1": [
+              0.023,
+              -1.389,
+              9.747
+            ],
+            "p2": [
+              0.023,
+              -1.389,
+              2.935
+            ],
+            "radius": 4.417,
+            "length": 6.813,
+            "total": 15.646
+          }
+        ]
+      },
+      {
+        "bone": "NPC Spine [Spn0]",
+        "kind": "bhkRigidBody",
+        "physics": {
+          "layer": "BIPED",
+          "response": "SIMPLE_CONTACT",
+          "mass": 4.0,
+          "friction": 0.3,
+          "restitution": 0.8
+        },
+        "capsules": [
+          {
+            "bone": "NPC Spine [Spn0]",
+            "index": 0,
+            "p1": [
+              3.434,
+              5.088,
+              4.51
+            ],
+            "p2": [
+              -3.434,
+              5.088,
+              4.51
+            ],
+            "radius": 8.709,
+            "length": 6.869,
+            "total": 24.287
+          }
+        ]
+      },
+      {
+        "bone": "NPC Spine1 [Spn1]",
+        "kind": "bhkRigidBody",
+        "physics": {
+          "layer": "BIPED",
+          "response": "SIMPLE_CONTACT",
+          "mass": 4.0,
+          "friction": 0.3,
+          "restitution": 0.8
+        },
+        "capsules": [
+          {
+            "bone": "NPC Spine1 [Spn1]",
+            "index": 0,
+            "p1": [
+              3.353,
+              4.651,
+              6.153
+            ],
+            "p2": [
+              -3.353,
+              4.651,
+              6.153
+            ],
+            "radius": 9.666,
+            "length": 6.707,
+            "total": 26.04
+          }
+        ]
+      },
+      {
+        "bone": "NPC Spine2 [Spn2]",
+        "kind": "bhkRigidBody",
+        "physics": {
+          "layer": "BIPED",
+          "response": "SIMPLE_CONTACT",
+          "mass": 7.0,
+          "friction": 0.3,
+          "restitution": 0.8
+        },
+        "capsules": [
+          {
+            "bone": "NPC Spine2 [Spn2]",
+            "index": 0,
+            "p1": [
+              3.023,
+              1.506,
+              11.112
+            ],
+            "p2": [
+              -3.03,
+              1.506,
+              11.112
+            ],
+            "radius": 12.224,
+            "length": 6.053,
+            "total": 30.5
+          }
+        ]
+      },
+      {
+        "bone": "NPC Neck [Neck]",
+        "kind": "bhkRigidBody",
+        "physics": {
+          "layer": "BIPED",
+          "response": "SIMPLE_CONTACT",
+          "mass": 6.0,
+          "friction": 0.3,
+          "restitution": 0.8
+        },
+        "capsules": [
+          {
+            "bone": "NPC Neck [Neck]",
+            "index": 0,
+            "p1": [
+              0.037,
+              1.337,
+              4.409
+            ],
+            "p2": [
+              -0.067,
+              1.337,
+              4.409
+            ],
+            "radius": 4.85,
+            "length": 0.105,
+            "total": 9.805
+          }
+        ]
+      },
+      {
+        "bone": "NPC Head [Head]",
+        "kind": "bhkRigidBody",
+        "physics": {
+          "layer": "BIPED",
+          "response": "SIMPLE_CONTACT",
+          "mass": 4.0,
+          "friction": 0.8,
+          "restitution": 0.8
+        },
+        "capsules": [
+          {
+            "bone": "NPC Head [Head]",
+            "index": 0,
+            "p1": [
+              -0.014,
+              3.158,
+              3.364
+            ],
+            "p2": [
+              -0.014,
+              2.358,
+              3.364
+            ],
+            "radius": 8.587,
+            "length": 0.8,
+            "total": 17.975
+          }
+        ]
+      },
+      {
+        "bone": "NPC R UpperArm [RUar]",
+        "kind": "bhkRigidBody",
+        "physics": {
+          "layer": "BIPED",
+          "response": "SIMPLE_CONTACT",
+          "mass": 2.0,
+          "friction": 0.3,
+          "restitution": 0.8
+        },
+        "capsules": [
+          {
+            "bone": "NPC R UpperArm [RUar]",
+            "index": 0,
+            "p1": [
+              0.087,
+              0.087,
+              14.272
+            ],
+            "p2": [
+              0.087,
+              0.087,
+              3.129
+            ],
+            "radius": 6.069,
+            "length": 11.143,
+            "total": 23.282
+          }
+        ]
+      },
+      {
+        "bone": "NPC R Forearm [RLar]",
+        "kind": "bhkRigidBody",
+        "physics": {
+          "layer": "BIPED",
+          "response": "SIMPLE_CONTACT",
+          "mass": 6.0,
+          "friction": 0.3,
+          "restitution": 0.8
+        },
+        "capsules": [
+          {
+            "bone": "NPC R Forearm [RLar]",
+            "index": 0,
+            "p1": [
+              -0.794,
+              0.101,
+              13.381
+            ],
+            "p2": [
+              -0.794,
+              0.101,
+              0.748
+            ],
+            "radius": 3.931,
+            "length": 12.633,
+            "total": 20.494
+          }
+        ]
+      },
+      {
+        "bone": "NPC R Hand [RHnd]",
+        "kind": "bhkRigidBody",
+        "physics": {
+          "layer": "BIPED",
+          "response": "SIMPLE_CONTACT",
+          "mass": 4.0,
+          "friction": 0.1,
+          "restitution": 0.8
+        },
+        "capsules": [
+          {
+            "bone": "NPC R Hand [RHnd]",
+            "index": 0,
+            "p1": [
+              0.206,
+              0.222,
+              3.827
+            ],
+            "p2": [
+              0.131,
+              0.222,
+              3.827
+            ],
+            "radius": 4.799,
+            "length": 0.074,
+            "total": 9.672
+          }
+        ]
+      },
+      {
+        "bone": "NPC L UpperArm [LUar]",
+        "kind": "bhkRigidBody",
+        "physics": {
+          "layer": "BIPED",
+          "response": "SIMPLE_CONTACT",
+          "mass": 2.0,
+          "friction": 0.3,
+          "restitution": 0.8
+        },
+        "capsules": [
+          {
+            "bone": "NPC L UpperArm [LUar]",
+            "index": 0,
+            "p1": [
+              -0.087,
+              0.087,
+              14.272
+            ],
+            "p2": [
+              -0.087,
+              0.087,
+              3.129
+            ],
+            "radius": 6.069,
+            "length": 11.143,
+            "total": 23.282
+          }
+        ]
+      },
+      {
+        "bone": "NPC L Forearm [LLar]",
+        "kind": "bhkRigidBody",
+        "physics": {
+          "layer": "BIPED",
+          "response": "SIMPLE_CONTACT",
+          "mass": 2.0,
+          "friction": 0.3,
+          "restitution": 0.8
+        },
+        "capsules": [
+          {
+            "bone": "NPC L Forearm [LLar]",
+            "index": 0,
+            "p1": [
+              0.794,
+              0.101,
+              13.381
+            ],
+            "p2": [
+              0.794,
+              0.101,
+              0.748
+            ],
+            "radius": 3.931,
+            "length": 12.633,
+            "total": 20.494
+          }
+        ]
+      },
+      {
+        "bone": "NPC L Hand [LHnd]",
+        "kind": "bhkRigidBody",
+        "physics": {
+          "layer": "BIPED",
+          "response": "SIMPLE_CONTACT",
+          "mass": 4.0,
+          "friction": 0.1,
+          "restitution": 0.8
+        },
+        "capsules": [
+          {
+            "bone": "NPC L Hand [LHnd]",
+            "index": 0,
+            "p1": [
+              -0.131,
+              0.222,
+              3.827
+            ],
+            "p2": [
+              -0.206,
+              0.222,
+              3.827
+            ],
+            "radius": 4.799,
+            "length": 0.074,
+            "total": 9.672
+          }
+        ]
+      }
+    ],
+    "world": [
+      {
+        "bone": "NPC COM [COM ]",
+        "kind": "bhkRigidBody",
+        "physics": {
+          "layer": "BIPED",
+          "response": "SIMPLE_CONTACT",
+          "mass": 40.0,
+          "friction": 2.5,
+          "restitution": 0.8
+        },
+        "ragdoll": {
+          "ragdollBone": "Ragdoll_NPC COM [COM ]",
+          "turn": 0.0,
+          "shift": 4.78
+        },
+        "capsules": [
+          {
+            "bone": "NPC COM [COM ]",
+            "index": 0,
+            "p1": [
+              2.93,
+              -0.0,
+              64.131
+            ],
+            "p2": [
+              -2.93,
+              -0.0,
+              64.131
+            ],
+            "radius": 9.141,
+            "length": 5.86,
+            "total": 24.142
+          }
+        ]
+      },
+      {
+        "bone": "NPC L Thigh [LThg]",
+        "kind": "bhkRigidBody",
+        "physics": {
+          "layer": "BIPED",
+          "response": "SIMPLE_CONTACT",
+          "mass": 6.0,
+          "friction": 0.3,
+          "restitution": 0.8
+        },
+        "ragdoll": {
+          "ragdollBone": "Ragdoll_NPC L Thigh [LThg]",
+          "turn": 1.7,
+          "shift": 4.78
+        },
+        "capsules": [
+          {
+            "bone": "NPC L Thigh [LThg]",
+            "index": 0,
+            "p1": [
+              -8.709,
+              -2.749,
+              39.378
+            ],
+            "p2": [
+              -8.155,
+              -0.381,
+              67.19
+            ],
+            "radius": 6.993,
+            "length": 27.918,
+            "total": 41.904
+          }
+        ]
+      },
+      {
+        "bone": "NPC L Calf [LClf]",
+        "kind": "bhkRigidBody",
+        "physics": {
+          "layer": "BIPED",
+          "response": "SIMPLE_CONTACT",
+          "mass": 6.0,
+          "friction": 0.3,
+          "restitution": 0.8
+        },
+        "ragdoll": {
+          "ragdollBone": "Ragdoll_NPC L Calf [LClf]",
+          "turn": 1.5,
+          "shift": 0.91
+        },
+        "capsules": [
+          {
+            "bone": "NPC L Calf [LClf]",
+            "index": 0,
+            "p1": [
+              -12.842,
+              -5.695,
+              7.773
+            ],
+            "p2": [
+              -10.22,
+              -2.08,
+              32.896
+            ],
+            "radius": 5.384,
+            "length": 25.516,
+            "total": 36.284
+          }
+        ]
+      },
+      {
+        "bone": "NPC L Foot [Lft ]",
+        "kind": "bhkRigidBody",
+        "physics": {
+          "layer": "BIPED",
+          "response": "SIMPLE_CONTACT",
+          "mass": 3.0,
+          "friction": 0.02,
+          "restitution": 0.8
+        },
+        "ragdoll": {
+          "ragdollBone": "Ragdoll_NPC L Foot [Lft ]",
+          "turn": 30.0,
+          "shift": 0.28
+        },
+        "capsules": [
+          {
+            "bone": "NPC L Foot [Lft ]",
+            "index": 0,
+            "p1": [
+              -15.314,
+              3.031,
+              3.96
+            ],
+            "p2": [
+              -13.483,
+              -3.511,
+              4.471
+            ],
+            "radius": 4.417,
+            "length": 6.813,
+            "total": 15.646
+          }
+        ]
+      },
+      {
+        "bone": "NPC R Thigh [RThg]",
+        "kind": "bhkRigidBody",
+        "physics": {
+          "layer": "BIPED",
+          "response": "SIMPLE_CONTACT",
+          "mass": 6.0,
+          "friction": 0.3,
+          "restitution": 0.8
+        },
+        "ragdoll": {
+          "ragdollBone": "Ragdoll_NPC R Thigh [RThg]",
+          "turn": 1.7,
+          "shift": 4.78
+        },
+        "capsules": [
+          {
+            "bone": "NPC R Thigh [RThg]",
+            "index": 0,
+            "p1": [
+              8.721,
+              -2.749,
+              39.375
+            ],
+            "p2": [
+              8.111,
+              -0.361,
+              67.385
+            ],
+            "radius": 6.985,
+            "length": 28.119,
+            "total": 42.088
+          }
+        ]
+      },
+      {
+        "bone": "NPC R Calf [RClf]",
+        "kind": "bhkRigidBody",
+        "physics": {
+          "layer": "BIPED",
+          "response": "SIMPLE_CONTACT",
+          "mass": 6.0,
+          "friction": 0.3,
+          "restitution": 0.8
+        },
+        "ragdoll": {
+          "ragdollBone": "Ragdoll_NPC R Calf [RClf]",
+          "turn": 1.5,
+          "shift": 0.91
+        },
+        "capsules": [
+          {
+            "bone": "NPC R Calf [RClf]",
+            "index": 0,
+            "p1": [
+              12.843,
+              -5.692,
+              7.773
+            ],
+            "p2": [
+              10.22,
+              -2.08,
+              32.896
+            ],
+            "radius": 5.384,
+            "length": 25.516,
+            "total": 36.284
+          }
+        ]
+      },
+      {
+        "bone": "NPC R Foot [Rft ]",
+        "kind": "bhkRigidBody",
+        "physics": {
+          "layer": "BIPED",
+          "response": "SIMPLE_CONTACT",
+          "mass": 3.0,
+          "friction": 0.02,
+          "restitution": 0.8
+        },
+        "ragdoll": {
+          "ragdollBone": "Ragdoll_NPC R Foot [Rft ]",
+          "turn": 30.0,
+          "shift": 0.28
+        },
+        "capsules": [
+          {
+            "bone": "NPC R Foot [Rft ]",
+            "index": 0,
+            "p1": [
+              15.312,
+              3.037,
+              3.958
+            ],
+            "p2": [
+              13.483,
+              -3.506,
+              4.47
+            ],
+            "radius": 4.417,
+            "length": 6.813,
+            "total": 15.646
+          }
+        ]
+      },
+      {
+        "bone": "NPC Spine [Spn0]",
+        "kind": "bhkRigidBody",
+        "physics": {
+          "layer": "BIPED",
+          "response": "SIMPLE_CONTACT",
+          "mass": 4.0,
+          "friction": 0.3,
+          "restitution": 0.8
+        },
+        "ragdoll": {
+          "ragdollBone": "Ragdoll_NPC Spine [Spn0]",
+          "turn": 0.0,
+          "shift": 4.78
+        },
+        "capsules": [
+          {
+            "bone": "NPC Spine [Spn0]",
+            "index": 0,
+            "p1": [
+              3.434,
+              0.04,
+              72.207
+            ],
+            "p2": [
+              -3.434,
+              0.04,
+              72.207
+            ],
+            "radius": 8.709,
+            "length": 6.869,
+            "total": 24.287
+          }
+        ]
+      },
+      {
+        "bone": "NPC Spine1 [Spn1]",
+        "kind": "bhkRigidBody",
+        "physics": {
+          "layer": "BIPED",
+          "response": "SIMPLE_CONTACT",
+          "mass": 4.0,
+          "friction": 0.3,
+          "restitution": 0.8
+        },
+        "ragdoll": {
+          "ragdollBone": "Ragdoll_NPC Spine1 [Spn1]",
+          "turn": 0.0,
+          "shift": 4.78
+        },
+        "capsules": [
+          {
+            "bone": "NPC Spine1 [Spn1]",
+            "index": 0,
+            "p1": [
+              3.353,
+              -0.893,
+              83.278
+            ],
+            "p2": [
+              -3.353,
+              -0.893,
+              83.278
+            ],
+            "radius": 9.666,
+            "length": 6.707,
+            "total": 26.04
+          }
+        ]
+      },
+      {
+        "bone": "NPC Spine2 [Spn2]",
+        "kind": "bhkRigidBody",
+        "physics": {
+          "layer": "BIPED",
+          "response": "SIMPLE_CONTACT",
+          "mass": 7.0,
+          "friction": 0.3,
+          "restitution": 0.8
+        },
+        "ragdoll": {
+          "ragdollBone": "Ragdoll_NPC Spine2 [Spn2]",
+          "turn": 0.0,
+          "shift": 4.78
+        },
+        "capsules": [
+          {
+            "bone": "NPC Spine2 [Spn2]",
+            "index": 0,
+            "p1": [
+              3.023,
+              -2.955,
+              97.28
+            ],
+            "p2": [
+              -3.03,
+              -2.955,
+              97.28
+            ],
+            "radius": 12.224,
+            "length": 6.053,
+            "total": 30.5
+          }
+        ]
+      },
+      {
+        "bone": "NPC Neck [Neck]",
+        "kind": "bhkRigidBody",
+        "physics": {
+          "layer": "BIPED",
+          "response": "SIMPLE_CONTACT",
+          "mass": 6.0,
+          "friction": 0.3,
+          "restitution": 0.8
+        },
+        "ragdoll": {
+          "ragdollBone": "Ragdoll_NPC Neck [Neck]",
+          "turn": 0.0,
+          "shift": 4.78
+        },
+        "capsules": [
+          {
+            "bone": "NPC Neck [Neck]",
+            "index": 0,
+            "p1": [
+              0.051,
+              -0.805,
+              112.379
+            ],
+            "p2": [
+              -0.053,
+              -0.804,
+              112.379
+            ],
+            "radius": 4.85,
+            "length": 0.105,
+            "total": 9.805
+          }
+        ]
+      },
+      {
+        "bone": "NPC Head [Head]",
+        "kind": "bhkRigidBody",
+        "physics": {
+          "layer": "BIPED",
+          "response": "SIMPLE_CONTACT",
+          "mass": 4.0,
+          "friction": 0.8,
+          "restitution": 0.8
+        },
+        "ragdoll": {
+          "ragdollBone": "Ragdoll_NPC Head [Head]",
+          "turn": 0.0,
+          "shift": 3.39
+        },
+        "capsules": [
+          {
+            "bone": "NPC Head [Head]",
+            "index": 0,
+            "p1": [
+              0.015,
+              1.886,
+              120.324
+            ],
+            "p2": [
+              0.006,
+              1.086,
+              120.325
+            ],
+            "radius": 8.587,
+            "length": 0.8,
+            "total": 17.975
+          }
+        ]
+      },
+      {
+        "bone": "NPC R UpperArm [RUar]",
+        "kind": "bhkRigidBody",
+        "physics": {
+          "layer": "BIPED",
+          "response": "SIMPLE_CONTACT",
+          "mass": 2.0,
+          "friction": 0.3,
+          "restitution": 0.8
+        },
+        "ragdoll": {
+          "ragdollBone": "Ragdoll_NPC R UpperArm [RUar]",
+          "turn": 1.1,
+          "shift": 4.78
+        },
+        "capsules": [
+          {
+            "bone": "NPC R UpperArm [RUar]",
+            "index": 0,
+            "p1": [
+              19.041,
+              -5.061,
+              88.827
+            ],
+            "p2": [
+              14.244,
+              -5.118,
+              98.885
+            ],
+            "radius": 6.069,
+            "length": 11.143,
+            "total": 23.282
+          }
+        ]
+      },
+      {
+        "bone": "NPC R Forearm [RLar]",
+        "kind": "bhkRigidBody",
+        "physics": {
+          "layer": "BIPED",
+          "response": "SIMPLE_CONTACT",
+          "mass": 6.0,
+          "friction": 0.3,
+          "restitution": 0.8
+        },
+        "ragdoll": {
+          "ragdollBone": "Ragdoll_NPC R Forearm [RLar]",
+          "turn": 1.5,
+          "shift": 2.39
+        },
+        "capsules": [
+          {
+            "bone": "NPC R Forearm [RLar]",
+            "index": 0,
+            "p1": [
+              28.074,
+              0.394,
+              73.036
+            ],
+            "p2": [
+              22.713,
+              -4.795,
+              83.23
+            ],
+            "radius": 3.931,
+            "length": 12.633,
+            "total": 20.494
+          }
+        ]
+      },
+      {
+        "bone": "NPC R Hand [RHnd]",
+        "kind": "bhkRigidBody",
+        "physics": {
+          "layer": "BIPED",
+          "response": "SIMPLE_CONTACT",
+          "mass": 4.0,
+          "friction": 0.1,
+          "restitution": 0.8
+        },
+        "ragdoll": {
+          "ragdollBone": "Ragdoll_NPC R Hand [RHnd]",
+          "turn": 4.0,
+          "shift": 2.35
+        },
+        "capsules": [
+          {
+            "bone": "NPC R Hand [RHnd]",
+            "index": 0,
+            "p1": [
+              29.913,
+              3.084,
+              68.31
+            ],
+            "p2": [
+              29.925,
+              3.026,
+              68.285
+            ],
+            "radius": 4.087,
+            "length": 0.063,
+            "total": 8.238
+          }
+        ]
+      },
+      {
+        "bone": "NPC L UpperArm [LUar]",
+        "kind": "bhkRigidBody",
+        "physics": {
+          "layer": "BIPED",
+          "response": "SIMPLE_CONTACT",
+          "mass": 2.0,
+          "friction": 0.3,
+          "restitution": 0.8
+        },
+        "ragdoll": {
+          "ragdollBone": "Ragdoll_NPC L UpperArm [LUar]",
+          "turn": 1.4,
+          "shift": 4.78
+        },
+        "capsules": [
+          {
+            "bone": "NPC L UpperArm [LUar]",
+            "index": 0,
+            "p1": [
+              -19.057,
+              -5.042,
+              88.832
+            ],
+            "p2": [
+              -14.25,
+              -5.11,
+              98.884
+            ],
+            "radius": 6.069,
+            "length": 11.143,
+            "total": 23.282
+          }
+        ]
+      },
+      {
+        "bone": "NPC L Forearm [LLar]",
+        "kind": "bhkRigidBody",
+        "physics": {
+          "layer": "BIPED",
+          "response": "SIMPLE_CONTACT",
+          "mass": 2.0,
+          "friction": 0.3,
+          "restitution": 0.8
+        },
+        "ragdoll": {
+          "ragdollBone": "Ragdoll_NPC L Forearm [LLar]",
+          "turn": 1.7,
+          "shift": 2.37
+        },
+        "capsules": [
+          {
+            "bone": "NPC L Forearm [LLar]",
+            "index": 0,
+            "p1": [
+              -28.033,
+              0.451,
+              73.022
+            ],
+            "p2": [
+              -22.732,
+              -4.756,
+              83.238
+            ],
+            "radius": 3.931,
+            "length": 12.633,
+            "total": 20.494
+          }
+        ]
+      },
+      {
+        "bone": "NPC L Hand [LHnd]",
+        "kind": "bhkRigidBody",
+        "physics": {
+          "layer": "BIPED",
+          "response": "SIMPLE_CONTACT",
+          "mass": 4.0,
+          "friction": 0.1,
+          "restitution": 0.8
+        },
+        "ragdoll": {
+          "ragdollBone": "Ragdoll_NPC L Hand [LHnd]",
+          "turn": 4.3,
+          "shift": 2.37
+        },
+        "capsules": [
+          {
+            "bone": "NPC L Hand [LHnd]",
+            "index": 0,
+            "p1": [
+              -29.893,
+              3.059,
+              68.269
+            ],
+            "p2": [
+              -29.881,
+              3.116,
+              68.294
+            ],
+            "radius": 4.087,
+            "length": 0.063,
+            "total": 8.238
+          }
+        ]
+      }
+    ],
+    "ragdoll": {
+      "state": "read",
+      "file": "D:\\Skyrim VR Modding\\Repositories\\morphbench\\fixtures\\human-collider-witness\\artifact\\mod\\meshes\\test_morphbench_human\\control\\skeleton_female.hkx",
+      "reason": null,
+      "bones": 18,
+      "unmatched": []
+    }
+  },
+  "marker": {
+    "local": [
+      {
+        "bone": "NPC COM [COM ]",
+        "kind": "bhkRigidBody",
+        "physics": {
+          "layer": "BIPED",
+          "response": "SIMPLE_CONTACT",
+          "mass": 40.0,
+          "friction": 2.5,
+          "restitution": 0.8
+        },
+        "capsules": [
+          {
+            "bone": "NPC COM [COM ]",
+            "index": 0,
+            "p1": [
+              2.93,
+              0.0,
+              0.0
+            ],
+            "p2": [
+              -2.93,
+              0.0,
+              0.0
+            ],
+            "radius": 9.141,
+            "length": 5.86,
+            "total": 24.142
+          }
+        ]
+      },
+      {
+        "bone": "NPC L Thigh [LThg]",
+        "kind": "bhkRigidBody",
+        "physics": {
+          "layer": "BIPED",
+          "response": "SIMPLE_CONTACT",
+          "mass": 6.0,
+          "friction": 0.3,
+          "restitution": 0.8
+        },
+        "capsules": [
+          {
+            "bone": "NPC L Thigh [LThg]",
+            "index": 0,
+            "p1": [
+              -0.498,
+              -1.119,
+              24.963
+            ],
+            "p2": [
+              1.875,
+              -0.502,
+              -2.847
+            ],
+            "radius": 20.979,
+            "length": 27.918,
+            "total": 69.876
+          }
+        ]
+      },
+      {
+        "bone": "NPC L Calf [LClf]",
+        "kind": "bhkRigidBody",
+        "physics": {
+          "layer": "BIPED",
+          "response": "SIMPLE_CONTACT",
+          "mass": 6.0,
+          "friction": 0.3,
+          "restitution": 0.8
+        },
+        "capsules": [
+          {
+            "bone": "NPC L Calf [LClf]",
+            "index": 0,
+            "p1": [
+              0.277,
+              0.025,
+              25.708
+            ],
+            "p2": [
+              0.277,
+              0.025,
+              0.192
+            ],
+            "radius": 5.384,
+            "length": 25.516,
+            "total": 36.284
+          }
+        ]
+      },
+      {
+        "bone": "NPC L Foot [Lft ]",
+        "kind": "bhkRigidBody",
+        "physics": {
+          "layer": "BIPED",
+          "response": "SIMPLE_CONTACT",
+          "mass": 3.0,
+          "friction": 0.02,
+          "restitution": 0.8
+        },
+        "capsules": [
+          {
+            "bone": "NPC L Foot [Lft ]",
+            "index": 0,
+            "p1": [
+              -0.023,
+              -1.389,
+              9.748
+            ],
+            "p2": [
+              -0.023,
+              -1.389,
+              2.935
+            ],
+            "radius": 4.417,
+            "length": 6.813,
+            "total": 15.646
+          }
+        ]
+      },
+      {
+        "bone": "NPC R Thigh [RThg]",
+        "kind": "bhkRigidBody",
+        "physics": {
+          "layer": "BIPED",
+          "response": "SIMPLE_CONTACT",
+          "mass": 6.0,
+          "friction": 0.3,
+          "restitution": 0.8
+        },
+        "capsules": [
+          {
+            "bone": "NPC R Thigh [RThg]",
+            "index": 0,
+            "p1": [
+              0.486,
+              -1.118,
+              24.967
+            ],
+            "p2": [
+              -1.851,
+              -0.495,
+              -3.047
+            ],
+            "radius": 6.985,
+            "length": 28.119,
+            "total": 42.088
+          }
+        ]
+      },
+      {
+        "bone": "NPC R Calf [RClf]",
+        "kind": "bhkRigidBody",
+        "physics": {
+          "layer": "BIPED",
+          "response": "SIMPLE_CONTACT",
+          "mass": 6.0,
+          "friction": 0.3,
+          "restitution": 0.8
+        },
+        "capsules": [
+          {
+            "bone": "NPC R Calf [RClf]",
+            "index": 0,
+            "p1": [
+              -0.277,
+              0.025,
+              25.708
+            ],
+            "p2": [
+              -0.277,
+              0.025,
+              0.192
+            ],
+            "radius": 5.384,
+            "length": 25.516,
+            "total": 36.284
+          }
+        ]
+      },
+      {
+        "bone": "NPC R Foot [Rft ]",
+        "kind": "bhkRigidBody",
+        "physics": {
+          "layer": "BIPED",
+          "response": "SIMPLE_CONTACT",
+          "mass": 3.0,
+          "friction": 0.02,
+          "restitution": 0.8
+        },
+        "capsules": [
+          {
+            "bone": "NPC R Foot [Rft ]",
+            "index": 0,
+            "p1": [
+              0.023,
+              -1.389,
+              9.747
+            ],
+            "p2": [
+              0.023,
+              -1.389,
+              2.935
+            ],
+            "radius": 4.417,
+            "length": 6.813,
+            "total": 15.646
+          }
+        ]
+      },
+      {
+        "bone": "NPC Spine [Spn0]",
+        "kind": "bhkRigidBody",
+        "physics": {
+          "layer": "BIPED",
+          "response": "SIMPLE_CONTACT",
+          "mass": 4.0,
+          "friction": 0.3,
+          "restitution": 0.8
+        },
+        "capsules": [
+          {
+            "bone": "NPC Spine [Spn0]",
+            "index": 0,
+            "p1": [
+              3.434,
+              5.088,
+              4.51
+            ],
+            "p2": [
+              -3.434,
+              5.088,
+              4.51
+            ],
+            "radius": 8.709,
+            "length": 6.869,
+            "total": 24.287
+          }
+        ]
+      },
+      {
+        "bone": "NPC Spine1 [Spn1]",
+        "kind": "bhkRigidBody",
+        "physics": {
+          "layer": "BIPED",
+          "response": "SIMPLE_CONTACT",
+          "mass": 4.0,
+          "friction": 0.3,
+          "restitution": 0.8
+        },
+        "capsules": [
+          {
+            "bone": "NPC Spine1 [Spn1]",
+            "index": 0,
+            "p1": [
+              3.353,
+              4.651,
+              6.153
+            ],
+            "p2": [
+              -3.353,
+              4.651,
+              6.153
+            ],
+            "radius": 9.666,
+            "length": 6.707,
+            "total": 26.04
+          }
+        ]
+      },
+      {
+        "bone": "NPC Spine2 [Spn2]",
+        "kind": "bhkRigidBody",
+        "physics": {
+          "layer": "BIPED",
+          "response": "SIMPLE_CONTACT",
+          "mass": 7.0,
+          "friction": 0.3,
+          "restitution": 0.8
+        },
+        "capsules": [
+          {
+            "bone": "NPC Spine2 [Spn2]",
+            "index": 0,
+            "p1": [
+              3.023,
+              1.506,
+              11.112
+            ],
+            "p2": [
+              -3.03,
+              1.506,
+              11.112
+            ],
+            "radius": 12.224,
+            "length": 6.053,
+            "total": 30.5
+          }
+        ]
+      },
+      {
+        "bone": "NPC Neck [Neck]",
+        "kind": "bhkRigidBody",
+        "physics": {
+          "layer": "BIPED",
+          "response": "SIMPLE_CONTACT",
+          "mass": 6.0,
+          "friction": 0.3,
+          "restitution": 0.8
+        },
+        "capsules": [
+          {
+            "bone": "NPC Neck [Neck]",
+            "index": 0,
+            "p1": [
+              0.037,
+              1.337,
+              4.409
+            ],
+            "p2": [
+              -0.067,
+              1.337,
+              4.409
+            ],
+            "radius": 4.85,
+            "length": 0.105,
+            "total": 9.805
+          }
+        ]
+      },
+      {
+        "bone": "NPC Head [Head]",
+        "kind": "bhkRigidBody",
+        "physics": {
+          "layer": "BIPED",
+          "response": "SIMPLE_CONTACT",
+          "mass": 4.0,
+          "friction": 0.8,
+          "restitution": 0.8
+        },
+        "capsules": [
+          {
+            "bone": "NPC Head [Head]",
+            "index": 0,
+            "p1": [
+              -0.014,
+              3.158,
+              3.364
+            ],
+            "p2": [
+              -0.014,
+              2.358,
+              3.364
+            ],
+            "radius": 8.587,
+            "length": 0.8,
+            "total": 17.975
+          }
+        ]
+      },
+      {
+        "bone": "NPC R UpperArm [RUar]",
+        "kind": "bhkRigidBody",
+        "physics": {
+          "layer": "BIPED",
+          "response": "SIMPLE_CONTACT",
+          "mass": 2.0,
+          "friction": 0.3,
+          "restitution": 0.8
+        },
+        "capsules": [
+          {
+            "bone": "NPC R UpperArm [RUar]",
+            "index": 0,
+            "p1": [
+              0.087,
+              0.087,
+              14.272
+            ],
+            "p2": [
+              0.087,
+              0.087,
+              3.129
+            ],
+            "radius": 6.069,
+            "length": 11.143,
+            "total": 23.282
+          }
+        ]
+      },
+      {
+        "bone": "NPC R Forearm [RLar]",
+        "kind": "bhkRigidBody",
+        "physics": {
+          "layer": "BIPED",
+          "response": "SIMPLE_CONTACT",
+          "mass": 6.0,
+          "friction": 0.3,
+          "restitution": 0.8
+        },
+        "capsules": [
+          {
+            "bone": "NPC R Forearm [RLar]",
+            "index": 0,
+            "p1": [
+              -0.794,
+              0.101,
+              13.381
+            ],
+            "p2": [
+              -0.794,
+              0.101,
+              0.748
+            ],
+            "radius": 3.931,
+            "length": 12.633,
+            "total": 20.494
+          }
+        ]
+      },
+      {
+        "bone": "NPC R Hand [RHnd]",
+        "kind": "bhkRigidBody",
+        "physics": {
+          "layer": "BIPED",
+          "response": "SIMPLE_CONTACT",
+          "mass": 4.0,
+          "friction": 0.1,
+          "restitution": 0.8
+        },
+        "capsules": [
+          {
+            "bone": "NPC R Hand [RHnd]",
+            "index": 0,
+            "p1": [
+              0.206,
+              0.222,
+              3.827
+            ],
+            "p2": [
+              0.131,
+              0.222,
+              3.827
+            ],
+            "radius": 4.799,
+            "length": 0.074,
+            "total": 9.672
+          }
+        ]
+      },
+      {
+        "bone": "NPC L UpperArm [LUar]",
+        "kind": "bhkRigidBody",
+        "physics": {
+          "layer": "BIPED",
+          "response": "SIMPLE_CONTACT",
+          "mass": 2.0,
+          "friction": 0.3,
+          "restitution": 0.8
+        },
+        "capsules": [
+          {
+            "bone": "NPC L UpperArm [LUar]",
+            "index": 0,
+            "p1": [
+              -0.087,
+              0.087,
+              14.272
+            ],
+            "p2": [
+              -0.087,
+              0.087,
+              3.129
+            ],
+            "radius": 6.069,
+            "length": 11.143,
+            "total": 23.282
+          }
+        ]
+      },
+      {
+        "bone": "NPC L Forearm [LLar]",
+        "kind": "bhkRigidBody",
+        "physics": {
+          "layer": "BIPED",
+          "response": "SIMPLE_CONTACT",
+          "mass": 2.0,
+          "friction": 0.3,
+          "restitution": 0.8
+        },
+        "capsules": [
+          {
+            "bone": "NPC L Forearm [LLar]",
+            "index": 0,
+            "p1": [
+              0.794,
+              0.101,
+              13.381
+            ],
+            "p2": [
+              0.794,
+              0.101,
+              0.748
+            ],
+            "radius": 3.931,
+            "length": 12.633,
+            "total": 20.494
+          }
+        ]
+      },
+      {
+        "bone": "NPC L Hand [LHnd]",
+        "kind": "bhkRigidBody",
+        "physics": {
+          "layer": "BIPED",
+          "response": "SIMPLE_CONTACT",
+          "mass": 4.0,
+          "friction": 0.1,
+          "restitution": 0.8
+        },
+        "capsules": [
+          {
+            "bone": "NPC L Hand [LHnd]",
+            "index": 0,
+            "p1": [
+              -0.131,
+              0.222,
+              3.827
+            ],
+            "p2": [
+              -0.206,
+              0.222,
+              3.827
+            ],
+            "radius": 4.799,
+            "length": 0.074,
+            "total": 9.672
+          }
+        ]
+      }
+    ],
+    "world": [
+      {
+        "bone": "NPC COM [COM ]",
+        "kind": "bhkRigidBody",
+        "physics": {
+          "layer": "BIPED",
+          "response": "SIMPLE_CONTACT",
+          "mass": 40.0,
+          "friction": 2.5,
+          "restitution": 0.8
+        },
+        "ragdoll": {
+          "ragdollBone": "Ragdoll_NPC COM [COM ]",
+          "turn": 0.0,
+          "shift": 4.78
+        },
+        "capsules": [
+          {
+            "bone": "NPC COM [COM ]",
+            "index": 0,
+            "p1": [
+              2.93,
+              -0.0,
+              64.131
+            ],
+            "p2": [
+              -2.93,
+              -0.0,
+              64.131
+            ],
+            "radius": 9.141,
+            "length": 5.86,
+            "total": 24.142
+          }
+        ]
+      },
+      {
+        "bone": "NPC L Thigh [LThg]",
+        "kind": "bhkRigidBody",
+        "physics": {
+          "layer": "BIPED",
+          "response": "SIMPLE_CONTACT",
+          "mass": 6.0,
+          "friction": 0.3,
+          "restitution": 0.8
+        },
+        "ragdoll": {
+          "ragdollBone": "Ragdoll_NPC L Thigh [LThg]",
+          "turn": 1.7,
+          "shift": 4.78
+        },
+        "capsules": [
+          {
+            "bone": "NPC L Thigh [LThg]",
+            "index": 0,
+            "p1": [
+              -8.709,
+              -2.749,
+              39.378
+            ],
+            "p2": [
+              -8.155,
+              -0.381,
+              67.19
+            ],
+            "radius": 20.979,
+            "length": 27.918,
+            "total": 69.876
+          }
+        ]
+      },
+      {
+        "bone": "NPC L Calf [LClf]",
+        "kind": "bhkRigidBody",
+        "physics": {
+          "layer": "BIPED",
+          "response": "SIMPLE_CONTACT",
+          "mass": 6.0,
+          "friction": 0.3,
+          "restitution": 0.8
+        },
+        "ragdoll": {
+          "ragdollBone": "Ragdoll_NPC L Calf [LClf]",
+          "turn": 1.5,
+          "shift": 0.91
+        },
+        "capsules": [
+          {
+            "bone": "NPC L Calf [LClf]",
+            "index": 0,
+            "p1": [
+              -12.842,
+              -5.695,
+              7.773
+            ],
+            "p2": [
+              -10.22,
+              -2.08,
+              32.896
+            ],
+            "radius": 5.384,
+            "length": 25.516,
+            "total": 36.284
+          }
+        ]
+      },
+      {
+        "bone": "NPC L Foot [Lft ]",
+        "kind": "bhkRigidBody",
+        "physics": {
+          "layer": "BIPED",
+          "response": "SIMPLE_CONTACT",
+          "mass": 3.0,
+          "friction": 0.02,
+          "restitution": 0.8
+        },
+        "ragdoll": {
+          "ragdollBone": "Ragdoll_NPC L Foot [Lft ]",
+          "turn": 30.0,
+          "shift": 0.28
+        },
+        "capsules": [
+          {
+            "bone": "NPC L Foot [Lft ]",
+            "index": 0,
+            "p1": [
+              -15.314,
+              3.031,
+              3.96
+            ],
+            "p2": [
+              -13.483,
+              -3.511,
+              4.471
+            ],
+            "radius": 4.417,
+            "length": 6.813,
+            "total": 15.646
+          }
+        ]
+      },
+      {
+        "bone": "NPC R Thigh [RThg]",
+        "kind": "bhkRigidBody",
+        "physics": {
+          "layer": "BIPED",
+          "response": "SIMPLE_CONTACT",
+          "mass": 6.0,
+          "friction": 0.3,
+          "restitution": 0.8
+        },
+        "ragdoll": {
+          "ragdollBone": "Ragdoll_NPC R Thigh [RThg]",
+          "turn": 1.7,
+          "shift": 4.78
+        },
+        "capsules": [
+          {
+            "bone": "NPC R Thigh [RThg]",
+            "index": 0,
+            "p1": [
+              8.721,
+              -2.749,
+              39.375
+            ],
+            "p2": [
+              8.111,
+              -0.361,
+              67.385
+            ],
+            "radius": 6.985,
+            "length": 28.119,
+            "total": 42.088
+          }
+        ]
+      },
+      {
+        "bone": "NPC R Calf [RClf]",
+        "kind": "bhkRigidBody",
+        "physics": {
+          "layer": "BIPED",
+          "response": "SIMPLE_CONTACT",
+          "mass": 6.0,
+          "friction": 0.3,
+          "restitution": 0.8
+        },
+        "ragdoll": {
+          "ragdollBone": "Ragdoll_NPC R Calf [RClf]",
+          "turn": 1.5,
+          "shift": 0.91
+        },
+        "capsules": [
+          {
+            "bone": "NPC R Calf [RClf]",
+            "index": 0,
+            "p1": [
+              12.843,
+              -5.692,
+              7.773
+            ],
+            "p2": [
+              10.22,
+              -2.08,
+              32.896
+            ],
+            "radius": 5.384,
+            "length": 25.516,
+            "total": 36.284
+          }
+        ]
+      },
+      {
+        "bone": "NPC R Foot [Rft ]",
+        "kind": "bhkRigidBody",
+        "physics": {
+          "layer": "BIPED",
+          "response": "SIMPLE_CONTACT",
+          "mass": 3.0,
+          "friction": 0.02,
+          "restitution": 0.8
+        },
+        "ragdoll": {
+          "ragdollBone": "Ragdoll_NPC R Foot [Rft ]",
+          "turn": 30.0,
+          "shift": 0.28
+        },
+        "capsules": [
+          {
+            "bone": "NPC R Foot [Rft ]",
+            "index": 0,
+            "p1": [
+              15.312,
+              3.037,
+              3.958
+            ],
+            "p2": [
+              13.483,
+              -3.506,
+              4.47
+            ],
+            "radius": 4.417,
+            "length": 6.813,
+            "total": 15.646
+          }
+        ]
+      },
+      {
+        "bone": "NPC Spine [Spn0]",
+        "kind": "bhkRigidBody",
+        "physics": {
+          "layer": "BIPED",
+          "response": "SIMPLE_CONTACT",
+          "mass": 4.0,
+          "friction": 0.3,
+          "restitution": 0.8
+        },
+        "ragdoll": {
+          "ragdollBone": "Ragdoll_NPC Spine [Spn0]",
+          "turn": 0.0,
+          "shift": 4.78
+        },
+        "capsules": [
+          {
+            "bone": "NPC Spine [Spn0]",
+            "index": 0,
+            "p1": [
+              3.434,
+              0.04,
+              72.207
+            ],
+            "p2": [
+              -3.434,
+              0.04,
+              72.207
+            ],
+            "radius": 8.709,
+            "length": 6.869,
+            "total": 24.287
+          }
+        ]
+      },
+      {
+        "bone": "NPC Spine1 [Spn1]",
+        "kind": "bhkRigidBody",
+        "physics": {
+          "layer": "BIPED",
+          "response": "SIMPLE_CONTACT",
+          "mass": 4.0,
+          "friction": 0.3,
+          "restitution": 0.8
+        },
+        "ragdoll": {
+          "ragdollBone": "Ragdoll_NPC Spine1 [Spn1]",
+          "turn": 0.0,
+          "shift": 4.78
+        },
+        "capsules": [
+          {
+            "bone": "NPC Spine1 [Spn1]",
+            "index": 0,
+            "p1": [
+              3.353,
+              -0.893,
+              83.278
+            ],
+            "p2": [
+              -3.353,
+              -0.893,
+              83.278
+            ],
+            "radius": 9.666,
+            "length": 6.707,
+            "total": 26.04
+          }
+        ]
+      },
+      {
+        "bone": "NPC Spine2 [Spn2]",
+        "kind": "bhkRigidBody",
+        "physics": {
+          "layer": "BIPED",
+          "response": "SIMPLE_CONTACT",
+          "mass": 7.0,
+          "friction": 0.3,
+          "restitution": 0.8
+        },
+        "ragdoll": {
+          "ragdollBone": "Ragdoll_NPC Spine2 [Spn2]",
+          "turn": 0.0,
+          "shift": 4.78
+        },
+        "capsules": [
+          {
+            "bone": "NPC Spine2 [Spn2]",
+            "index": 0,
+            "p1": [
+              3.023,
+              -2.955,
+              97.28
+            ],
+            "p2": [
+              -3.03,
+              -2.955,
+              97.28
+            ],
+            "radius": 12.224,
+            "length": 6.053,
+            "total": 30.5
+          }
+        ]
+      },
+      {
+        "bone": "NPC Neck [Neck]",
+        "kind": "bhkRigidBody",
+        "physics": {
+          "layer": "BIPED",
+          "response": "SIMPLE_CONTACT",
+          "mass": 6.0,
+          "friction": 0.3,
+          "restitution": 0.8
+        },
+        "ragdoll": {
+          "ragdollBone": "Ragdoll_NPC Neck [Neck]",
+          "turn": 0.0,
+          "shift": 4.78
+        },
+        "capsules": [
+          {
+            "bone": "NPC Neck [Neck]",
+            "index": 0,
+            "p1": [
+              0.051,
+              -0.805,
+              112.379
+            ],
+            "p2": [
+              -0.053,
+              -0.804,
+              112.379
+            ],
+            "radius": 4.85,
+            "length": 0.105,
+            "total": 9.805
+          }
+        ]
+      },
+      {
+        "bone": "NPC Head [Head]",
+        "kind": "bhkRigidBody",
+        "physics": {
+          "layer": "BIPED",
+          "response": "SIMPLE_CONTACT",
+          "mass": 4.0,
+          "friction": 0.8,
+          "restitution": 0.8
+        },
+        "ragdoll": {
+          "ragdollBone": "Ragdoll_NPC Head [Head]",
+          "turn": 0.0,
+          "shift": 3.39
+        },
+        "capsules": [
+          {
+            "bone": "NPC Head [Head]",
+            "index": 0,
+            "p1": [
+              0.015,
+              1.886,
+              120.324
+            ],
+            "p2": [
+              0.006,
+              1.086,
+              120.325
+            ],
+            "radius": 8.587,
+            "length": 0.8,
+            "total": 17.975
+          }
+        ]
+      },
+      {
+        "bone": "NPC R UpperArm [RUar]",
+        "kind": "bhkRigidBody",
+        "physics": {
+          "layer": "BIPED",
+          "response": "SIMPLE_CONTACT",
+          "mass": 2.0,
+          "friction": 0.3,
+          "restitution": 0.8
+        },
+        "ragdoll": {
+          "ragdollBone": "Ragdoll_NPC R UpperArm [RUar]",
+          "turn": 1.1,
+          "shift": 4.78
+        },
+        "capsules": [
+          {
+            "bone": "NPC R UpperArm [RUar]",
+            "index": 0,
+            "p1": [
+              19.041,
+              -5.061,
+              88.827
+            ],
+            "p2": [
+              14.244,
+              -5.118,
+              98.885
+            ],
+            "radius": 6.069,
+            "length": 11.143,
+            "total": 23.282
+          }
+        ]
+      },
+      {
+        "bone": "NPC R Forearm [RLar]",
+        "kind": "bhkRigidBody",
+        "physics": {
+          "layer": "BIPED",
+          "response": "SIMPLE_CONTACT",
+          "mass": 6.0,
+          "friction": 0.3,
+          "restitution": 0.8
+        },
+        "ragdoll": {
+          "ragdollBone": "Ragdoll_NPC R Forearm [RLar]",
+          "turn": 1.5,
+          "shift": 2.39
+        },
+        "capsules": [
+          {
+            "bone": "NPC R Forearm [RLar]",
+            "index": 0,
+            "p1": [
+              28.074,
+              0.394,
+              73.036
+            ],
+            "p2": [
+              22.713,
+              -4.795,
+              83.23
+            ],
+            "radius": 3.931,
+            "length": 12.633,
+            "total": 20.494
+          }
+        ]
+      },
+      {
+        "bone": "NPC R Hand [RHnd]",
+        "kind": "bhkRigidBody",
+        "physics": {
+          "layer": "BIPED",
+          "response": "SIMPLE_CONTACT",
+          "mass": 4.0,
+          "friction": 0.1,
+          "restitution": 0.8
+        },
+        "ragdoll": {
+          "ragdollBone": "Ragdoll_NPC R Hand [RHnd]",
+          "turn": 4.0,
+          "shift": 2.35
+        },
+        "capsules": [
+          {
+            "bone": "NPC R Hand [RHnd]",
+            "index": 0,
+            "p1": [
+              29.913,
+              3.084,
+              68.31
+            ],
+            "p2": [
+              29.925,
+              3.026,
+              68.285
+            ],
+            "radius": 4.087,
+            "length": 0.063,
+            "total": 8.238
+          }
+        ]
+      },
+      {
+        "bone": "NPC L UpperArm [LUar]",
+        "kind": "bhkRigidBody",
+        "physics": {
+          "layer": "BIPED",
+          "response": "SIMPLE_CONTACT",
+          "mass": 2.0,
+          "friction": 0.3,
+          "restitution": 0.8
+        },
+        "ragdoll": {
+          "ragdollBone": "Ragdoll_NPC L UpperArm [LUar]",
+          "turn": 1.4,
+          "shift": 4.78
+        },
+        "capsules": [
+          {
+            "bone": "NPC L UpperArm [LUar]",
+            "index": 0,
+            "p1": [
+              -19.057,
+              -5.042,
+              88.832
+            ],
+            "p2": [
+              -14.25,
+              -5.11,
+              98.884
+            ],
+            "radius": 6.069,
+            "length": 11.143,
+            "total": 23.282
+          }
+        ]
+      },
+      {
+        "bone": "NPC L Forearm [LLar]",
+        "kind": "bhkRigidBody",
+        "physics": {
+          "layer": "BIPED",
+          "response": "SIMPLE_CONTACT",
+          "mass": 2.0,
+          "friction": 0.3,
+          "restitution": 0.8
+        },
+        "ragdoll": {
+          "ragdollBone": "Ragdoll_NPC L Forearm [LLar]",
+          "turn": 1.7,
+          "shift": 2.37
+        },
+        "capsules": [
+          {
+            "bone": "NPC L Forearm [LLar]",
+            "index": 0,
+            "p1": [
+              -28.033,
+              0.451,
+              73.022
+            ],
+            "p2": [
+              -22.732,
+              -4.756,
+              83.238
+            ],
+            "radius": 3.931,
+            "length": 12.633,
+            "total": 20.494
+          }
+        ]
+      },
+      {
+        "bone": "NPC L Hand [LHnd]",
+        "kind": "bhkRigidBody",
+        "physics": {
+          "layer": "BIPED",
+          "response": "SIMPLE_CONTACT",
+          "mass": 4.0,
+          "friction": 0.1,
+          "restitution": 0.8
+        },
+        "ragdoll": {
+          "ragdollBone": "Ragdoll_NPC L Hand [LHnd]",
+          "turn": 4.3,
+          "shift": 2.37
+        },
+        "capsules": [
+          {
+            "bone": "NPC L Hand [LHnd]",
+            "index": 0,
+            "p1": [
+              -29.893,
+              3.059,
+              68.269
+            ],
+            "p2": [
+              -29.881,
+              3.116,
+              68.294
+            ],
+            "radius": 4.087,
+            "length": 0.063,
+            "total": 8.238
+          }
+        ]
+      }
+    ],
+    "ragdoll": {
+      "state": "read",
+      "file": "D:\\Skyrim VR Modding\\Repositories\\morphbench\\fixtures\\human-collider-witness\\artifact\\mod\\meshes\\test_morphbench_human\\marker\\skeleton_female.hkx",
+      "reason": null,
+      "bones": 18,
+      "unmatched": []
+    }
+  },
+  "recipe": {
+    "changedBone": "NPC L Thigh [LThg]",
+    "radiusMultiplier": 3,
+    "endpointsUnchanged": true,
+    "otherCapsulesUnchanged": true,
+    "fitted": [
+      {
+        "bone": "NPC L Thigh [LThg]",
+        "points": 965,
+        "fitted": true,
+        "was": {
+          "bone": "NPC L Thigh [LThg]",
+          "index": 0,
+          "p1": [
+            -0.107,
+            -0.174,
+            25.939
+          ],
+          "p2": [
+            -0.107,
+            -0.174,
+            3.668
+          ],
+          "radius": 6.888,
+          "length": 22.271,
+          "total": 36.047
+        },
+        "wasCount": 1,
+        "now": {
+          "bone": "NPC L Thigh [LThg]",
+          "index": 0,
+          "p1": [
+            -0.498,
+            -1.119,
+            24.963
+          ],
+          "p2": [
+            1.875,
+            -0.502,
+            -2.847
+          ],
+          "radius": 6.993,
+          "length": 27.918,
+          "total": 41.904
+        },
+        "count": 1,
+        "capsules": [
+          {
+            "bone": "NPC L Thigh [LThg]",
+            "index": 0,
+            "p1": [
+              -0.498,
+              -1.119,
+              24.963
+            ],
+            "p2": [
+              1.875,
+              -0.502,
+              -2.847
+            ],
+            "radius": 6.993,
+            "length": 27.918,
+            "total": 41.904
+          }
+        ]
+      },
+      {
+        "bone": "NPC R Thigh [RThg]",
+        "points": 966,
+        "fitted": true,
+        "was": {
+          "bone": "NPC R Thigh [RThg]",
+          "index": 0,
+          "p1": [
+            0.108,
+            -0.174,
+            25.94
+          ],
+          "p2": [
+            0.108,
+            -0.174,
+            3.667
+          ],
+          "radius": 6.887,
+          "length": 22.273,
+          "total": 36.047
+        },
+        "wasCount": 1,
+        "now": {
+          "bone": "NPC R Thigh [RThg]",
+          "index": 0,
+          "p1": [
+            0.486,
+            -1.118,
+            24.967
+          ],
+          "p2": [
+            -1.851,
+            -0.495,
+            -3.047
+          ],
+          "radius": 6.985,
+          "length": 28.119,
+          "total": 42.088
+        },
+        "count": 1,
+        "capsules": [
+          {
+            "bone": "NPC R Thigh [RThg]",
+            "index": 0,
+            "p1": [
+              0.486,
+              -1.118,
+              24.967
+            ],
+            "p2": [
+              -1.851,
+              -0.495,
+              -3.047
+            ],
+            "radius": 6.985,
+            "length": 28.119,
+            "total": 42.088
+          }
+        ]
+      }
+    ]
+  }
+}

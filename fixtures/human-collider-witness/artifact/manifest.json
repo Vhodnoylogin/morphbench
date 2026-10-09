@@ -1,0 +1,147 @@
+{
+  "fixtureVersion": 1,
+  "nonrelease": true,
+  "plugin": "test_MorphbenchHumanColliders.esp",
+  "actors": {
+    "control": "000900",
+    "marker": "000901"
+  },
+  "bases": {
+    "control": "000806",
+    "marker": "000807"
+  },
+  "sourceInputs": {
+    "body_0": {
+      "name": "femalebody_0.nif",
+      "sha256": "5dbb9c6c86b2e3ce05a2e9116c38015e1a65065d2c05c596649a2fe4669b2abe"
+    },
+    "body_1": {
+      "name": "femalebody_1.nif",
+      "sha256": "683538729e1a3d03adc40ca0f25f333fd69179d5e438ea99e5d224ee89bf7790"
+    },
+    "skeleton": {
+      "name": "skeleton_female.nif",
+      "sha256": "f6e73d3c54227ec0cac35cdc50e3056e825a9f0eae71d472892152da6eb17442"
+    },
+    "hkx": {
+      "name": "skeleton_female.hkx",
+      "sha256": "438730b8c891c9aa5db0eb9b8e54e1ec550ddf4f36fcefdd895ca4feb746f0d9"
+    },
+    "esm": {
+      "name": "Skyrim.esm",
+      "sha256": "2bbc77fdec35a70ef96b710f8c525e50a1db9e63e11a391a0eb9ee8f56d36107"
+    },
+    "fixture_esp": {
+      "name": "test_morphbench-auto.esp",
+      "sha256": "8c3088bcfd03b0244c5ba2d8ec9234ebbe62e08e01bedd35e579db1d05c4a1be"
+    }
+  },
+  "records": [
+    {
+      "kind": "TES4",
+      "localId": "000000"
+    },
+    {
+      "kind": "RACE",
+      "localId": "000800"
+    },
+    {
+      "kind": "RACE",
+      "localId": "000801"
+    },
+    {
+      "kind": "ARMO",
+      "localId": "000802"
+    },
+    {
+      "kind": "ARMO",
+      "localId": "000803"
+    },
+    {
+      "kind": "ARMA",
+      "localId": "000804"
+    },
+    {
+      "kind": "ARMA",
+      "localId": "000805"
+    },
+    {
+      "kind": "NPC_",
+      "localId": "000806"
+    },
+    {
+      "kind": "NPC_",
+      "localId": "000807"
+    },
+    {
+      "kind": "CELL",
+      "localId": "032AE7"
+    },
+    {
+      "kind": "ACHR",
+      "localId": "000900"
+    },
+    {
+      "kind": "ACHR",
+      "localId": "000901"
+    }
+  ],
+  "files": [
+    {
+      "path": "mod/meshes/test_morphbench_human/body/femalebody_0.nif",
+      "sha256": "5dbb9c6c86b2e3ce05a2e9116c38015e1a65065d2c05c596649a2fe4669b2abe"
+    },
+    {
+      "path": "mod/meshes/test_morphbench_human/body/femalebody_1.nif",
+      "sha256": "683538729e1a3d03adc40ca0f25f333fd69179d5e438ea99e5d224ee89bf7790"
+    },
+    {
+      "path": "mod/meshes/test_morphbench_human/control/skeleton_female.hkx",
+      "sha256": "438730b8c891c9aa5db0eb9b8e54e1ec550ddf4f36fcefdd895ca4feb746f0d9"
+    },
+    {
+      "path": "mod/meshes/test_morphbench_human/control/skeleton_female.nif",
+      "sha256": "8e05dc7e46a95dbfbdfc57d76f27a88e2235276473b08f253c93bcc7ea43b86c"
+    },
+    {
+      "path": "mod/meshes/test_morphbench_human/marker/skeleton_female.hkx",
+      "sha256": "438730b8c891c9aa5db0eb9b8e54e1ec550ddf4f36fcefdd895ca4feb746f0d9"
+    },
+    {
+      "path": "mod/meshes/test_morphbench_human/marker/skeleton_female.nif",
+      "sha256": "c9d1fa385c40d2662fe21a2698f0145d794ef0b9c8507e73fdf3bf3f9b85e7ca"
+    },
+    {
+      "path": "mod/test_MorphbenchHumanColliders.esp",
+      "sha256": "a114f3b23ba80cbacc81191dd104e60f27b3637c58a964e7bd3441ee65e26ed7"
+    },
+    {
+      "path": "reference/colliders.json",
+      "sha256": "40a2f4b76e18f592c99d3ff62f142c446d66f46bb1e4bda57a44d6d4a42fabd6"
+    },
+    {
+      "path": "reference/control-back.png",
+      "sha256": "e4291464ac3bf8449ba3f07678fdd8adec7c39922bc88574d868d3d0a991fd31"
+    },
+    {
+      "path": "reference/control-front.png",
+      "sha256": "dab6215e02fe21815d055f40a0c880d8eb1e3251bbe8cc1a10b94e8db619edaf"
+    },
+    {
+      "path": "reference/control-side.png",
+      "sha256": "459ff7ae82060989ae051e0cfa7487734269dfd19458ecbc0b28c416149a9f2c"
+    },
+    {
+      "path": "reference/marker-back.png",
+      "sha256": "9300daa0e9c783c7e7affe46669912fe097076bee0a0ad8dd6e8657f0c15c2dd"
+    },
+    {
+      "path": "reference/marker-front.png",
+      "sha256": "d9bfbdb241111f373ea14b59ee51089d0936cc0bfd74a4f6b56c29ef43fd6c18"
+    },
+    {
+      "path": "reference/marker-side.png",
+      "sha256": "daa23791804426d4693021467b4f7e7bc33d01bfd456d79ee145f93f5d297199"
+    }
+  ]
+}

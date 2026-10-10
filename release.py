@@ -23,6 +23,7 @@ The usage text the user sees is not in this docstring: it lives under the key
 from __future__ import annotations
 
 import argparse
+import csv
 import glob
 import json
 import os
@@ -160,7 +161,7 @@ def vendor_folder(dep: dict, home: Path, stage: Path, named: str | None) -> str:
         raise SystemExit(t("release.noFolder", name=dep["name"],
                            source=dep.get("source", "")))
     target = stage / str(dep.get("into") or ("vendor/" + dep["name"]))
-    junk = shutil.ignore_patterns("__pycache__", "*.pyc", "tests", "docs")
+    junk = shutil.ignore_patterns("__pycache__", "*.pyc", "*.pyi", "test", "tests", "docs")
     # `keep` names what we actually use, and it is an allow-list for the same reason CONTENT
     # is: a later version of somebody else's add-on can grow a new folder, and a deny-list
     # would carry it in without anyone noticing. Absent `keep`, the whole folder travels.
@@ -181,6 +182,40 @@ def vendor_folder(dep: dict, home: Path, stage: Path, named: str | None) -> str:
     return "%s <- %s" % (target.relative_to(stage), folder)
 
 
+def trim_packages(into: Path) -> None:
+    """Keep runtime modules and licences, without dependency test suites or type stubs.
+
+    This changes only the staged distribution, never the builder's installed packages.
+    numpy.testing remains: it is an importable API, unlike directories named tests.
+    The wheel RECORD is narrowed to the retained files; hashes of those files stay intact.
+    """
+    into = into.resolve()
+    for folder in sorted(into.rglob("*"), key=lambda p: len(p.parts), reverse=True):
+        if folder.is_dir() and folder.name in ("test", "tests", "__pycache__"):
+            if not folder.resolve().is_relative_to(into):
+                raise ValueError(folder)
+            shutil.rmtree(folder)
+    hooks = into / "numpy" / "_pyinstaller"
+    if hooks.is_dir():
+        if not hooks.resolve().is_relative_to(into):
+            raise ValueError(hooks)
+        shutil.rmtree(hooks)
+    for pattern in ("*.pyi", "*.pyc"):
+        for stub in into.rglob(pattern):
+            stub.unlink()
+    # pip generates these build/configuration launchers with the builder's Python path.
+    # Morphbench uses NumPy as a library and never launches either utility.
+    for name in ("f2py.exe", "numpy-config.exe"):
+        launcher = into / "bin" / name
+        if launcher.is_file():
+            launcher.unlink()
+    for record in into.glob("*.dist-info/RECORD"):
+        with record.open(encoding="utf-8", newline="") as stream:
+            rows = [row for row in csv.reader(stream) if row and (into / row[0]).is_file()]
+        with record.open("w", encoding="utf-8", newline="") as stream:
+            csv.writer(stream).writerows(rows)
+
+
 def vendor_packages(deps: list[dict], stage: Path) -> list[str]:
     """Python packages - by the same pip, but into the release folder, not into the system."""
     names = [str(d.get("pip") or d["name"]) for d in deps]
@@ -194,8 +229,7 @@ def vendor_packages(deps: list[dict], stage: Path) -> list[str]:
         raise SystemExit(t("release.pipFailed", names=", ".join(names), code=code))
     # Wheel metadata includes licence files and the exact installed versions. It belongs
     # with the distribution even when pip itself is not shipped.
-    for junk in into.rglob("__pycache__"):
-        shutil.rmtree(junk)
+    trim_packages(into)
     return ["%s <- pip" % (into.relative_to(stage) / n) for n in names]
 
 
@@ -212,6 +246,15 @@ def vendor_python(dep: dict, stage: Path, version: str) -> str:
     with zipfile.ZipFile(tmp) as z:
         z.extractall(into)
     tmp.unlink()
+    # Nexus rejects nested archives. The official stdlib ZIP contains runtime bytecode,
+    # not disposable caches: unpack it unchanged and point _pth at the directory instead.
+    libraries = {}
+    for library in into.glob("python*.zip"):
+        target = into / library.stem
+        with zipfile.ZipFile(library) as archive:
+            archive.extractall(target)
+        libraries[library.name] = target.name
+        library.unlink()
     # The embeddable build does not look around itself by default: let it see vendor\ and
     # the workbench folder, or numpy and PyNifly stay invisible to it.
     for pth in into.glob("python*._pth"):
@@ -220,6 +263,7 @@ def vendor_python(dep: dict, stage: Path, version: str) -> str:
         # never picked up.
         keep = [l.rstrip() for l in pth.read_text(encoding="utf-8").splitlines()
                 if l.strip().lstrip("#").strip() not in ("import site", "..", "..\\vendor")]
+        keep = [libraries.get(line.strip(), line) for line in keep]
         pth.write_text("\n".join(keep + ["..", "..\\vendor", "import site"]) + "\n",
                        encoding="utf-8")
     return "%s <- %s" % (into.relative_to(stage), url)

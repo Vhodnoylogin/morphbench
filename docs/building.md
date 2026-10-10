@@ -247,8 +247,12 @@ in reverse name order, so the newest Blender version wins.
 ### The packages and the embedded Python
 
 `numpy` and `pillow` are installed by the same `pip` you already have, but into the release folder
-rather than into the system: `pip install --target <stage>/vendor`. `__pycache__` is removed;
-`.dist-info` stays, including the exact versions and the package licence files.
+rather than into the system: `pip install --target <stage>/vendor`. Dependency `test`/`tests`
+directories, `__pycache__`, `.pyc` caches, `.pyi` type stubs and NumPy's `_pyinstaller` build
+hooks and generated `f2py.exe`/`numpy-config.exe` build utilities are removed from the
+staged copy. Runtime APIs such as `numpy.testing` stay.
+`.dist-info` stays, including the exact versions and package licence files; `RECORD` lists
+only retained files. The builder's installed dependencies are not changed.
 
 One rule follows from this and is easy to get wrong: **run `release.py` with the same Python
 major/minor version you are bundling, on 64-bit Windows.** The builder checks this before staging.
@@ -262,6 +266,12 @@ workbench folder would be invisible to it. `release.py` rewrites the `python*._p
 `..` and `..\vendor` and to enable `import site`. Note that the line has to be **replaced**, not
 added to: the build ships with `import site` commented out, and writing a new line next to the
 commented one leaves the old one in place and the paths are never picked up.
+
+The bundled `python312.zip` standard library is extracted unchanged into `python/python312/`,
+and its `_pth` entry points to that directory. The release contains no nested Python ZIP.
+The standard library's `.pyc` files are required runtime bytecode and stay; they are different
+from disposable dependency caches. This layout permits archive inspection under Nexus's
+nested-archive policy, but does not establish antivirus or moderator clearance.
 
 ### THIRD-PARTY.md
 

@@ -1,5 +1,5 @@
 {
-  "status": "unpublished-nexus-draft-new-file-scanning",
+  "status": "unpublished-nexus-draft-quarantined",
   "modId": 194795,
   "page": "https://www.nexusmods.com/skyrimspecialedition/mods/194795",
   "editor": "https://www.nexusmods.com/games/skyrimspecialedition/mods/194795/edit/media",
@@ -21,9 +21,9 @@
   "descriptionFile": "docs/nexus-description.bbcode",
   "mainFile": {
     "nexusFileId": 817787,
-    "quarantined": null,
-    "scanStatus": "Virus scanning is in progress",
-    "name": "Morphbench 0.7.1 - packaging revision 2",
+    "quarantined": true,
+    "scanStatus": "Quarantined by automated safety checks",
+    "name": "Morphbench 0.7.1",
     "fileVersion": "0.7.1-r2",
     "runtimeVersion": "0.7.1",
     "filename": "morphbench-0.7.1-repack.zip",
@@ -112,10 +112,19 @@
   "scanComparison": {
     "originalFileId": 817686,
     "newFileId": 817787,
-    "newStatus": "virus-scanning-in-progress",
-    "checkedAt": "2026-10-10T21:52:20.312655+00:00",
+    "newStatus": "quarantined",
+    "checkedAt": "2026-10-10T22:11:34.407495+00:00",
     "exactNexusReasonConfirmed": false,
-    "securityClearanceEstablished": false
+    "securityClearanceEstablished": false,
+    "oldVirusTotalCounts": {
+      "detections": 3,
+      "engines": 66
+    },
+    "newVirusTotalCounts": {
+      "detections": 2,
+      "engines": 65
+    },
+    "removedDetection": "Kingsoft; cause of result change not established"
   },
   "descriptionStyle": {
     "reference": "https://www.nexusmods.com/skyrimspecialedition/mods/194796",
@@ -132,5 +141,24 @@
       "Инструкция на русском"
     ],
     "savedAndRenderedVerified": true
+  },
+  "repackQuarantine": {
+    "checkedAt": "2026-10-10T22:11:34.407495+00:00",
+    "nexusFileId": 817787,
+    "virusTotalReport": "https://www.virustotal.com/gui/file/169be1215df3be054088f763506892bc61d9a0a9c01ee8711e9225cedb7d45bf",
+    "scanAt": "2026-10-10T21:49:54Z",
+    "detections": 2,
+    "engines": 65,
+    "flags": {
+      "Elastic": "Malicious (high Confidence)",
+      "Sophos": "Generic ML PUA (PUA)"
+    },
+    "Kingsoft": "Undetected",
+    "exactNexusReasonConfirmed": false,
+    "falsePositiveConfirmed": false,
+    "supportTicketId": 270665,
+    "supportUpdateSent": false,
+    "nativeBinariesUnchanged": true,
+    "nextStep": "Add the new file ID, hash and report to existing support ticket 270665; do not infer security clearance or delete the review evidence."
   }
 }

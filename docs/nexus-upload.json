@@ -1,16 +1,21 @@
 {
-  "status": "local-preparation-only",
+  "status": "unpublished-nexus-draft-quarantined",
+  "modId": 194795,
+  "page": "https://www.nexusmods.com/skyrimspecialedition/mods/194795",
+  "editor": "https://www.nexusmods.com/games/skyrimspecialedition/mods/194795/edit/media",
   "title": "Morphbench - Mesh Morph and Collider Workbench",
   "summary": "Inspect Skyrim NIF meshes, TRI morphs, mesh bounds and skeleton collision capsules outside the game. Includes a browser viewer, CLI and local HTTP API. Self-contained Windows x64 tool.",
   "version": "0.7.1",
   "author": "Vhodnoylogin",
   "suggestedGame": "Skyrim Special Edition",
   "suggestedCategory": "Utilities",
-  "gameSelectionReason": "The tool works on Skyrim files; the current runtime comparison is Skyrim VR. Verify the live site's category and game choices before saving the page.",
-  "suggestedTags": ["Utilities", "Modder's Resource", "VR", "AI-Generated Content", "AI Media"],
-  "tagNote": "Use the site's exact current tag labels. AI-Generated Content covers generated code; AI Media covers the assisted page description. Do not claim limited AI involvement without evidence.",
+  "gameSelectionReason": "Saved in Skyrim Special Edition / Utilities; the current runtime comparison is Skyrim VR.",
+  "suggestedTags": ["Utilities for Modders", "Modder's Resource", "Skyrim VR", "AI-Generated Content", "AI Media"],
+  "tagNote": "These exact labels are saved on Nexus. AI Media includes the conceptual image_gen cover and assisted description. The six model screenshots are authentic unretouched tool captures.",
   "descriptionFile": "docs/nexus-description.bbcode",
   "mainFile": {
+    "nexusFileId": 817686,
+    "quarantined": true,
     "name": "Morphbench 0.7.1 - Windows x64",
     "filename": "morphbench-0.7.1.zip",
     "sha256": "ee0400f22081ebcb4718b3755c02df66ad6e740eb986dccf219b79e361301c23",
@@ -37,11 +42,30 @@
   ],
   "policySources": [
     "https://help.nexusmods.com/article/136-best-practices-for-mod-authors",
-    "https://help.nexusmods.com/article/28-file-submission-guidelines"
+    "https://help.nexusmods.com/article/28-file-submission-guidelines",
+    "https://help.nexusmods.com/article/117-why-has-my-mod-been-quarantined"
   ],
+  "quarantine": {
+    "checkedDate": "2026-10-10",
+    "virusTotalReport": "https://www.virustotal.com/gui/file/ee0400f22081ebcb4718b3755c02df66ad6e740eb986dccf219b79e361301c23",
+    "detections": 3,
+    "engines": 66,
+    "flags": {"Elastic": "Malicious (high Confidence)", "Kingsoft": "Malware.kb.c.974", "Sophos": "Generic ML PUA (PUA)"},
+    "exactNexusReasonConfirmed": false,
+    "falsePositiveConfirmed": false,
+    "nextStep": "Request moderator review with source and build instructions; keep the original uploaded file. A support email draft is prepared locally but has not been sent."
+  },
+  "media": {
+    "directory": "docs/release-media/0.7.1",
+    "thumbnail": "cover-v1.png",
+    "visibleImages": 7,
+    "hiddenImages": 1,
+    "hiddenImage": "CLAW HeadSize morph screenshot retained hidden at the owner's request.",
+    "thumbnailPersistedAfterReload": true
+  },
   "publication": {
-    "nexusPageCreated": false,
-    "nexusFilesUploaded": false,
+    "nexusPageCreated": true,
+    "nexusFilesUploaded": true,
     "nexusPublished": false,
     "githubReleasePublished": false
   }

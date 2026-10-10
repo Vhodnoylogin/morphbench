@@ -25,5 +25,6 @@
 *.nif   filter=lfs diff=lfs merge=lfs -text
 *.tri   filter=lfs diff=lfs merge=lfs -text
 *.png   filter=lfs diff=lfs merge=lfs -text
+docs/release-media/**/*.jpg filter=lfs diff=lfs merge=lfs -text
 fixtures/human-collider-witness/artifact/mod/*.esp filter=lfs diff=lfs merge=lfs -text
 fixtures/human-collider-witness/artifact/mod/**/*.hkx filter=lfs diff=lfs merge=lfs -text

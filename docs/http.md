@@ -39,7 +39,10 @@ come from the settings. Source and protocol details are in `presenters/serve.py`
 | `/api/root?root=<folder>` | Set the browse root; under MO2 it must remain within the game's Data |
 | `/api/shutdown` | Stop the server after returning the response |
 
-Catalogue and payload requests can also supply `root=<folder>`. A payload request without
+Catalogue and payload requests can also supply `root=<folder>`. To open a mesh without TRI,
+pass `all=1` to both the catalogue and the payload request, for example
+`/api/payload?name=femalebody_1.nif&all=1`.
+A payload request without
 an open mesh returns an error. Opening a payload changes the server's selected mesh;
 setting a root and shutting down are actions even though their routes use GET.
 

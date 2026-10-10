@@ -1,0 +1,48 @@
+{
+  "status": "local-preparation-only",
+  "title": "Morphbench - Mesh Morph and Collider Workbench",
+  "summary": "Inspect Skyrim NIF meshes, TRI morphs, mesh bounds and skeleton collision capsules outside the game. Includes a browser viewer, CLI and local HTTP API. Self-contained Windows x64 tool.",
+  "version": "0.7.1",
+  "author": "Vhodnoylogin",
+  "suggestedGame": "Skyrim Special Edition",
+  "suggestedCategory": "Utilities",
+  "gameSelectionReason": "The tool works on Skyrim files; the current runtime comparison is Skyrim VR. Verify the live site's category and game choices before saving the page.",
+  "suggestedTags": ["Utilities", "Modder's Resource", "VR", "AI-Generated Content", "AI Media"],
+  "tagNote": "Use the site's exact current tag labels. AI-Generated Content covers generated code; AI Media covers the assisted page description. Do not claim limited AI involvement without evidence.",
+  "descriptionFile": "docs/nexus-description.bbcode",
+  "mainFile": {
+    "name": "Morphbench 0.7.1 - Windows x64",
+    "filename": "morphbench-0.7.1.zip",
+    "sha256": "ee0400f22081ebcb4718b3755c02df66ad6e740eb986dccf219b79e361301c23",
+    "bytes": 32470683,
+    "sourceCommit": "ec77cd186a9f4ef7e80a8ac29c50ac217565c709",
+    "description": "Self-contained Windows x64 workbench. Python, NumPy, Pillow and required PyNifly components included. Extract to a tools folder; add morphbench.exe to MO2 to browse merged Data. English and Russian documentation included.",
+    "downloadMethod": "Manual download"
+  },
+  "requiredNexusMods": [],
+  "optionalRequirementNotes": {
+    "Mod Organizer 2": "Only for browsing MO2's merged Data folder.",
+    "BodySlide": "Produces meshes and morphs that can be inspected; not required to run Morphbench.",
+    "PLANCK / HIGGS / Collision Visualizer VR": "For reproducing the Skyrim VR game comparison, not for the utility."
+  },
+  "permissions": {
+    "license": "GPL-3.0",
+    "text": "Use, modify and redistribute Morphbench under GNU GPL version 3, keeping notices and supplying the required source. Bundled dependencies retain their licences. This grants no rights to third-party models or game assets.",
+    "source": "https://github.com/Vhodnoylogin/morphbench/tree/ec77cd186a9f4ef7e80a8ac29c50ac217565c709"
+  },
+  "releaseChangeNotes": [
+    "Includes exclusive output creation, improved morph and bounds checks, capsule coverage corrections and packaging validation.",
+    "Human left-thigh x3 diagnostic placement accepted in tool/game comparison.",
+    "HTTP documentation explains all=1 on both catalogue and payload requests for meshes without TRI."
+  ],
+  "policySources": [
+    "https://help.nexusmods.com/article/136-best-practices-for-mod-authors",
+    "https://help.nexusmods.com/article/28-file-submission-guidelines"
+  ],
+  "publication": {
+    "nexusPageCreated": false,
+    "nexusFilesUploaded": false,
+    "nexusPublished": false,
+    "githubReleasePublished": false
+  }
+}

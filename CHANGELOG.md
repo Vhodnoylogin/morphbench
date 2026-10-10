@@ -22,7 +22,10 @@ go in a major release, and nowhere else.
   and build scripts no longer require an outer `morphbench/` module folder. Python imports
   and the release archive layout stay the same.
 - The local Windows bundle was checked on CLAW male/female NIF/TRI and XP32 HKX, including
-  new NIF output, PNG/HTML and a live MO2 launch with merged Data. Game validation remains open.
+  new NIF output, PNG/HTML and a live MO2 launch with merged Data.
+- On 2026-10-10 the owner accepted the visual comparison of the human fixture in Morphbench
+  and Skyrim VR: the enlarged left-thigh capsule appears in the same area and interacts in game.
+  The control/marker fixture and paired-view recipe remain in the repository, outside the release bundle.
 - Documented the running server's HTTP API for automation.
 
 ## [0.7.0] — unreleased

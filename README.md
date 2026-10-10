@@ -204,3 +204,7 @@ from `dependencies.json`.
 | [CLAUDE.md](CLAUDE.md) | the manifest for an AI assistant handed this folder and no history |
 
 Each of these exists twice, in English and in Russian: `NAME.md` and `NAME.ru.md`.
+
+## Development assistance
+
+Developed with assistance from [Codex (OpenAI)](https://github.com/codex).

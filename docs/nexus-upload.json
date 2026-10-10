@@ -160,5 +160,61 @@
     "supportUpdateSent": false,
     "nativeBinariesUnchanged": true,
     "nextStep": "Add the new file ID, hash and report to existing support ticket 270665; do not infer security clearance or delete the review evidence."
+  },
+  "vendorReview": {
+    "checkedDate": "2026-10-11",
+    "elastic": {
+      "status": "submitted-response-recorded",
+      "form": "https://docs.google.com/forms/d/e/1FAIpQLSfKZOPSPcucmgNR9_j316JnG_qYbJBpti5JSsNxQNQtTHjsxw/viewform",
+      "sampleSha256": "169be1215df3be054088f763506892bc61d9a0a9c01ee8711e9225cedb7d45bf",
+      "launcherAlsoIdentified": true,
+      "intelixReportsAddedToExistingResponse": true,
+      "reviewOutcome": "pending",
+      "privateReceiptLocation": "External vendor-analysis evidence; contact and response-edit link are not committed."
+    },
+    "sophosIntelix": {
+      "archive": {
+        "id": "159a3a66755a44ebb5279f66407b69a5",
+        "sha256": "169be1215df3be054088f763506892bc61d9a0a9c01ee8711e9225cedb7d45bf",
+        "staticReport": "https://intelix.sophos.com/report/159a3a66755a44ebb5279f66407b69a5/static/file",
+        "staticVerdict": "Clean",
+        "staticScopeCaveat": "Header names the archive hash, but detailed PE/reputation/VT data names numpy/_core/_rational_tests.cp312-win_amd64.pyd and links to that component's different hash. This is not established full archive coverage.",
+        "cloudLookup": "Suspicious or Unknown",
+        "reputationScore": 30,
+        "dynamicReport": "https://intelix.sophos.com/report/159a3a66755a44ebb5279f66407b69a5/dynamic/file",
+        "dynamicStatus": "completed",
+        "dynamicVerdict": "Clean",
+        "dynamicDurationSeconds": 238,
+        "dynamicObservations": {
+          "processes": 3,
+          "pythonCommand": "mb.py serve --status --json",
+          "networkConnections": ["TCP 127.0.0.1:8767"],
+          "filesWritten": 104,
+          "visibleWrites": "Python import caches; summary lists first 10 and reports 104 total",
+          "coverageLimit": "Observed launcher status probe and imports; no full viewer/mesh-processing session established."
+        }
+      },
+      "launcher": {
+        "id": "43d130831cdd41ec956a2ff2dd586043",
+        "sha256": "8307a26a2d13e4bad08a216b12c9c4bcc06904aa65be12f890f6a52519a64094",
+        "staticReport": "https://intelix.sophos.com/report/43d130831cdd41ec956a2ff2dd586043/static/file",
+        "staticVerdict": "Likely Clean",
+        "sophosAntiMalware": "Generic ML PUA (PUA)",
+        "machineLearning": "Suspicious",
+        "structureSimilarity": "Malicious",
+        "featureAnalysis": "Likely Clean",
+        "cloudLookup": "Suspicious or Unknown",
+        "reputationScore": 31,
+        "observations": ["Unsigned", "Low prevalence", "Assembly/file/product version 0.0.0.0"],
+        "causalTriggerConfirmed": false,
+        "cachedVirusTotalCount": "8/68; separately observed current VT report was 9/68",
+        "dynamicReport": "https://intelix.sophos.com/report/43d130831cdd41ec956a2ff2dd586043/dynamic/file",
+        "dynamicStatus": "completed",
+        "dynamicVerdict": "Clean",
+        "dynamicDurationSeconds": 182,
+        "dynamicScopeCaveat": "Standalone EXE report lists one process and a single processcreate event; execution of the Python application is not established."
+      }
+    },
+    "securityClearanceEstablished": false
   }
 }

@@ -53,7 +53,11 @@
     "flags": {"Elastic": "Malicious (high Confidence)", "Kingsoft": "Malware.kb.c.974", "Sophos": "Generic ML PUA (PUA)"},
     "exactNexusReasonConfirmed": false,
     "falsePositiveConfirmed": false,
-    "nextStep": "Request moderator review with source and build instructions; keep the original uploaded file. A support email draft is prepared locally but has not been sent."
+    "supportTicketId": 270665,
+    "supportAcknowledgedAt": "2026-10-10T19:29:40Z",
+    "supportRequestSubmittedByOwner": true,
+    "reviewStatus": "Awaiting human support review; automated receipt is not clearance.",
+    "nextStep": "Await support review for ticket 270665; keep the original uploaded file. Reply to the same ticket if additional details are needed."
   },
   "media": {
     "directory": "docs/release-media/0.7.1",

@@ -67,6 +67,10 @@
     "nexusPageCreated": true,
     "nexusFilesUploaded": true,
     "nexusPublished": false,
-    "githubReleasePublished": false
+    "githubReleasePublished": true,
+    "githubReleaseUrl": "https://github.com/Vhodnoylogin/morphbench/releases/tag/v0.7.1",
+    "githubPublishedAt": "2026-10-10T19:30:37Z",
+    "githubPublicDownloadsVerified": true,
+    "githubReleaseSourceCommit": "ec77cd186a9f4ef7e80a8ac29c50ac217565c709"
   }
 }

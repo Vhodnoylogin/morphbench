@@ -1,5 +1,5 @@
 {
-  "status": "unpublished-nexus-draft-quarantined",
+  "status": "unpublished-nexus-draft-new-file-scanning",
   "modId": 194795,
   "page": "https://www.nexusmods.com/skyrimspecialedition/mods/194795",
   "editor": "https://www.nexusmods.com/games/skyrimspecialedition/mods/194795/edit/media",
@@ -10,19 +10,32 @@
   "suggestedGame": "Skyrim Special Edition",
   "suggestedCategory": "Utilities",
   "gameSelectionReason": "Saved in Skyrim Special Edition / Utilities; the current runtime comparison is Skyrim VR.",
-  "suggestedTags": ["Utilities for Modders", "Modder's Resource", "Skyrim VR", "AI-Generated Content", "AI Media"],
+  "suggestedTags": [
+    "Utilities for Modders",
+    "Modder's Resource",
+    "Skyrim VR",
+    "AI-Generated Content",
+    "AI Media"
+  ],
   "tagNote": "These exact labels are saved on Nexus. AI Media includes the conceptual image_gen cover and assisted description. The six model screenshots are authentic unretouched tool captures.",
   "descriptionFile": "docs/nexus-description.bbcode",
   "mainFile": {
-    "nexusFileId": 817686,
-    "quarantined": true,
-    "name": "Morphbench 0.7.1 - Windows x64",
-    "filename": "morphbench-0.7.1.zip",
-    "sha256": "ee0400f22081ebcb4718b3755c02df66ad6e740eb986dccf219b79e361301c23",
-    "bytes": 32470683,
-    "sourceCommit": "ec77cd186a9f4ef7e80a8ac29c50ac217565c709",
-    "description": "Self-contained Windows x64 workbench. Python, NumPy, Pillow and required PyNifly components included. Extract to a tools folder; add morphbench.exe to MO2 to browse merged Data. English and Russian documentation included.",
-    "downloadMethod": "Manual download"
+    "nexusFileId": 817787,
+    "quarantined": null,
+    "scanStatus": "Virus scanning is in progress",
+    "name": "Morphbench 0.7.1 - packaging revision 2",
+    "fileVersion": "0.7.1-r2",
+    "runtimeVersion": "0.7.1",
+    "filename": "morphbench-0.7.1-repack.zip",
+    "sha256": "169be1215df3be054088f763506892bc61d9a0a9c01ee8711e9225cedb7d45bf",
+    "bytes": 30472009,
+    "sourceCommit": "6ad7ad4a2cb2b43446502047fae0340a33b8f685",
+    "description": "Self-contained Windows x64 tool. Packaging revision: dependency tests, .pyi, PyInstaller hooks and build utilities removed; embedded stdlib unpacked. Runtime remains 0.7.1. Extract to a tools folder, run morphbench.exe.",
+    "downloadMethod": "Manual download",
+    "primary": true,
+    "nativeBinariesUnchanged": true,
+    "validatedCandidateBytesUnchanged": true,
+    "buildInfoNote": "build-info.json records the pre-publication candidate state; the validated ZIP was published byte-for-byte."
   },
   "requiredNexusMods": [],
   "optionalRequirementNotes": {
@@ -45,20 +58,6 @@
     "https://help.nexusmods.com/article/28-file-submission-guidelines",
     "https://help.nexusmods.com/article/117-why-has-my-mod-been-quarantined"
   ],
-  "quarantine": {
-    "checkedDate": "2026-10-10",
-    "virusTotalReport": "https://www.virustotal.com/gui/file/ee0400f22081ebcb4718b3755c02df66ad6e740eb986dccf219b79e361301c23",
-    "detections": 3,
-    "engines": 66,
-    "flags": {"Elastic": "Malicious (high Confidence)", "Kingsoft": "Malware.kb.c.974", "Sophos": "Generic ML PUA (PUA)"},
-    "exactNexusReasonConfirmed": false,
-    "falsePositiveConfirmed": false,
-    "supportTicketId": 270665,
-    "supportAcknowledgedAt": "2026-10-10T19:29:40Z",
-    "supportRequestSubmittedByOwner": true,
-    "reviewStatus": "Awaiting human support review; automated receipt is not clearance.",
-    "nextStep": "Await support review for ticket 270665; keep the original uploaded file. Reply to the same ticket if additional details are needed."
-  },
   "media": {
     "directory": "docs/release-media/0.7.1",
     "thumbnail": "cover-v1.png",
@@ -72,9 +71,66 @@
     "nexusFilesUploaded": true,
     "nexusPublished": false,
     "githubReleasePublished": true,
-    "githubReleaseUrl": "https://github.com/Vhodnoylogin/morphbench/releases/tag/v0.7.1",
-    "githubPublishedAt": "2026-10-10T19:30:37Z",
+    "githubReleaseUrl": "https://github.com/Vhodnoylogin/morphbench/releases/tag/v0.7.1-repack",
+    "githubPublishedAt": "2026-10-10T21:48:24Z",
     "githubPublicDownloadsVerified": true,
-    "githubReleaseSourceCommit": "ec77cd186a9f4ef7e80a8ac29c50ac217565c709"
+    "githubReleaseSourceCommit": "6ad7ad4a2cb2b43446502047fae0340a33b8f685",
+    "previousGithubReleaseUrl": "https://github.com/Vhodnoylogin/morphbench/releases/tag/v0.7.1"
+  },
+  "historicalFiles": [
+    {
+      "nexusFileId": 817686,
+      "quarantined": true,
+      "name": "Morphbench 0.7.1 - Windows x64",
+      "filename": "morphbench-0.7.1.zip",
+      "sha256": "ee0400f22081ebcb4718b3755c02df66ad6e740eb986dccf219b79e361301c23",
+      "bytes": 32470683,
+      "sourceCommit": "ec77cd186a9f4ef7e80a8ac29c50ac217565c709",
+      "description": "Self-contained Windows x64 workbench. Python, NumPy, Pillow and required PyNifly components included. Extract to a tools folder; add morphbench.exe to MO2 to browse merged Data. English and Russian documentation included.",
+      "downloadMethod": "Manual download",
+      "category": "Old files / retained version history"
+    }
+  ],
+  "originalArchiveQuarantine": {
+    "checkedDate": "2026-10-10",
+    "virusTotalReport": "https://www.virustotal.com/gui/file/ee0400f22081ebcb4718b3755c02df66ad6e740eb986dccf219b79e361301c23",
+    "detections": 3,
+    "engines": 66,
+    "flags": {
+      "Elastic": "Malicious (high Confidence)",
+      "Kingsoft": "Malware.kb.c.974",
+      "Sophos": "Generic ML PUA (PUA)"
+    },
+    "exactNexusReasonConfirmed": false,
+    "falsePositiveConfirmed": false,
+    "supportTicketId": 270665,
+    "supportAcknowledgedAt": "2026-10-10T19:29:40Z",
+    "supportRequestSubmittedByOwner": true,
+    "reviewStatus": "Awaiting human support review; automated receipt is not clearance.",
+    "nextStep": "Await support review for ticket 270665; keep the original uploaded file. Reply to the same ticket if additional details are needed."
+  },
+  "scanComparison": {
+    "originalFileId": 817686,
+    "newFileId": 817787,
+    "newStatus": "virus-scanning-in-progress",
+    "checkedAt": "2026-10-10T21:52:20.312655+00:00",
+    "exactNexusReasonConfirmed": false,
+    "securityClearanceEstablished": false
+  },
+  "descriptionStyle": {
+    "reference": "https://www.nexusmods.com/skyrimspecialedition/mods/194796",
+    "headingColor": "#D0B17A",
+    "dividerUrl": "https://staticdelivery.nexusmods.com/mods/1704/images/194796/194796-1791664990-433961669.png",
+    "dividerDisplaySize": [
+      600,
+      100
+    ],
+    "dividerCount": 7,
+    "dividerSource": "Existing divider from the owner's Body Pouches page, reused by explicit request.",
+    "collapsibleBlocks": [
+      "Without MO2 / command-line use",
+      "Инструкция на русском"
+    ],
+    "savedAndRenderedVerified": true
   }
 }

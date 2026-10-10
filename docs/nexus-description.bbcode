@@ -1,64 +1,100 @@
-[size=5][b]Morphbench — Mesh, Morph and Collider Workbench[/b][/size]
+[center][size=5][color=#D0B17A][b]Inspect the mesh before you start the game[/b][/color][/size][/center]
 
 Open a Skyrim mesh, adjust its named morphs, and inspect the result before starting the game. Morphbench measures surface stretching, mesh bounds and skeleton collision capsules, with an interactive browser viewer and commands for repeatable checks.
 
 [b]BodySlide builds the body; Morphbench checks it.[/b]
 
-[size=4][b]What you can do[/b][/size]
+[center][img width=600 height=100]https://staticdelivery.nexusmods.com/mods/1704/images/194796/194796-1791664990-433961669.png[/img][/center]
+[size=4][color=#D0B17A][b]What you can do[/b][/color][/size]
 [list]
-[*]Open NIF meshes and their TRI/TRIP morphs. Inspect parts, bones and sliders.
-[*]Preview individual morphs or combinations, and colour the mesh by bone influence, morph displacement or surface strain.
-[*]Find empty or missing sliders, stretched seams and cover layers that do not follow the underlying surface.
-[*]Check whether the bounding spheres stored in a NIF contain the morphed geometry. Write corrected bounds to a new NIF.
-[*]Display skeleton collision capsules, measure their coverage, and fit capsules to selected geometry. Write the result to a new skeleton NIF.
-[*]Use skeleton HKX ragdoll transforms to position capsule bodies; select the matching NIF and HKX when comparing a custom skeleton.
-[*]Save PNG views or a self-contained interactive HTML viewer.
-[*]Automate checks through the command line, JSON output and a local HTTP API.
+[*]Open NIF meshes and their TRI/TRIP morphs. Inspect parts, bones and sliders.[/*]
+[*]Preview individual morphs or combinations, and colour the mesh by bone influence, morph displacement or surface strain.[/*]
+[*]Find empty or missing sliders, stretched seams and cover layers that do not follow the underlying surface.[/*]
+[*]Check whether the bounding spheres stored in a NIF contain the morphed geometry. Write corrected bounds to a new NIF.[/*]
+[*]Display skeleton collision capsules, measure their coverage, and fit capsules to selected geometry. Write the result to a new skeleton NIF.[/*]
+[*]Use skeleton HKX ragdoll transforms to position capsule bodies; select the matching NIF and HKX when comparing a custom skeleton.[/*]
+[*]Save PNG views or a self-contained interactive HTML viewer.[/*]
+[*]Automate checks through the command line, JSON output and a local HTTP API.[/*]
 [/list]
 
-[size=4][b]Install and start[/b][/size]
+[center][img width=600 height=100]https://staticdelivery.nexusmods.com/mods/1704/images/194796/194796-1791664990-433961669.png[/img][/center]
+[size=4][color=#D0B17A][b]Install and start[/b][/color][/size]
 Download the main file manually and extract it to a writable tools folder. Keep the extracted folder together. The Windows x64 package includes Python, NumPy, Pillow and the required PyNifly components; you do not need to install Python or Blender separately.
 
 [b]With Mod Organizer 2[/b]
 [list=1]
-[*]Add an executable in MO2. Set Binary to the extracted morphbench.exe.
-[*]Set Arguments to --start. Start in can remain empty.
-[*]Run Morphbench from MO2. This lets it see the merged Data folder of your selected profile.
-[*]Open the local viewer, select a mesh and inspect it.
+[*]Add an executable in MO2. Set Binary to the extracted morphbench.exe.[/*]
+[*]Set Arguments to --start. Start in can remain empty.[/*]
+[*]Run Morphbench from MO2. This lets it see the merged Data folder of your selected profile.[/*]
+[*]Open the local viewer, select a mesh and inspect it.[/*]
 [/list]
 Morphbench is an external tool. Install it in your tools folder and add it as an MO2 executable.
 
-[b]Without MO2[/b]
+[b]Without MO2 / command-line use[/b]
+[spoiler]
 Run morphbench.exe and choose the folder containing your meshes. For command-line use, open a terminal in the extracted folder:
 [code]python\python.exe mb.py summary "path\to\body_1.nif" --json
 python\python.exe mb.py web "path\to\body_1.nif" --out preview.html[/code]
 You can also add the bundled python\python.exe directly to MO2, with Arguments set to mb.py serve and Start in set to the extracted folder.
+[/spoiler]
 
-[size=4][b]Requirements and compatibility[/b][/size]
+[center][img width=600 height=100]https://staticdelivery.nexusmods.com/mods/1704/images/194796/194796-1791664990-433961669.png[/img][/center]
+[size=4][color=#D0B17A][b]Requirements and compatibility[/b][/color][/size]
 [list]
-[*]Windows x64 and a browser for the interactive viewer.
-[*]Your own NIF mesh. A matching TRI/TRIP file is needed for morph checks; a skeleton NIF is needed for capsule checks, and its matching skeleton HKX supplies ragdoll placement.
-[*]MO2 is needed only when browsing its virtual merged Data folder.
-[*]The release was checked using Skyrim VR assets and a human collider fixture. File analysis runs outside the game and does not require a running Skyrim or SKSE process.
-[*]PLANCK, HIGGS and Collision Visualizer are useful for a Skyrim VR game comparison; they are not dependencies of Morphbench itself.
+[*]Windows x64 and a browser for the interactive viewer.[/*]
+[*]Your own NIF mesh. A matching TRI/TRIP file is needed for morph checks; a skeleton NIF is needed for capsule checks, and its matching skeleton HKX supplies ragdoll placement.[/*]
+[*]MO2 is needed only when browsing its virtual merged Data folder.[/*]
+[*]The release was checked using Skyrim VR assets and a human collider fixture. File analysis runs outside the game and does not require a running Skyrim or SKSE process.[/*]
+[*]PLANCK, HIGGS and Collision Visualizer are useful for a Skyrim VR game comparison; they are not dependencies of Morphbench itself.[/*]
 [/list]
 Meshes without morph files are supported. If a body is absent from the default mesh list, enable the option to show meshes without morphs. With the HTTP API, use all=1 on both catalogue and payload requests.
 
-[size=4][b]What the results mean[/b][/size]
+[center][img width=600 height=100]https://staticdelivery.nexusmods.com/mods/1704/images/194796/194796-1791664990-433961669.png[/img][/center]
+[size=4][color=#D0B17A][b]What the results mean[/b][/color][/size]
 Morphbench measures the selected files. Strain highlights stretching; bounds checks find geometry beyond the stored spheres; capsule checks show coverage in the selected skeleton's frame. These results help locate file problems, but game animation, culling and physical contacts still need an in-game check.
 
 The human diagnostic comparison for 0.7.1 used a left-thigh capsule with three times the control radius. Its placement in the tool matched the owner's game screenshot, and the enlarged capsule was visible and interacted in game. This is a specific fixture comparison, rather than a claim that every body, pose or physics setup has been tested.
 
 Bounds and capsule fitting write [b]new files[/b]. The tool refuses to overwrite an existing output. Install a generated result as a separate patch mod in MO2, then verify it in game.
 
-[size=4][b]Help and documentation[/b][/size]
+[center][img width=600 height=100]https://staticdelivery.nexusmods.com/mods/1704/images/194796/194796-1791664990-433961669.png[/img][/center]
+[size=4][color=#D0B17A][b]Help and documentation[/b][/color][/size]
 The archive includes English and Russian documentation: quick start, viewer controls, commands, HTTP API and an explanation of the measurements. The interface supports English and Russian.
 
 [url=https://github.com/Vhodnoylogin/morphbench]Source code and issue tracker[/url]
 When reporting a problem, include the tool version, the command or steps, the error message, and whether Morphbench was launched through MO2. Share third-party meshes only when their author permits redistribution.
 
-[size=4][b]Credits and permissions[/b][/size]
-Morphbench: Vhodnoylogin. PyNifly: BadDogSkyrim and contributors. Python, NumPy and Pillow: their respective developers and contributors. Full dependency credits and licences are included in THIRD-PARTY.md and the bundled licence files.
+
+[center][img width=600 height=100]https://staticdelivery.nexusmods.com/mods/1704/images/194796/194796-1791664990-433961669.png[/img][/center]
+[size=4][color=#D0B17A][b]Инструкция на русском[/b][/color][/size]
+[spoiler]
+Morphbench открывает меши NIF и морфы TRI/TRIP, показывает влияние костей, растяжение поверхности, границы меша и капсулы коллизий скелета. Можно сохранить PNG или автономный HTML и повторить действия через CLI или локальный HTTP API.
+
+[b]Установка[/b]
+Скачайте основной файл вручную и распакуйте всю папку в доступный для записи каталог инструментов. Запустите morphbench.exe. Python, NumPy, Pillow и необходимые компоненты PyNifly уже включены.
+
+[b]Запуск через MO2[/b]
+[list=1]
+[*]Добавьте исполняемый файл в MO2: Binary — распакованный morphbench.exe.[/*]
+[*]Arguments — --start; Start in можно оставить пустым.[/*]
+[*]Запускайте инструмент из MO2, чтобы он видел объединённую Data текущего профиля.[/*]
+[*]Откройте локальный просмотрщик и выберите меш.[/*]
+[/list]
+[b]Файлы для проверки[/b]
+Для морфов нужен соответствующий TRI/TRIP; для капсул — skeleton.nif и соответствующий skeleton.hkx, который задаёт положение тел ragdoll. Для обычного просмотра подходит NIF без морфов: включите показ мешей без морфов. В HTTP-запросах используйте all=1 и для каталога, и для payload.
+
+[b]Оценка результата[/b]
+Растяжение, границы и охват капсулами относятся к выбранным файлам. Анимацию, отсечение и физические контакты проверяйте в игре. Сравнение человеческого пробника с утроенным радиусом левой капсулы бедра принято владельцем: положение в инструменте совпало со снимком игры, контакт также подтверждён. Это проверка конкретного пробника.
+
+[b]Сохранение изменений[/b]
+Исправление границ и подгонка капсул создают новые NIF. Перезапись существующего файла отклоняется. Установите результат отдельным патч-модом MO2 и проверьте его в игре.
+
+В архиве есть подробные инструкции на русском и английском. PLANCK, HIGGS и Collision Visualizer нужны только для соответствующего игрового сравнения Skyrim VR, а не для работы Morphbench.
+[/spoiler]
+
+[center][img width=600 height=100]https://staticdelivery.nexusmods.com/mods/1704/images/194796/194796-1791664990-433961669.png[/img][/center]
+[size=4][color=#D0B17A][b]Credits and permissions[/b][/color][/size]
+Morphbench: Vhodnoylogin, with development assistance from Codex. PyNifly: BadDogSkyrim and contributors. Python, NumPy and Pillow: their respective developers and contributors. Full dependency credits and licences are included in THIRD-PARTY.md and the bundled licence files.
 
 Morphbench is distributed under GNU GPL version 3. Use, modify and redistribute it under that licence, preserving notices and providing the required source. These permissions apply to Morphbench; third-party meshes and game assets retain their own permissions.
 

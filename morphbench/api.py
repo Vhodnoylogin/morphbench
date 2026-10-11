@@ -50,6 +50,7 @@ from .model import BodyModel, sphere_of, vertex_normals
 from .morphs import MorphSet
 from .ragdoll import RagdollMap
 from .view import ViewState
+from .placements import Placements
 
 
 class MorphBench:
@@ -65,6 +66,75 @@ class MorphBench:
         self.env = Environment(self.cfg)
         self._sliders: dict[str, float] = {}
         self._catalogs: dict[tuple[str, bool], Catalog] = {}
+        self._placements = Placements(self.cfg)
+
+    # ---- offline named anchor placements --------------------------------------------
+    def slots_mode(self, mode: str = "slots") -> str:
+        if mode not in ("mesh", "slots"):
+            raise ValueError(t("slots.invalid", field="mode"))
+        self._placements.mode = mode
+        return mode
+
+    def slots_replace(self, metadata: dict, placements: list) -> dict:
+        return self._placements.replace(metadata, placements)
+
+    def slots_validate(self, metadata: dict, placements: list, limits: dict | None = None) -> dict:
+        """Pure validation; a presenter can supply fixed numeric format constraints."""
+        return Placements(self.cfg, limits).replace(metadata, placements)
+
+    def slots_add(self, name: str, anchor: str, attributes: dict | None = None) -> dict:
+        return self._placements.add(name, anchor, attributes)
+
+    def slots_select(self, name: str | None) -> str | None:
+        if name is not None:
+            self._placements.require(name)
+        self._placements.selected = name
+        return name
+
+    def slots_set(self, name: str, changes: dict) -> dict:
+        return self._placements.set(name, changes)
+
+    def slots_customize(self, name: str, changes: dict) -> dict:
+        return self._placements.set(name, changes, customize=True)
+
+    def slots_clear(self, name: str) -> list:
+        self._placements.require(name)
+        self._placements.overrides.pop(name, None)
+        return self.slots_effective()
+
+    def slots_remove(self, name: str) -> dict:
+        self._placements.require(name)
+        del self._placements.authored[name]
+        self._placements.overrides.pop(name, None)
+        self._placements.selected = next(iter(sorted(self._placements.authored)), None)
+        return self.slots_project()
+
+    def slots_project(self) -> dict:
+        return self._placements.project()
+
+    def slots_metadata(self, metadata: dict) -> dict:
+        if type(metadata) is not dict:
+            raise ValueError(t("slots.invalid", field="metadata"))
+        self._placements.metadata = self._placements._json(metadata)
+        return self.slots_project()["metadata"]
+
+    def slots_effective(self) -> list:
+        return self._placements.effective()
+
+    def slots_anchors(self) -> dict:
+        """True skeleton NODE frames only; no ragdoll frames or identity fallback."""
+        return {} if self.rig is None else {name: matrix.tolist() for name, matrix in self.rig.matrices.items()}
+
+    def slots_preview(self) -> list:
+        return self._placements.preview(self.slots_anchors())
+
+    def slots_meshes(self) -> list:
+        return self._placements.meshes(self.slots_anchors())
+
+    def slots_state(self) -> dict:
+        return {"mode": self._placements.mode, "selected": self._placements.selected,
+                "project": self.slots_project(), "effective": self.slots_effective(),
+                "preview": self.slots_preview(), "anchors": self.slots_anchors()}
 
     # ---- the environment, and browsing for meshes -------------------------------------
     def environment(self) -> dict:
@@ -816,9 +886,12 @@ class MorphBench:
         sliders applied, along the axes of the camera, then the aim and the pan. The core
         works it out; the presenters only place the camera by it, and that is how zooming at a
         point knows which frame was on the screen."""
-        self._require()
-        chunks = [self.deformed(n) for n in self.visible_shapes()
+        if self._placements.mode != "slots":
+            self._require()
+        chunks = [] if self.model is None else [self.deformed(n) for n in self.visible_shapes()
                   if self.model.shape(n).triangle_count]
+        if self._placements.mode == "slots":
+            chunks.extend(np.asarray(mesh["vertices"], dtype=np.float32) for mesh in self.slots_meshes())
         if not chunks:
             raise RuntimeError(t("core.allHidden"))
         verts = np.vstack(chunks)

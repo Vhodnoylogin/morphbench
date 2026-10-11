@@ -390,3 +390,7 @@ the mirror, not a tolerance to live with.
 
 See also: [README.md](../README.md) · [quickstart.md](quickstart.md) · [cli.md](cli.md) ·
 [physics.md](physics.md) · [localisation.md](localisation.md) · [building.md](building.md)
+
+## Slots authoring mode
+
+The workbench mode selector opens **Slots authoring** on this same canvas. Its controls create/load named anchor placements, edit author defaults or temporary effective geometry, and download author JSON, `.bslots` packages or a replayable CLI recipe. Mesh inspection keeps its existing behavior. The slots overlay uses true skeleton node frames and explicitly marks missing anchors unavailable. See [slots.md](slots.md); this mode does not edit an inventory, a game save or item instances.

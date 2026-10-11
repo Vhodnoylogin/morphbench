@@ -9,6 +9,7 @@ class App {
     this.data = data;
     this.bench = new BenchMirror(data);
     this.lastCall = "";
+    this.slotActions = [];
     this.scale = 1.0;
     this.canvas = document.getElementById("canvas");
     this.renderer = new Renderer(this.canvas, data.settings);
@@ -18,6 +19,7 @@ class App {
     // collider_mesh() on every frame.
     for (const chunk of this.bench.collider_meshes()) this.renderer.uploadColliders(chunk);
     this.renderer.uploadColliders(this.bench.bumper_mesh());
+    this.refreshSlots();
     this.refreshPositions();
     this.refreshColours();
     this.panel = new Panel(this, document.getElementById("panel"));
@@ -29,8 +31,9 @@ class App {
   // The one door to every action: the name of a facade method and its arguments.
   invoke(method, ...args) {
     this.panel.error.textContent = "";
+    let result;
     try {
-      this.bench[method](...args);
+      result = this.bench[method](...args);
     } catch (e) {
       this.panel.error.textContent = String(e.message || e);
       return;
@@ -38,9 +41,15 @@ class App {
     this.lastCall = "bench." + method + "(" + args.map((a) => JSON.stringify(a)).join(", ") + ")";
     if (POSITION_METHODS.has(method)) this.refreshPositions();
     if (COLOUR_METHODS.has(method)) this.refreshColours();
+    if (method.startsWith("slots_") && !["slots_project","slots_state","slots_effective","slots_preview","slots_meshes","slots_anchors","slots_validate"].includes(method)) {
+      this.slotActions.push({method:method,args:placementClone(args)});
+      this.refreshSlots();
+    }
     this.panel.refresh();
     this.draw();
+    return result;
   }
+  refreshSlots() { this.renderer.uploadSlots(this.bench.slots_meshes()); }
   // Positions with the sliders applied, and the normals that follow from them, into the
   // buffers; the normals are recomputed after every slider move, because the shading is
   // taken off the deformed body.

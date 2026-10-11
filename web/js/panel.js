@@ -14,6 +14,7 @@ class Panel {
 
     // the model: what is open and, when a server is behind the page, what to choose from
     root.appendChild(this.buildModel());
+    this.slotsPanel = new SlotsPanel(app, root);
 
     // view presets
     this.presetButtons = new Map();
@@ -208,6 +209,7 @@ class Panel {
   // Going to the same server with another body or another root: the page holds one body, so
   // changing the model is a reload with a different query, not a second set of geometry.
   go(params) {
+    params.mode=this.bench.placements.mode;
     const q = [];
     for (const k in params) if (params[k] !== undefined && params[k] !== null && params[k] !== "") q.push(k + "=" + encodeURIComponent(params[k]));
     if (this.allBox && this.allBox.checked) q.push("all=1");
@@ -268,6 +270,7 @@ class Panel {
     }
   }
   refresh() {
+    this.slotsPanel.refresh();
     const bench = this.bench, view = bench.view, state = view.as_dict();
     const preset = state.preset;
     for (const [name, b] of this.presetButtons) b.classList.toggle("on", name === preset);

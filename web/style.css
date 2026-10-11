@@ -46,3 +46,9 @@
   .muted { color: var(--muted); font-size: 12px; }
   .warn { color: var(--accent); font-size: 12px; }
   .err { color: #e07070; }
+/* Offline Slots mode shares the viewer and stays usable on the existing narrow panel. */
+.slot-field { display: block; margin: 8px 0; }
+.slot-field .row { flex-wrap: wrap; }
+.slot-number { width: 5.5em; }
+.slots-editor textarea { box-sizing: border-box; font-family: monospace; }
+.slot-status { white-space: pre-wrap; }

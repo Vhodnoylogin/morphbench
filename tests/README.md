@@ -58,3 +58,7 @@ settings, otherwise the `io_scene_nifly` addon in the Blender addons folder. Wit
 suites that have to write a real file are **skipped** with a reason - a skip does not count as
 a failure. A refusal from the PyNifly API itself while creating a file is a skip too, carrying
 the text of the exception: what is under test is the bench's reading, not PyNifly.
+
+## Slots mode checks
+
+`test_slots.py` covers atomic placement validation, author/effective isolation, immutable override policy, true node transforms versus deliberately different ragdoll transforms, missing/invalid anchors, one application of uniform scale, access/axis geometry, slots framing, public schema/package layout, strict JSON/file guards and CLI recipe replay. When Node is available, it executes the actual browser mirror and compares its effective state, preview, meshes, framing and package bytes with the Python facade. Node is an optional test tool, not a product dependency; the rest uses synthetic in-memory models and frames only.

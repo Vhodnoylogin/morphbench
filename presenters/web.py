@@ -196,6 +196,9 @@ class WebPage:
             "colliderColour": [float(x) for x in cfg["colliderColour"]],
             "colliderOpacity": float(cfg["colliderOpacity"]),
             "collidersFollowParts": bool(cfg["collidersFollowParts"]),
+            **{key: cfg[key] for key in ("placementLimit", "placementRadius", "placementCoordinateLimit",
+               "placementRotationTolerance", "placementStep", "placementColour", "placementOpacity",
+               "placementMarkerFraction", "placementAxisColours", "colliderSegments")},
         }
 
     # ---- the server: what the page knows about it -------------------------------------
@@ -288,6 +291,7 @@ class WebPage:
             # The page's labels travel ready-made: a script in the browser cannot reach
             # the language catalogue.
             "texts": section("page."),
+            "slots": bench.slots_state(),
         })
         return data
 

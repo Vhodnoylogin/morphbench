@@ -601,3 +601,9 @@ always outranks the setting, and only for that run — `--percentile` does not w
 back to the file.
 
 The full list is in the comments of `morphbench/config.py`, which are the authority.
+
+## `slots`: offline anchor placement authoring
+
+`python mb.py slots --project author.json --recipe session.json --out edited.json --package edited.bslots --json` replays the same named `slots_*` facade actions used by the Slots UI. `--action` accepts one `{method,args}` JSON object and may be repeated. `--provider` starts a new empty project when no author JSON is supplied. An optional mesh and `--skeleton` enable numerical reference-pose preview; authoring/export needs neither. JSON output contains `{project,effective,preview,saved}`. Author JSON and packages contain author defaults; recipe overrides affect only the effective offline preview. Outputs must be new files and cannot overwrite inputs. See [slots.md](slots.md) for actions and limits.
+
+`web` and `serve` also accept `--mode mesh|slots` and `--slots-project author.json`; the default is mesh inspection. `serve` accepts `--skeleton` on a new server. A running server can open `/?mode=slots` and import JSON through the self-contained page; no HTTP mutation routes are added.

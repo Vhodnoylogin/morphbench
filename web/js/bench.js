@@ -31,7 +31,25 @@ class BenchMirror {
     this._bumperMesh = raw && raw.bumper ? new ColliderMesh("colliders:bumper", raw.bumper) : null;
     this.view = new ViewMirror(data.settings, data.presets, data.view);
     this._sliders = new Map(Object.entries(data.sliders));
+    this.placements = new PlacementMirror(data.settings, data.slots);
   }
+
+  slots_mode(mode="slots") { if (!["mesh","slots"].includes(mode)) this.placements.fail("mode"); this.placements.mode=mode; return mode; }
+  slots_replace(metadata,rows) { return this.placements.replace(metadata,rows); }
+  slots_validate(metadata,rows,limits) { return new PlacementMirror(this.settings,null,limits).replace(metadata,rows); }
+  slots_add(name,anchor,attributes) { return this.placements.add(name,anchor,attributes); }
+  slots_select(name) { if(name!==null) this.placements.require(name);this.placements.selected=name;return name; }
+  slots_set(name,changes) { return this.placements.set(name,changes,false); }
+  slots_customize(name,changes) { return this.placements.set(name,changes,true); }
+  slots_clear(name) { this.placements.require(name);this.placements.overrides.delete(name);return this.slots_effective(); }
+  slots_remove(name) { this.placements.require(name);this.placements.authored.delete(name);this.placements.overrides.delete(name);this.placements.selected=[...this.placements.authored.keys()].sort()[0]||null;return this.slots_project(); }
+  slots_project() { return this.placements.project(); }
+  slots_metadata(metadata) { if(!metadata||typeof metadata!=="object"||Array.isArray(metadata)) this.placements.fail("metadata");this.placements.metadata=placementClone(metadata);return this.slots_project().metadata; }
+  slots_effective() { return this.placements.effective(); }
+  slots_anchors() { return placementClone(this.placements.anchors); }
+  slots_preview() { return this.placements.preview(); }
+  slots_meshes() { return this.placements.meshes(); }
+  slots_state() { return {mode:this.placements.mode,selected:this.placements.selected,project:this.slots_project(),effective:this.slots_effective(),preview:this.slots_preview(),anchors:this.slots_anchors()}; }
 
   is_open() { return this.summary !== null; }
   // skeleton and capsules: the core has already worked the geometry out, and it travels in the page
@@ -96,10 +114,11 @@ class BenchMirror {
   // half-span stays in ViewMirror, so zooming to a point knows which frame was on the screen.
   framing() {
     const shapes = this.visible_shapes().map((n) => this.shape(n)).filter((s) => s.triCount > 0);
-    if (!shapes.length) throw new Error(T.errAllHidden);
+    const clouds = shapes.map((shape) => this.deformed(shape.name));
+    if(this.placements.mode === "slots") for(const mesh of this.slots_meshes()) clouds.push(new Float32Array(mesh.vertices.flat()));
+    if (!clouds.length) throw new Error(T.errAllHidden);
     const lo = [Infinity, Infinity, Infinity], hi = [-Infinity, -Infinity, -Infinity];
-    for (const s of shapes) {
-      const p = this.deformed(s.name);
+    for (const p of clouds) {
       for (let i = 0, n = p.length; i < n; i += 3) {
         if (p[i] < lo[0]) lo[0] = p[i]; if (p[i] > hi[0]) hi[0] = p[i];
         if (p[i + 1] < lo[1]) lo[1] = p[i + 1]; if (p[i + 1] > hi[1]) hi[1] = p[i + 1];
@@ -109,8 +128,7 @@ class BenchMirror {
     const whole = [0.5 * (lo[0] + hi[0]), 0.5 * (lo[1] + hi[1]), 0.5 * (lo[2] + hi[2])];
     const b = this.view.basis(), r = b.right, u = b.up;
     let half = 0.0;
-    for (const s of shapes) {
-      const p = s.pos;
+    for (const p of clouds) {
       for (let i = 0, n = p.length; i < n; i += 3) {
         const dx = p[i] - whole[0], dy = p[i + 1] - whole[1], dz = p[i + 2] - whole[2];
         const x = Math.abs(dx * r[0] + dy * r[1] + dz * r[2]);

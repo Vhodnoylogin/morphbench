@@ -201,6 +201,16 @@ DEFAULTS = {
     "sliderStep": 0.01,
     "orbitSensitivity": 0.4,
     "wheelZoomRate": 0.0015,
+    # Generic anchor-placement authoring. Exporters impose their own format limits.
+    "placementLimit": 256,
+    "placementRadius": 10.0,
+    "placementCoordinateLimit": 1000000.0,
+    "placementRotationTolerance": 0.0001,
+    "placementStep": 0.1,
+    "placementColour": [255, 180, 70],
+    "placementAxisColours": {"x": [255, 80, 80], "y": [80, 230, 110], "z": [90, 140, 255], "origin": [255, 255, 255]},
+    "placementOpacity": 0.4,
+    "placementMarkerFraction": 0.12,
 }
 
 

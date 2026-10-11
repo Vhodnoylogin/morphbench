@@ -481,9 +481,52 @@ def cmd_web(args) -> int:
     from presenters.web import WebPage
     bench = _bench(args)
     _apply_view(bench, args)
+    bench.slots_mode(args.mode)
+    if args.slots_project:
+        from presenters import body_slots
+        body_slots.load_into(bench, body_slots.read_project(args.slots_project))
     path = WebPage(bench).save(args.out)
     _out(args, {"saved": str(path), "view": bench.view_state(),
                 "sliders": bench.sliders()} if args.json else t("cli.msg.page", path=path))
+    return 0
+
+
+def cmd_slots(args) -> int:
+    """Offline placement authoring; replay exactly the facade calls offered on the page."""
+    from presenters import body_slots
+    bench = _bench(args) if args.nif or args.skeleton else MorphBench()
+    bench.slots_mode("slots")
+    if args.project:
+        body_slots.load_into(bench, body_slots.read_project(args.project))
+    else:
+        bench.slots_metadata({"namespace": args.provider, "reference": {
+            "rig": body_slots.RIG, "units": body_slots.UNITS, "axes": body_slots.AXES}})
+    actions = body_slots.read_project(args.recipe) if args.recipe else []
+    if type(actions) is not list:
+        raise ValueError(t("slots.invalid", field="recipe"))
+    try:
+        actions = actions + [json.loads(value) for value in args.action]
+    except json.JSONDecodeError:
+        raise ValueError(t("slots.invalid", field="action JSON")) from None
+    methods = {"slots_replace", "slots_add", "slots_select", "slots_set", "slots_customize", "slots_clear",
+               "slots_remove", "slots_metadata", "slots_mode", "slots_project", "slots_effective", "slots_preview", "slots_state"}
+    for action in actions:
+        if (type(action) is not dict or set(action) != {"method", "args"} or
+                type(action["method"]) is not str or action["method"] not in methods or type(action["args"]) is not list):
+            raise ValueError(t("slots.invalid", field="action"))
+        try:
+            getattr(bench, action["method"])(*action["args"])
+        except TypeError:
+            raise ValueError(t("slots.invalid", field="action arguments")) from None
+    schema = body_slots.to_schema(bench)
+    inputs = (args.project, args.recipe, args.nif, args.tri, args.skeleton, args.hkx)
+    saved = []
+    if args.out:
+        saved.append(body_slots.write_new(args.out, (json.dumps(schema, ensure_ascii=False, indent=2) + "\n").encode("utf-8"), inputs))
+    if args.package:
+        saved.append(body_slots.write_new(args.package, body_slots.package(bench), inputs))
+    result = {"project": schema, "effective": bench.slots_effective(), "preview": bench.slots_preview(), "saved": saved}
+    print(json.dumps(result, ensure_ascii=False, indent=2))
     return 0
 
 
@@ -524,6 +567,10 @@ def cmd_serve(args) -> int:
     from presenters.serve import ServerLink, WebServer
     bench = MorphBench()
     cfg = bench.cfg
+    bench.slots_mode(args.mode)
+    if args.slots_project:
+        from presenters import body_slots
+        body_slots.load_into(bench, body_slots.read_project(args.slots_project))
     link = ServerLink(args.host or cfg["serveHost"],
                       cfg["servePort"] if args.port is None else args.port)
     if args.status:
@@ -548,6 +595,8 @@ def cmd_serve(args) -> int:
         raise
     if args.nif:
         bench.open(args.nif, args.tri, getattr(args, "skeleton", None))
+    elif args.skeleton:
+        bench.open_skeleton(args.skeleton)
     if getattr(args, "parent", None):
         # Leave together with whoever started it: otherwise a window killed outright
         # leaves an invisible server sitting on a live MO2 overlay, and the next run
@@ -609,10 +658,10 @@ def _hand_over(bench: MorphBench, link, args) -> int:
         raise ValueError(t("serve.foreignServer", url=link.url))
     root = args.root if args.root is not None else here["dataRoot"]
     handed = link.set_root(root) if root is not None else None
-    if args.nif:
+    if args.nif or args.skeleton or args.slots_project:
         raise ValueError(t("serve.openMeshOnPage", url=link.url))
     if not args.no_browser:
-        link.open_page()
+        link.open_page(mode=args.mode)
     _out(args, {"started": False, "url": link.url, "root": there.get("root") if handed is None
                 else handed["root"], "handed": handed, "insideMo2": there["insideMo2"]}
          if args.json else
@@ -813,7 +862,18 @@ COMMANDS = (
         Arg("--views", default=None),
         Arg("--prefix", default="view"),
     )),
-    Command("web", "cli.cmd.web", cmd_web, mesh=MESH_OPTIONAL, args=VIEW_ARGS),
+    Command("web", "cli.cmd.web", cmd_web, mesh=MESH_OPTIONAL, args=VIEW_ARGS + (
+        Arg("--mode", choices=("mesh", "slots"), default="mesh", help_key="cli.opt.slots.mode"),
+        Arg("--slots-project", default=None, help_key="cli.opt.slots.project"),
+    )),
+    Command("slots", "cli.cmd.slots", cmd_slots, mesh=MESH_OPTIONAL, args=(
+        Arg("--project", default=None, help_key="cli.opt.slots.project"),
+        Arg("--provider", default="morphbench", help_key="cli.opt.slots.provider"),
+        Arg("--action", action="append", default=[], help_key="cli.opt.slots.action"),
+        Arg("--recipe", default=None, help_key="cli.opt.slots.recipe"),
+        Arg("--out", default=None, help_key="cli.opt.slots.out"),
+        Arg("--package", default=None, help_key="cli.opt.slots.package"),
+    )),
     # Commands that need no mesh: the surroundings, the catalogue, the page with the list.
     Command("env", "cli.cmd.env", cmd_env, mesh=MESH_NONE),
     Command("catalog", "cli.cmd.catalog", cmd_catalog, mesh=MESH_NONE, args=(
@@ -822,6 +882,9 @@ COMMANDS = (
         Arg("--find", default=None, help_key="cli.opt.catalog.find"),
     )),
     Command("serve", "cli.cmd.serve", cmd_serve, mesh=MESH_NONE, args=(
+        Arg("--mode", choices=("mesh", "slots"), default="mesh", help_key="cli.opt.slots.mode"),
+        Arg("--slots-project", default=None, help_key="cli.opt.slots.project"),
+        Arg("--skeleton", default=None, help_key="cli.opt.top.skeleton"),
         Arg("--root", default=None, help_key="cli.opt.serve.root"),
         Arg("--nif", default=None, help_key="cli.opt.serve.nif"),
         Arg("--tri", default=None),

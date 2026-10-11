@@ -69,6 +69,7 @@ class Renderer {
                         "uLight", "uAmbient", "uDiffuse", "uFill", "uFlat", "uAlpha"])
       this.uni[name] = gl.getUniformLocation(this.program, name);
     this.meshes = new Map();
+    this.slotChunks = [];
     this.bg = settings.background.map((x) => x / 255.0);
     this.flat = settings.shading === "flat";
     // The capsule layer: colour and opacity from the same settings keys the rasteriser reads.
@@ -110,7 +111,7 @@ class Renderer {
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, idx);
     gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, shape.tris, gl.STATIC_DRAW);
     gl.bindVertexArray(null);
-    this.meshes.set(shape.name, { vao, pos, nrm, col, count: shape.tris.length,
+    this.meshes.set(shape.name, { vao, pos, nrm, col, idx, count: shape.tris.length,
       type: shape.tris instanceof Uint32Array ? gl.UNSIGNED_INT : gl.UNSIGNED_SHORT });
   }
   _refill(buffer, data) {
@@ -131,6 +132,23 @@ class Renderer {
     for (let i = 0; i < chunk.count; i++) { colours[i * 3] = t[0]; colours[i * 3 + 1] = t[1]; colours[i * 3 + 2] = t[2]; }
     this.setColours(chunk, colours);
   }
+  uploadSlots(meshes) {
+    const gl = this.gl;
+    for(const chunk of this.slotChunks) {
+      const buffers=this.meshes.get(chunk.name);
+      if(buffers) { for(const key of ["pos","nrm","col","idx"]) gl.deleteBuffer(buffers[key]);gl.deleteVertexArray(buffers.vao);this.meshes.delete(chunk.name); }
+    }
+    this.slotChunks = meshes.map((mesh) => {
+      const pos=new Float32Array(mesh.vertices.flat()),tris=pos.length/3>65535?new Uint32Array(mesh.triangles.flat()):new Uint16Array(mesh.triangles.flat());
+      const chunk={name:"slot:"+mesh.name,pos:pos,tris:tris,count:pos.length/3,triCount:tris.length/3,
+        nrm:vertexNormals(pos,tris,new Float32Array(pos.length)),kind:mesh.kind};
+      this.upload(chunk);
+      const tint=(this.settings.placementAxisColours[mesh.kind]||this.settings.placementColour).map((x)=>x/255);
+      const colours=new Float32Array(pos.length);for(let i=0;i<colours.length;i++) colours[i]=tint[i%3];
+      this.setColours(chunk,colours);return chunk;
+    });
+  }
+  _slotChunks(bench) { return bench.placements.mode === "slots" ? this.slotChunks : []; }
   // The capsule chunks that have to be drawn right now: the capsules of the visible bones when
   // the layer is on, and the bumper on top of that by its own flag. No skeleton, or the layer
   // switched off - nothing.
@@ -153,7 +171,7 @@ class Renderer {
   _depthRange(bench, centre, forward) {
     let zmin = Infinity, zmax = -Infinity;
     const clouds = bench.visible_shapes().map((n) => bench.shape(n)).filter((s) => s.triCount > 0)
-      .concat(this._colliderChunks(bench));
+      .concat(this._colliderChunks(bench),this._slotChunks(bench));
     for (const s of clouds) {
       const p = s.pos;
       for (let i = 0, n = p.length; i < n; i += 3) {
@@ -204,6 +222,7 @@ class Renderer {
       gl.drawElements(gl.TRIANGLES, m.count, m.type, 0);
     }
     this._overlayColliders(bench);
+    this._overlaySlots(bench);
     gl.bindVertexArray(null);
     return { scale: scale };
   }
@@ -233,5 +252,15 @@ class Renderer {
     }
     gl.uniform1f(this.uni.uAlpha, 1.0);
     gl.disable(gl.BLEND);
+  }
+  _overlaySlots(bench) {
+    const chunks=this._slotChunks(bench);if(!chunks.length) return;
+    const gl=this.gl;gl.enable(gl.BLEND);gl.blendFuncSeparate(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA,gl.ZERO,gl.ONE);
+    gl.clear(gl.DEPTH_BUFFER_BIT);
+    for(const chunk of chunks) {
+      gl.uniform1f(this.uni.uAlpha,chunk.kind === "region" ? this.settings.placementOpacity : 1);
+      const mesh=this.meshes.get(chunk.name);gl.bindVertexArray(mesh.vao);gl.drawElements(gl.TRIANGLES,mesh.count,mesh.type,0);
+    }
+    gl.uniform1f(this.uni.uAlpha,1);gl.disable(gl.BLEND);
   }
 }

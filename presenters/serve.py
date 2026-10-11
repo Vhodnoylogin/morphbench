@@ -330,6 +330,8 @@ class WebServer:
             shown_root = root
             catalog: list[dict] = []
             try:
+                if query.get("mode") is not None:
+                    bench.slots_mode(query.get("mode"))
                 if root is not None:
                     catalog = bench.catalog(root, with_morphs)
                 key = query.key
@@ -441,8 +443,8 @@ class ServerLink:
                 out["root"] = env.get("root")
         return out
 
-    def open_page(self) -> None:
-        webbrowser.open(self.url)
+    def open_page(self, mode=None) -> None:
+        webbrowser.open(self.url + ("?mode=" + urllib.parse.quote(str(mode)) if mode else ""))
 
 
 class _Handler(BaseHTTPRequestHandler):

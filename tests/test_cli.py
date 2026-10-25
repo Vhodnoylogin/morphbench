@@ -39,6 +39,38 @@ def run(argv, cfg) -> str:
     return out.getvalue()
 
 
+class TestBoundsOutputRefusals(unittest.TestCase):
+
+    def test_existing_output_is_a_concise_refusal_and_preserves_both_files(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            cfg = common.config(root)
+            pynifly = common.load_pynifly(cfg)
+            verts = [(0, 0, 0), (2, 0, 0), (0, 2, 0)]
+            source = common.write_nif(pynifly, root / "body.nif", {"body": {
+                "verts": verts, "tris": [(0, 1, 2)],
+                "uvs": [(0, 0), (1, 0), (0, 1)], "normals": [(0, 0, 1)] * 3}},
+                game="SKYRIMSE")
+            tri = common.trip_file_class(cfg)()
+            tri.set_morphs("body", {"Up": [(0, 0, 30), (2, 0, 0), (0, 2, 0)]}, verts)
+            tri.write(str(root / "body.tri"))
+            destination = root / "already-there.nif"
+            destination.write_bytes(b"another mod owns this output")
+            before = {path: path.read_bytes() for path in (source, root / "body.tri", destination)}
+            stdout, stderr = io.StringIO(), io.StringIO()
+            with (mock.patch.object(mb, "Config", return_value=cfg),
+                  mock.patch.object(mb, "MorphBench", lambda: MorphBench(cfg))):
+                with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
+                    code = mb.main(["bounds", str(source), "--out", str(destination), "--json"])
+            self.assertEqual(code, 2)
+            self.assertEqual(stdout.getvalue(), "")
+            self.assertEqual(len(stderr.getvalue().splitlines()), 1)
+            self.assertTrue(stderr.getvalue().startswith("bounds: "))
+            self.assertNotIn("Traceback", stderr.getvalue())
+            for path, data in before.items():
+                self.assertEqual(path.read_bytes(), data)
+
+
 class TestEnvAndCatalog(unittest.TestCase):
 
     def setUp(self):

@@ -40,7 +40,7 @@ from presenters import ppb, text             # noqa: E402
 #: - no mesh open, no morph file beside it, no skeleton, everything hidden - and
 #: `presenters/serve.py` has always answered those with 400 rather than a stack trace.
 #: The command line said the same thing with a traceback until this was noticed.
-_REFUSALS = (ValueError, PermissionError, FileNotFoundError, KeyError, RuntimeError)
+_REFUSALS = (ValueError, PermissionError, FileNotFoundError, FileExistsError, KeyError, RuntimeError)
 
 
 def _bench(args) -> MorphBench:

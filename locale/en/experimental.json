@@ -1,0 +1,8 @@
+{
+  "#": "Separate experimental Body Slots archive; version identity is part of this build's presentation.",
+  "page.experimentalBuild": "Morphbench Slots · 0.8.0-slots.1 · experimental",
+  "page.experimentalTitle": "Morphbench Slots 0.8.0-slots.1 — %(name)s",
+  "page.slotsStart": "Open Slots authoring",
+  "page.slotsEntryHint": "Create a named placement, choose its skeleton node, then export author JSON or a .bslots package.",
+  "launcher.experimentalTitle": "Morphbench Slots 0.8.0-slots.1 — experimental"
+}

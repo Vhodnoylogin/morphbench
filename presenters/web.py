@@ -311,7 +311,7 @@ class WebPage:
                 else t("page.noMesh"))
         return self.assets.page({
             "__MB_LANG__": _escape(language()),
-            "__MB_TITLE__": _escape("morphbench — %s" % name),
+            "__MB_TITLE__": _escape(t("page.experimentalTitle", name=name)),
             # Two labels stand in the markup itself, before the script runs: the hint about
             # the mouse and the word for a browser without WebGL2 - which is read exactly
             # when the script did not go.

@@ -6,7 +6,10 @@ class SlotsPanel {
     this.mode=el("select",{on:{change:()=>app.invoke("slots_mode",this.mode.value)}});
     this.mode.appendChild(el("option",{value:"mesh",text:T.slotsMeshMode}));
     this.mode.appendChild(el("option",{value:"slots",text:T.slotsMode}));
-    root.appendChild(el("section",null,[el("h2",{text:T.slotsWorkbench}),this.mode]));
+    this.startButton=el("button",{class:"wide",text:T.slotsStart,on:{click:()=>app.invoke("slots_mode","slots")}});
+    root.appendChild(el("section",null,[el("h2",{text:T.slotsWorkbench}),
+      el("div",{class:"muted",text:T.experimentalBuild}),
+      el("p",{text:T.slotsEntryHint}),this.mode,this.startButton]));
     this.section=el("section",{class:"slots-editor"});root.appendChild(this.section);
     this.provider=el("input",{type:"text",class:"wide",on:{change:()=>{
       const metadata=this.bench.slots_project().metadata;metadata.namespace=this.provider.value;app.invoke("slots_metadata",metadata);
@@ -164,6 +167,7 @@ class SlotsPanel {
   }
   refresh() {
     const state=this.bench.slots_state();this.mode.value=state.mode;this.section.style.display=state.mode==="slots"?"":"none";
+    this.startButton.hidden=state.mode==="slots";
     if(document.activeElement!==this.provider) this.provider.value=typeof state.project.metadata.namespace==="string"?state.project.metadata.namespace:"";
     this.list.textContent="";for(const row of state.project.placements) this.list.appendChild(el("option",{value:row.name,text:row.name}));
     this.list.value=state.selected||"";

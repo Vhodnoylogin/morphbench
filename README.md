@@ -1,5 +1,9 @@
 # morphbench
 
+**Morphbench Slots 0.8.0-slots.1 — separate experimental build.** This archive is for offline Body Slots authoring and is separate from the main Morphbench download on Nexus Mods page 194795. Run `morphbench.exe`, open the page and click **Open Slots authoring**. The page and launcher show the experimental version. See [Slots mode](docs/slots.md) for author JSON, `.bslots`, local variants and session recovery. No body/skeleton meshes are included, and exported definitions do not establish game compatibility.
+
+Unpack into a separate folder. Stop another Morphbench server before starting this build; both keep the existing default port 8767. Advanced users can choose a separate `servePort` in this build's own `morphbench.json`. The CLI and file formats are unchanged.
+
 A workbench for meshes and named morphs of Skyrim, outside the game. It opens a `.nif`, reads the
 sliders from the `.tri` beside it, applies any set of values, and answers in numbers: what this
 slider tears, how far the geometry now reaches, whether the collision capsules still cover the

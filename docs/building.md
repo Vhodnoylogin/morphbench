@@ -123,6 +123,14 @@ The header comment in `build.cmd` still says the icon is not versioned. That com
 
 ## The release archive
 
+This branch builds the separate **Morphbench Slots 0.8.0-slots.1** experiment. Build the launcher first, then use the existing release tooling with an explicit label and an external output directory:
+
+```text
+python release.py --version 0.8.0-slots.1 --out <external-output-directory>
+```
+
+Keep this archive separate from the main Nexus Mods page 194795 line. The source, locales and launcher identify the experiment; `manifest.json` records the same version. No reference meshes or skeletons belong in the archive. Package validation can run from extracted files without launching a browser; a blocked local-page visual check must remain reported as unavailable.
+
 ```
 python release.py --version 0.7.0
 ```

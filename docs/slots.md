@@ -2,6 +2,8 @@
 
 Русская версия этого файла — [slots.ru.md](slots.ru.md).
 
+The separate experimental archive is **Morphbench Slots 0.8.0-slots.1**. Its launcher and page display that label. Click **Open Slots authoring** near the top of the page, or use the existing workbench-mode selector. The button calls `slots_mode("slots")`, equivalent to `--mode slots` below; it does not create or replace a project. Supply your own licensed mesh and skeleton references when a geometric preview is needed. Without a matching skeleton node, the editor still preserves the project and reports the preview unavailable.
+
 Choose **Slots authoring** in the workbench mode control of the existing viewer. The same canvas, mesh visibility, camera and skeleton reader are reused. This mode authors named anchor placements outside the game. It does not create item instances or modify an inventory, equipment, a game save, or access transactions.
 
 ```text

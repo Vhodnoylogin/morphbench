@@ -1,0 +1,8 @@
+{
+  "#": "Отдельный экспериментальный архив Body Slots; обозначение версии относится к этому выпуску.",
+  "page.experimentalBuild": "Morphbench Slots · 0.8.0-slots.1 · экспериментальная сборка",
+  "page.experimentalTitle": "Morphbench Slots 0.8.0-slots.1 — %(name)s",
+  "page.slotsStart": "Открыть редактор слотов",
+  "page.slotsEntryHint": "Создайте именованное размещение, выберите узел скелета и экспортируйте авторский JSON или пакет .bslots.",
+  "launcher.experimentalTitle": "Morphbench Slots 0.8.0-slots.1 — экспериментальная сборка"
+}

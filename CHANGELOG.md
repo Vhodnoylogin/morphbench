@@ -11,6 +11,12 @@ go in a major release, and nowhere else.
 
 Эта страница на русском: [CHANGELOG.ru.md](CHANGELOG.ru.md).
 
+## [0.8.0-slots.1] — experimental, unreleased
+
+- Separate Body Slots authoring archive, identified in the launcher and page.
+- A visible **Open Slots authoring** button uses the existing `slots_mode` action.
+- Retains authored JSON/package bytes, local variants, replayable session recovery and the existing mesh-inspection commands. No third-party reference meshes or game/runtime support claims are included.
+
 ## [0.7.1] — unreleased
 
 - Offline audit on 2026-10-03: refuses existing NIF outputs, including hardlink aliases;

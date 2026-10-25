@@ -698,7 +698,7 @@ class MainForm : Form
     public MainForm(Options options)
     {
         this.options = options;
-        Text = "morphbench";
+        Text = Texts.T("launcher.experimentalTitle");
         // The title icon is set explicitly: /win32icon gives an icon to the FILE (explorer, the
         // taskbar), and a WinForms window without this draws its own default one. The same .ico
         // is taken, embedded as a resource - it holds every size, and Windows picks the 16 point

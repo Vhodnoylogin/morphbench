@@ -19,6 +19,7 @@
   "page.slotsWorkbench": "Workbench mode",
   "page.slotsOffline": "Offline authoring. The picture is a reference pose, not a game state. Missing node frames remain unavailable. Save before choosing another mesh or reloading.",
   "page.slotsProvider": "Provider identity",
+  "page.slotsLoad": "Open author JSON or session recipe",
   "page.slotsNew": "New project",
   "page.slotsSelect": "Named placement",
   "page.slotsAdd": "Add placement",
@@ -46,7 +47,7 @@
   "page.slotsApply": "Apply fields",
   "page.slotsRemove": "Remove placement",
   "page.slotsClear": "Clear preview override",
-  "page.slotsCreateHint": "Load author JSON or add a named placement. A loaded skeleton supplies the anchor list.",
+  "page.slotsCreateHint": "Open author JSON or a session recipe, or add a named placement. A loaded skeleton supplies the anchor list.",
   "page.slotsUnavailable": "Preview unavailable: no matching valid skeleton NODE frame. No identity frame is substituted.",
   "page.slotsAvailable": "Reference-pose preview available",
   "page.slotsDisabled": "Disabled: region is hidden",
@@ -54,9 +55,10 @@
   "page.slotsWorldRadius": "Reference-pose sphere radius:",
   "page.slotsCustomized": "Effective geometry includes a temporary override. Author defaults are preserved.",
   "page.slotsDefault": "Effective geometry equals author defaults.",
+  "page.slotsPolicyInvalid": "Unfinished Body Slots fields: %(fields)s. Author data is preserved; repair these fields before runtime export.",
   "page.slotsMarkers": "Orange: access sphere. White: placement origin. Red / green / blue: local X / Y / Z. Uniform anchor scale is applied once.",
   "page.slotsJSON": "Download author JSON",
   "page.slotsPackage": "Download .bslots",
   "page.slotsRecipe": "Download session recipe",
-  "page.slotsExports": "JSON and packages export author defaults. Recipes replay temporary overrides too. No item instances, equipment, inventory, access transactions, or game saves are edited."
+  "page.slotsExports": "Author JSON and packages require valid Body Slots definitions. Save a session recipe to reopen applied author edits, preview overrides, selection and mode, including unfinished projects. No item instances, equipment, inventory, access transactions, or game saves are edited."
 }

@@ -70,10 +70,7 @@ class MorphBench:
 
     # ---- offline named anchor placements --------------------------------------------
     def slots_mode(self, mode: str = "slots") -> str:
-        if mode not in ("mesh", "slots"):
-            raise ValueError(t("slots.invalid", field="mode"))
-        self._placements.mode = mode
-        return mode
+        return self._placements.set_mode(mode)
 
     def slots_replace(self, metadata: dict, placements: list) -> dict:
         return self._placements.replace(metadata, placements)
@@ -86,10 +83,7 @@ class MorphBench:
         return self._placements.add(name, anchor, attributes)
 
     def slots_select(self, name: str | None) -> str | None:
-        if name is not None:
-            self._placements.require(name)
-        self._placements.selected = name
-        return name
+        return self._placements.select(name)
 
     def slots_set(self, name: str, changes: dict) -> dict:
         return self._placements.set(name, changes)
@@ -98,25 +92,28 @@ class MorphBench:
         return self._placements.set(name, changes, customize=True)
 
     def slots_clear(self, name: str) -> list:
-        self._placements.require(name)
-        self._placements.overrides.pop(name, None)
-        return self.slots_effective()
+        return self._placements.clear(name)
 
     def slots_remove(self, name: str) -> dict:
-        self._placements.require(name)
-        del self._placements.authored[name]
-        self._placements.overrides.pop(name, None)
-        self._placements.selected = next(iter(sorted(self._placements.authored)), None)
-        return self.slots_project()
+        return self._placements.remove(name)
 
     def slots_project(self) -> dict:
         return self._placements.project()
 
     def slots_metadata(self, metadata: dict) -> dict:
-        if type(metadata) is not dict:
-            raise ValueError(t("slots.invalid", field="metadata"))
-        self._placements.metadata = self._placements._json(metadata)
-        return self.slots_project()["metadata"]
+        return self._placements.set_metadata(metadata)
+
+    def slots_session(self) -> dict:
+        return self._placements.session()
+
+    def slots_restore(self, session: dict) -> dict:
+        return self._placements.restore(session)
+
+    def slots_recipe(self) -> list:
+        return self._placements.recipe()
+
+    def slots_replay(self, actions: list) -> dict:
+        return self._placements.replay(actions)
 
     def slots_effective(self) -> list:
         return self._placements.effective()
@@ -134,7 +131,8 @@ class MorphBench:
     def slots_state(self) -> dict:
         return {"mode": self._placements.mode, "selected": self._placements.selected,
                 "project": self.slots_project(), "effective": self.slots_effective(),
-                "preview": self.slots_preview(), "anchors": self.slots_anchors()}
+                "preview": self.slots_preview(), "anchors": self.slots_anchors(),
+                "session": self.slots_session()}
 
     # ---- the environment, and browsing for meshes -------------------------------------
     def environment(self) -> dict:

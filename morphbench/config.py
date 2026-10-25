@@ -203,6 +203,7 @@ DEFAULTS = {
     "wheelZoomRate": 0.0015,
     # Generic anchor-placement authoring. Exporters impose their own format limits.
     "placementLimit": 256,
+    "placementRecipeLimit": 4096,
     "placementRadius": 10.0,
     "placementCoordinateLimit": 1000000.0,
     "placementRotationTolerance": 0.0001,

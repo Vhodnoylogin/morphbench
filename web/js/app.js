@@ -9,7 +9,6 @@ class App {
     this.data = data;
     this.bench = new BenchMirror(data);
     this.lastCall = "";
-    this.slotActions = [];
     this.scale = 1.0;
     this.canvas = document.getElementById("canvas");
     this.renderer = new Renderer(this.canvas, data.settings);
@@ -41,8 +40,7 @@ class App {
     this.lastCall = "bench." + method + "(" + args.map((a) => JSON.stringify(a)).join(", ") + ")";
     if (POSITION_METHODS.has(method)) this.refreshPositions();
     if (COLOUR_METHODS.has(method)) this.refreshColours();
-    if (method.startsWith("slots_") && !["slots_project","slots_state","slots_effective","slots_preview","slots_meshes","slots_anchors","slots_validate"].includes(method)) {
-      this.slotActions.push({method:method,args:placementClone(args)});
+    if (method.startsWith("slots_") && !["slots_project","slots_state","slots_effective","slots_preview","slots_meshes","slots_anchors","slots_validate","slots_session","slots_recipe"].includes(method)) {
       this.refreshSlots();
     }
     this.panel.refresh();

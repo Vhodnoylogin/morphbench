@@ -12,6 +12,22 @@ import numpy as np
 from .i18n import t
 
 
+def compose_placement(authored, override):
+    """Pure effective copy; callers cannot edit either source through the result."""
+    return copy.deepcopy({**authored, **override})
+
+
+# A recipe is data, never a general-purpose facade dispatcher. Arity is checked on
+# both sides of the Python/page boundary, including JS's otherwise ignored extras.
+RECIPE_ARITY = {
+    "slots_replace": (2, 2), "slots_add": (2, 3), "slots_select": (1, 1),
+    "slots_set": (2, 2), "slots_customize": (2, 2), "slots_clear": (1, 1),
+    "slots_remove": (1, 1), "slots_metadata": (1, 1), "slots_mode": (0, 1),
+    "slots_project": (0, 0), "slots_effective": (0, 0), "slots_preview": (0, 0),
+    "slots_state": (0, 0), "slots_restore": (1, 1),
+}
+
+
 class Placements:
     def __init__(self, cfg, limits=None):
         self.cfg = cfg
@@ -24,20 +40,28 @@ class Placements:
                         for key in ("coordinate", "rotationTolerance"))):
                 self._fail("limits")
             self.limits = copy.deepcopy(limits)
-        self.metadata = {}
-        self.authored = {}
-        self.overrides = {}
-        self.selected = None
-        self.mode = "mesh"
+        self._metadata = {}
+        self._authored = {}
+        self._overrides = {}
+        self._selected = None
+        self._mode = "mesh"
+
+    @property
+    def mode(self):
+        return self._mode
+
+    @property
+    def selected(self):
+        return self._selected
 
     def _fail(self, field):
         raise ValueError(t("slots.invalid", field=field))
 
-    def _json(self, value):
+    def _json(self, value, field="attributes"):
         try:
             return json.loads(json.dumps(value, allow_nan=False))
         except (TypeError, ValueError):
-            self._fail("attributes")
+            self._fail(field)
 
     def validate(self, row):
         fields = {"name", "anchor", "position", "rotation", "radius", "center", "enabled", "attributes"}
@@ -88,50 +112,156 @@ class Placements:
             candidate[value["name"]] = value
         # Validate the entire candidate before committing anything.
         metadata = self._json(metadata)
-        self.metadata, self.authored, self.overrides = metadata, candidate, {}
-        self.selected = next(iter(sorted(candidate)), None)
+        self._metadata, self._authored, self._overrides = metadata, candidate, {}
+        self._selected = next(iter(sorted(candidate)), None)
         return self.project()
 
     def project(self):
-        return copy.deepcopy({"metadata": self.metadata,
-                              "placements": [self.authored[name] for name in sorted(self.authored)]})
+        return copy.deepcopy({"metadata": self._metadata,
+                              "placements": [self._authored[name] for name in sorted(self._authored)]})
 
-    def require(self, name):
-        if name not in self.authored:
+    def _require(self, name):
+        if type(name) is not str:
+            self._fail("name")
+        if name not in self._authored:
             raise KeyError(t("slots.missing", name=name))
-        return self.authored[name]
+        return self._authored[name]
+
+    def set_mode(self, mode="slots"):
+        if mode not in ("mesh", "slots"):
+            self._fail("mode")
+        self._mode = mode
+        return mode
+
+    def select(self, name):
+        if name is not None:
+            self._require(name)
+        self._selected = name
+        return name
+
+    def clear(self, name):
+        self._require(name)
+        self._overrides.pop(name, None)
+        return self.effective()
+
+    def remove(self, name):
+        self._require(name)
+        del self._authored[name]
+        self._overrides.pop(name, None)
+        self._selected = next(iter(sorted(self._authored)), None)
+        return self.project()
+
+    def set_metadata(self, metadata):
+        if type(metadata) is not dict:
+            self._fail("metadata")
+        self._metadata = self._json(metadata, "metadata")
+        return copy.deepcopy(self._metadata)
 
     def add(self, name, anchor, attributes=None):
-        if name in self.authored or len(self.authored) >= int(self.limits["count"]):
+        if type(name) is not str or name in self._authored or len(self._authored) >= int(self.limits["count"]):
             self._fail("name/count")
         row = self.validate({"name": name, "anchor": anchor, "position": [0, 0, 0],
                              "rotation": np.eye(3).tolist(), "radius": self.cfg["placementRadius"],
-                             "center": [0, 0, 0], "enabled": True, "attributes": attributes or {}})
-        self.authored[name] = row
-        self.selected = name
+                             "center": [0, 0, 0], "enabled": True,
+                             "attributes": {} if attributes is None else attributes})
+        self._authored[name] = row
+        self._selected = name
         return copy.deepcopy(row)
 
     def set(self, name, changes, customize=False):
-        authored = self.require(name)
+        authored = self._require(name)
         allowed = {"position", "rotation", "radius", "center", "enabled"} if customize else set(authored) - {"name"}
         if type(changes) is not dict or not set(changes) <= allowed:
             self._fail("changes")
-        candidate = self.validate({**authored, **(self.overrides.get(name, {}) if customize else {}), **changes})
+        candidate = self.validate({**authored, **(self._overrides.get(name, {}) if customize else {}), **changes})
         if customize:
-            self.overrides[name] = {key: candidate[key] for key in allowed if candidate[key] != authored[key]}
+            explicit = set(self._overrides.get(name, {})) | set(changes)
+            self._overrides[name] = {key: candidate[key] for key in explicit}
         else:
-            self.authored[name] = candidate
+            self._authored[name] = candidate
         return copy.deepcopy(candidate)
 
     def effective(self):
-        return [copy.deepcopy({**self.authored[name], **self.overrides.get(name, {})}) for name in sorted(self.authored)]
+        return [compose_placement(self._authored[name], self._overrides.get(name, {})) for name in sorted(self._authored)]
+
+    def session(self):
+        """Editable checkpoint, independent of any runtime export format or rig."""
+        return copy.deepcopy({"version": 1, "project": self.project(),
+                              "overrides": [{"name": name, "changes": self._overrides[name]}
+                                            for name in sorted(self._overrides) if self._overrides[name]],
+                              "selected": self._selected, "mode": self._mode})
+
+    def restore(self, session):
+        """Validate a complete checkpoint before publishing any of its fields."""
+        if (type(session) is not dict or set(session) != {"version", "project", "overrides", "selected", "mode"} or
+                type(session["version"]) is not int or session["version"] != 1):
+            self._fail("session")
+        project = session["project"]
+        if type(project) is not dict or set(project) != {"metadata", "placements"}:
+            self._fail("project")
+        candidate = Placements(self.cfg, self.limits)
+        candidate.replace(project["metadata"], project["placements"])
+        overrides = session["overrides"]
+        if type(overrides) is not list or len(overrides) > int(self.limits["count"]):
+            self._fail("overrides")
+        allowed = {"position", "rotation", "radius", "center", "enabled"}
+        for item in overrides:
+            if type(item) is not dict or set(item) != {"name", "changes"}:
+                self._fail("override")
+            name, changes = item["name"], item["changes"]
+            authored = candidate._require(name)
+            if name in candidate._overrides or type(changes) is not dict or not changes or not set(changes) <= allowed:
+                self._fail("override")
+            row = candidate.validate({**authored, **changes})
+            # Preserve explicit fields even if an author edit made their value equal.
+            candidate._overrides[name] = {key: row[key] for key in changes}
+        candidate.select(session["selected"])
+        candidate.set_mode(session["mode"])
+        self._commit(candidate)
+        return self.session()
+
+    def _commit(self, candidate):
+        self._metadata, self._authored, self._overrides, self._selected, self._mode = (
+            candidate._metadata, candidate._authored, candidate._overrides, candidate._selected, candidate._mode)
+
+    def recipe(self):
+        return [{"method": "slots_restore", "args": [self.session()]}]
+
+    def replay(self, actions):
+        """Old action arrays and checkpoints share one bounded, atomic replay path."""
+        if type(actions) is not list or len(actions) > int(self.cfg["placementRecipeLimit"]):
+            self._fail("recipe")
+        actions = self._json(actions, "recipe")
+        for action in actions:
+            if (type(action) is not dict or set(action) != {"method", "args"} or
+                    type(action["method"]) is not str or action["method"] not in RECIPE_ARITY or
+                    type(action["args"]) is not list):
+                self._fail("action")
+            low, high = RECIPE_ARITY[action["method"]]
+            if not low <= len(action["args"]) <= high:
+                self._fail("action arguments")
+        candidate = Placements(self.cfg, self.limits)
+        candidate.restore(self.session())
+        calls = {"slots_replace": candidate.replace, "slots_add": candidate.add,
+                 "slots_select": candidate.select, "slots_set": candidate.set,
+                 "slots_customize": lambda name, changes: candidate.set(name, changes, customize=True),
+                 "slots_clear": candidate.clear, "slots_remove": candidate.remove,
+                 "slots_metadata": candidate.set_metadata, "slots_mode": candidate.set_mode,
+                 "slots_restore": candidate.restore}
+        for action in actions:
+            call = calls.get(action["method"])
+            if call is not None:
+                call(*action["args"])
+            # Original read-only recipe actions have no effect on committed state.
+        self._commit(candidate)
+        return self.session()
 
     def preview(self, matrices):
         out = []
         for row in self.effective():
             matrix = matrices.get(row["anchor"])
             item = {"name": row["name"], "anchor": row["anchor"], "enabled": row["enabled"],
-                    "customized": bool(self.overrides.get(row["name"])), "available": False}
+                    "customized": bool(self._overrides.get(row["name"])), "available": False}
             if matrix is not None:
                 frame = np.asarray(matrix, dtype=np.float64)
                 if frame.shape != (4, 4) or not np.isfinite(frame).all() or not np.allclose(frame[3], [0, 0, 0, 1], atol=float(self.cfg["placementRotationTolerance"]), rtol=0):

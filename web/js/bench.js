@@ -34,22 +34,26 @@ class BenchMirror {
     this.placements = new PlacementMirror(data.settings, data.slots);
   }
 
-  slots_mode(mode="slots") { if (!["mesh","slots"].includes(mode)) this.placements.fail("mode"); this.placements.mode=mode; return mode; }
+  slots_mode(mode="slots") { return this.placements.setMode(mode); }
   slots_replace(metadata,rows) { return this.placements.replace(metadata,rows); }
   slots_validate(metadata,rows,limits) { return new PlacementMirror(this.settings,null,limits).replace(metadata,rows); }
   slots_add(name,anchor,attributes) { return this.placements.add(name,anchor,attributes); }
-  slots_select(name) { if(name!==null) this.placements.require(name);this.placements.selected=name;return name; }
+  slots_select(name) { return this.placements.select(name); }
   slots_set(name,changes) { return this.placements.set(name,changes,false); }
   slots_customize(name,changes) { return this.placements.set(name,changes,true); }
-  slots_clear(name) { this.placements.require(name);this.placements.overrides.delete(name);return this.slots_effective(); }
-  slots_remove(name) { this.placements.require(name);this.placements.authored.delete(name);this.placements.overrides.delete(name);this.placements.selected=[...this.placements.authored.keys()].sort()[0]||null;return this.slots_project(); }
+  slots_clear(name) { return this.placements.clear(name); }
+  slots_remove(name) { return this.placements.remove(name); }
   slots_project() { return this.placements.project(); }
-  slots_metadata(metadata) { if(!metadata||typeof metadata!=="object"||Array.isArray(metadata)) this.placements.fail("metadata");this.placements.metadata=placementClone(metadata);return this.slots_project().metadata; }
+  slots_metadata(metadata) { return this.placements.setMetadata(metadata); }
+  slots_session() { return this.placements.session(); }
+  slots_restore(session) { return this.placements.restore(session); }
+  slots_recipe() { return this.placements.recipe(); }
+  slots_replay(actions) { return this.placements.replay(actions); }
   slots_effective() { return this.placements.effective(); }
-  slots_anchors() { return placementClone(this.placements.anchors); }
+  slots_anchors() { return this.placements.anchors(); }
   slots_preview() { return this.placements.preview(); }
   slots_meshes() { return this.placements.meshes(); }
-  slots_state() { return {mode:this.placements.mode,selected:this.placements.selected,project:this.slots_project(),effective:this.slots_effective(),preview:this.slots_preview(),anchors:this.slots_anchors()}; }
+  slots_state() { return {mode:this.placements.mode,selected:this.placements.selected,project:this.slots_project(),effective:this.slots_effective(),preview:this.slots_preview(),anchors:this.slots_anchors(),session:this.slots_session()}; }
 
   is_open() { return this.summary !== null; }
   // skeleton and capsules: the core has already worked the geometry out, and it travels in the page

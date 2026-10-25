@@ -2,7 +2,7 @@
 // Slots mode: widgets call the same named facade actions as mb.py slots recipes.
 class SlotsPanel {
   constructor(app, root) {
-    this.app=app;this.bench=app.bench;this.initial=placementClone(this.bench.slots_project());this.loadedToken="";
+    this.app=app;this.bench=app.bench;this.loadedToken="";
     this.mode=el("select",{on:{change:()=>app.invoke("slots_mode",this.mode.value)}});
     this.mode.appendChild(el("option",{value:"mesh",text:T.slotsMeshMode}));
     this.mode.appendChild(el("option",{value:"slots",text:T.slotsMode}));
@@ -44,7 +44,8 @@ class SlotsPanel {
     this.section.appendChild(el("h2",{text:T.slotsMode}));
     this.section.appendChild(el("div",{class:"muted",text:T.slotsOffline}));
     this.section.appendChild(el("label",{class:"slot-field"},[T.slotsProvider,this.provider]));
-    this.section.appendChild(el("div",{class:"row"},[this.upload,el("button",{text:T.slotsNew,on:{click:()=>this.newProject()}})]));
+    this.section.appendChild(el("label",{class:"slot-field"},[T.slotsLoad,this.upload]));
+    this.section.appendChild(el("button",{text:T.slotsNew,on:{click:()=>this.newProject()}}));
     this.section.appendChild(el("label",{class:"slot-field"},[T.slotsSelect,this.list]));
     this.section.appendChild(el("div",{class:"row"},[this.newName,el("button",{text:T.slotsAdd,on:{click:()=>this.add()}})]));
     this.section.appendChild(el("label",{class:"slot-field"},[T.slotsEditing,this.target]));
@@ -83,8 +84,9 @@ class SlotsPanel {
       const changes={position:vector("position"),rotation:JSON.parse(this.rotation.value),center:vector("center"),radius:vector("radius")[0],enabled:this.enabled.checked};
       if(this.target.value==="author") {
         changes.anchor=this.anchor.value;
-        changes.attributes={kind:this.kind.value,hands:Object.keys(this.handBoxes).filter((name)=>this.handBoxes[name].checked),
-          contents:Object.keys(this.contentBoxes).filter((name)=>this.contentBoxes[name].checked)};
+        const authored=this.bench.slots_project().placements.find((row)=>row.name===this.list.value);
+        changes.attributes=Object.assign({},authored.attributes,{kind:this.kind.value,hands:Object.keys(this.handBoxes).filter((name)=>this.handBoxes[name].checked),
+          contents:Object.keys(this.contentBoxes).filter((name)=>this.contentBoxes[name].checked)});
         const candidate=this.bench.slots_project();candidate.placements=candidate.placements.map((row)=>row.name===this.list.value?Object.assign({},row,changes):row);
         const [metadata,rows]=BodySlotsFormat.normalize(BodySlotsFormat.schema(candidate));
         if(!this.app.invoke("slots_validate",metadata,rows,BodySlotsFormat.limits)) return;
@@ -96,46 +98,68 @@ class SlotsPanel {
     try {
       const file=this.upload.files[0];if(!file) return;
       if(file.size>1048576) BodySlotsFormat.fail("file size");
-      const project=JSON.parse(await file.text()),[metadata,rows]=BodySlotsFormat.normalize(project);
-      if(!this.app.invoke("slots_validate",metadata,rows,BodySlotsFormat.limits)) return;
-      this.app.invoke("slots_replace",metadata,rows);
+      const project=placementParseJSON(await file.text());
+      if(Array.isArray(project)) this.app.invoke("slots_replay",project);
+      else {
+        const [metadata,rows]=BodySlotsFormat.normalize(project);
+        if(!this.app.invoke("slots_validate",metadata,rows,BodySlotsFormat.limits)) return;
+        this.app.invoke("slots_replace",metadata,rows);
+      }
     } catch(error) { this.app.panel.error.textContent=String(error.message||error); }
     this.upload.value="";
   }
   download(kind) {
     try {
       const project=this.app.invoke("slots_project");if(!project) return;
-      const schema=BodySlotsFormat.schema(project),[metadata,rows]=BodySlotsFormat.normalize(schema);
-      if(!this.app.invoke("slots_validate",metadata,rows,BodySlotsFormat.limits)) return;
-      let content=JSON.stringify(schema,null,2)+"\n",extension=".json",type="application/json";
-      if(kind==="package") {content=BodySlotsFormat.encode(project,this.bench);extension=".bslots";type="application/octet-stream";}
-      if(kind==="recipe") {content=JSON.stringify([{method:"slots_replace",args:[this.initial.metadata,this.initial.placements]}].concat(this.app.slotActions),null,2)+"\n";extension=".session.json";}
-      const name=(schema.provider||"placements").replace(/[^A-Za-z0-9_.-]/g,"_");
+      let content,extension=".json",type="application/json";
+      if(kind==="recipe") {
+        const recipe=this.app.invoke("slots_recipe");if(!recipe) return;
+        content=JSON.stringify(recipe,null,2)+"\n";extension=".session.json";
+      } else {
+        const schema=BodySlotsFormat.schema(project),[metadata,rows]=BodySlotsFormat.normalize(schema);
+        if(!this.app.invoke("slots_validate",metadata,rows,BodySlotsFormat.limits)) return;
+        content=JSON.stringify(schema,null,2)+"\n";
+        if(kind==="package") {content=BodySlotsFormat.encode(project,this.bench);extension=".bslots";type="application/octet-stream";}
+      }
+      const provider=project.metadata.namespace;
+      const name=(typeof provider==="string"&&provider?provider:"placements").replace(/[^A-Za-z0-9_.-]/g,"_");
       const url=URL.createObjectURL(new Blob([content],{type:type})),link=el("a",{href:url,download:name+extension});
       document.body.appendChild(link);link.click();link.remove();URL.revokeObjectURL(url);
     } catch(error) {this.app.panel.error.textContent=String(error.message||error);}
   }
   refresh() {
     const state=this.bench.slots_state();this.mode.value=state.mode;this.section.style.display=state.mode==="slots"?"":"none";
-    if(document.activeElement!==this.provider) this.provider.value=state.project.metadata.namespace||"";
+    if(document.activeElement!==this.provider) this.provider.value=typeof state.project.metadata.namespace==="string"?state.project.metadata.namespace:"";
     this.list.textContent="";for(const row of state.project.placements) this.list.appendChild(el("option",{value:row.name,text:row.name}));
     this.list.value=state.selected||"";
     const authored=state.project.placements.find((row)=>row.name===state.selected),effective=state.effective.find((row)=>row.name===state.selected);
     const row=this.target.value==="author"?authored:effective;
+    const policyIssues=[];
+    if(row) {
+      try {BodySlotsFormat.text(state.project.metadata.namespace,64,"provider",true);} catch(error) {policyIssues.push(T.slotsProvider);}
+      try {BodySlotsFormat.text(BodySlotsFormat.value(row.attributes,"kind","holster"),32,"kind",true);} catch(error) {policyIssues.push(T.slotsKind);}
+      for(const [field,choices,label] of [["hands",BodySlotsFormat.hands,T.slotsHands],["contents",BodySlotsFormat.contents,T.slotsContents]]) {
+        try {BodySlotsFormat.mask(BodySlotsFormat.value(row.attributes,field,Object.keys(choices)),choices,field);} catch(error) {policyIssues.push(label);}
+      }
+    }
     this.apply.disabled=this.remove.disabled=this.clear.disabled=!row;
     this.anchor.disabled=this.target.value!=="author";this.policy.style.display=this.target.value==="author"?"":"none";
     const token=JSON.stringify([row,this.target.value]);
     if(row&&token!==this.loadedToken) {
       this.anchor.value=row.anchor;this.rotation.value=JSON.stringify(row.rotation);this.enabled.checked=row.enabled;
       for(const key of ["position","center","radius"]) (key==="radius"?[row.radius]:row[key]).forEach((value,index)=>this.fields[key][index].value=value);
-      this.kind.value=row.attributes.kind||"holster";
-      for(const [key,box] of Object.entries(this.handBoxes)) box.checked=(row.attributes.hands||Object.keys(BodySlotsFormat.hands)).includes(key);
-      for(const [key,box] of Object.entries(this.contentBoxes)) box.checked=(row.attributes.contents||Object.keys(BodySlotsFormat.contents)).includes(key);
+      const kind=BodySlotsFormat.value(row.attributes,"kind","holster");
+      this.kind.value=typeof kind==="string"?kind:"";
+      const hands=BodySlotsFormat.value(row.attributes,"hands",Object.keys(BodySlotsFormat.hands));
+      const contents=BodySlotsFormat.value(row.attributes,"contents",Object.keys(BodySlotsFormat.contents));
+      for(const [key,box] of Object.entries(this.handBoxes)) box.checked=Array.isArray(hands)&&hands.includes(key);
+      for(const [key,box] of Object.entries(this.contentBoxes)) box.checked=Array.isArray(contents)&&contents.includes(key);
     }
     this.loadedToken=token;
     const preview=state.preview.find((item)=>item.name===state.selected);
     this.status.textContent=!preview?T.slotsCreateHint:(!preview.available?T.slotsUnavailable:
       (preview.enabled?T.slotsAvailable:T.slotsDisabled)+"\n"+T.slotsWorldCenter+" "+preview.center.map((x)=>fmt(x)).join(", ")+"\n"+T.slotsWorldRadius+" "+fmt(preview.radius))+
-      (preview?"\n"+(preview.customized?T.slotsCustomized:T.slotsDefault):"");
+      (preview?"\n"+(preview.customized?T.slotsCustomized:T.slotsDefault):"")+
+      (policyIssues.length?"\n"+say(T.slotsPolicyInvalid,{fields:policyIssues.join(", ")}):"");
   }
 }

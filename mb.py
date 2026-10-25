@@ -508,16 +508,7 @@ def cmd_slots(args) -> int:
         actions = actions + [json.loads(value) for value in args.action]
     except json.JSONDecodeError:
         raise ValueError(t("slots.invalid", field="action JSON")) from None
-    methods = {"slots_replace", "slots_add", "slots_select", "slots_set", "slots_customize", "slots_clear",
-               "slots_remove", "slots_metadata", "slots_mode", "slots_project", "slots_effective", "slots_preview", "slots_state"}
-    for action in actions:
-        if (type(action) is not dict or set(action) != {"method", "args"} or
-                type(action["method"]) is not str or action["method"] not in methods or type(action["args"]) is not list):
-            raise ValueError(t("slots.invalid", field="action"))
-        try:
-            getattr(bench, action["method"])(*action["args"])
-        except TypeError:
-            raise ValueError(t("slots.invalid", field="action arguments")) from None
+    bench.slots_replay(actions)
     schema = body_slots.to_schema(bench)
     inputs = (args.project, args.recipe, args.nif, args.tri, args.skeleton, args.hkx)
     saved = []
@@ -525,7 +516,8 @@ def cmd_slots(args) -> int:
         saved.append(body_slots.write_new(args.out, (json.dumps(schema, ensure_ascii=False, indent=2) + "\n").encode("utf-8"), inputs))
     if args.package:
         saved.append(body_slots.write_new(args.package, body_slots.package(bench), inputs))
-    result = {"project": schema, "effective": bench.slots_effective(), "preview": bench.slots_preview(), "saved": saved}
+    result = {"project": schema, "effective": bench.slots_effective(), "preview": bench.slots_preview(),
+              "session": bench.slots_session(), "saved": saved}
     print(json.dumps(result, ensure_ascii=False, indent=2))
     return 0
 

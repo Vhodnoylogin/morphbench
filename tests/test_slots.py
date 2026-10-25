@@ -104,6 +104,84 @@ class TestPlacements(PlacementFixture):
         returned["placements"][0]["position"][0] = 999
         self.assertEqual(self.bench.slots_project(), original)
 
+    def test_session_reopens_explicit_override_selection_and_mode(self):
+        self.bench.slots_customize("belt", {"radius": 6, "enabled": False})
+        self.bench.slots_set("belt", {"radius": 6})  # Equal now, but still explicitly overridden.
+        self.bench.slots_add("other", "missing")
+        self.bench.slots_select("belt")
+        self.bench.slots_mode("mesh")
+        expected = self.bench.slots_session()
+        reopened = MorphBench(self.bench.cfg)
+        reopened.slots_replay(self.bench.slots_recipe())
+        self.assertEqual(reopened.slots_session(), expected)
+        self.assertFalse(reopened.slots_preview()[0]["available"])
+        reopened.slots_customize("belt", {"center": [1, 0, 0]})
+        reopened.slots_set("belt", {"radius": 9})
+        self.assertEqual(reopened.slots_effective()[0]["radius"], 6)
+        self.assertEqual(reopened.slots_project()["placements"][0]["radius"], 9)
+        # Neither editable checkpoints nor recipe arguments expose live mutable state.
+        expected["overrides"][0]["changes"]["radius"] = 999
+        recipe = self.bench.slots_recipe()
+        recipe[0]["args"][0]["project"]["metadata"]["namespace"] = "other"
+        self.assertEqual(self.bench.slots_effective()[0]["radius"], 6)
+        self.assertEqual(self.bench.slots_project()["metadata"]["namespace"], "test.provider")
+        reopened.slots_select(None)
+        self.bench.slots_restore(reopened.slots_session())
+        self.assertIsNone(self.bench.slots_state()["selected"])
+        self.bench.slots_clear("belt")
+        self.assertEqual(self.bench.slots_effective()[0]["radius"], 9)
+        self.bench.slots_remove("belt")
+        self.assertEqual(self.bench.slots_state()["selected"], "other")
+        self.assertEqual(self.bench.slots_session()["overrides"], [])
+
+    def test_restore_rejects_entire_malformed_session(self):
+        self.bench.slots_customize("belt", {"radius": 6})
+        original = self.bench.slots_session()
+        mutations = [lambda row: row.update(version=True), lambda row: row.update(version=2),
+                     lambda row: row.update(mode="game"), lambda row: row.update(selected="missing"),
+                     lambda row: row.update(extra=True),
+                     lambda row: row["overrides"].append(copy.deepcopy(row["overrides"][0])),
+                     lambda row: row["overrides"][0].update(name="missing"),
+                     lambda row: row["overrides"][0].update(changes={}),
+                     lambda row: row["overrides"][0].update(changes={"anchor": "other"}),
+                     lambda row: row["overrides"][0].update(changes={"radius": 0}),
+                     lambda row: row["project"]["placements"].append(copy.deepcopy(row["project"]["placements"][0]))]
+        for mutate in mutations:
+            value = copy.deepcopy(original); mutate(value)
+            with self.subTest(value=value), self.assertRaises((ValueError, KeyError)):
+                self.bench.slots_restore(value)
+            self.assertEqual(self.bench.slots_session(), original)
+
+    def test_recipe_replay_is_atomic_and_keeps_original_whitelist(self):
+        original = self.bench.slots_session()
+        prefix = [{"method": "slots_metadata", "args": [{"namespace": "changed"}]},
+                  {"method": "slots_mode", "args": ["slots"]},
+                  {"method": "slots_customize", "args": ["belt", {"radius": 7}]}]
+        invalid = [{"method": "slots_set", "args": ["belt", {"radius": 0}]},
+                   {"method": "slots_select", "args": ["missing"]},
+                   {"method": "__init__", "args": []},
+                   {"method": "slots_replay", "args": [[]]},
+                   {"method": "slots_project", "args": ["extra"]},
+                   {"method": "slots_clear", "args": []},
+                   {"method": "slots_add", "args": ["new", "Pelvis", []]},
+                   {"method": "slots_set", "args": ["belt", {"radius": float("nan")}]},
+                   {"method": "slots_mode", "args": [], "extra": True}]
+        for action in invalid:
+            with self.subTest(action=action), self.assertRaises((ValueError, KeyError)):
+                self.bench.slots_replay(prefix + [action])
+            self.assertEqual(self.bench.slots_session(), original)
+            self.assertEqual(self.bench.slots_recipe()[0]["args"][0], original)
+        reads = [{"method": method, "args": []} for method in
+                 ("slots_project", "slots_effective", "slots_preview", "slots_state")]
+        self.bench.slots_replay(prefix + reads + [{"method": "slots_mode", "args": []}])
+        self.assertEqual(self.bench.slots_state()["mode"], "slots")
+        self.assertEqual(self.bench.slots_effective()[0]["radius"], 7)
+        self.bench.cfg.set("placementRecipeLimit", 1)
+        original = self.bench.slots_session()
+        with self.assertRaises(ValueError):
+            self.bench.slots_replay(reads)
+        self.assertEqual(self.bench.slots_session(), original)
+
     def test_slots_frame_can_show_nodes_without_body(self):
         self.bench.model = None
         self.bench.slots_mode("slots")
@@ -202,6 +280,192 @@ class TestBodySlotsFormat(PlacementFixture):
         self.assertFalse(result["preview"][0]["available"])
         self.assertEqual(source.read_text(), json.dumps(author_project()))
         self.assertEqual(len(package.read_bytes()), 520)
+
+    def test_cli_replays_checkpoint_without_source_project(self):
+        self.bench.slots_customize("belt", {"position": [7, 8, 9]})
+        self.bench.slots_select(None)
+        self.bench.slots_mode("mesh")
+        recipe = Path(self.tmp.name) / "checkpoint.json"
+        recipe.write_text(json.dumps(self.bench.slots_recipe()), encoding="utf-8")
+        stream = io.StringIO()
+        with mock.patch.object(mb, "MorphBench", lambda: MorphBench(self.bench.cfg)), contextlib.redirect_stdout(stream):
+            code = mb.main(["slots", "--recipe", str(recipe), "--json"])
+        self.assertEqual(code, 0)
+        result = json.loads(stream.getvalue())
+        self.assertEqual(result["session"], self.bench.slots_session())
+        self.assertEqual(result["project"], author_project())
+        self.assertEqual(result["effective"], self.bench.slots_effective())
+
+    def test_recovery_recipe_does_not_require_valid_runtime_provider(self):
+        self.bench.slots_metadata({"namespace": "unfinished:provider"})
+        self.bench.slots_customize("belt", {"radius": 8})
+        reopened = MorphBench(self.bench.cfg)
+        reopened.slots_replay(self.bench.slots_recipe())
+        self.assertEqual(reopened.slots_session(), self.bench.slots_session())
+        with self.assertRaises(ValueError):
+            body_slots.to_schema(reopened)
+        with self.assertRaises(ValueError):
+            body_slots.package(reopened)
+
+    @unittest.skipUnless(shutil.which("node"), "Node is optional and only used to execute the browser mirror")
+    def test_actual_page_reopens_and_saves_recovery_without_partial_import(self):
+        root = Path(__file__).resolve().parent.parent
+        self.bench.slots_customize("belt", {"radius": 6})
+        self.bench.slots_set("belt", {"radius": 6})
+        self.bench.slots_select(None)
+        self.bench.slots_mode("slots")
+        payload = WebPage(self.bench).payload()
+        legacy = [{"method": "slots_add", "args": ["second", "missing"]},
+                  {"method": "slots_select", "args": ["belt"]},
+                  {"method": "slots_mode", "args": ["mesh"]}]
+        self.bench.slots_replay(legacy)
+        expected = self.bench.slots_session()
+        expected_package = body_slots.package(self.bench)
+        self.bench.slots_metadata({"namespace": "unfinished:provider"})
+        recovery = self.bench.slots_session()
+        scripts = ["core.js", "shapes.js", "view.js", "placements.js", "body_slots.js", "bench.js", "slots_panel.js", "app.js"]
+        source = "const document={getElementById:()=>({textContent:JSON.stringify(input.payload)}),body:{appendChild(){}}};\n"
+        source += "\n".join((root / "web" / "js" / name).read_text(encoding="utf-8") for name in scripts)
+        source += r'''
+(async()=>{
+  const bench=new BenchMirror(DATA),app=Object.create(App.prototype);
+  Object.assign(app,{bench:bench,panel:{error:{textContent:""},refresh(){}},refreshSlots(){},draw(){}});
+  const panel={app:app,bench:bench,upload:{files:[],value:""}};
+  const load=async(text)=>{panel.upload.files=[{size:Buffer.byteLength(text),text:async()=>text}];await SlotsPanel.prototype.load.call(panel);};
+  const startup=bench.slots_session();
+  const partial=new BenchMirror(DATA);partial.slots_replay(partial.slots_recipe());
+  partial.slots_customize("belt",{center:[1,0,0]});partial.slots_set("belt",{radius:9});
+  const partialCustomization={session:partial.slots_session(),effective:partial.slots_effective()};
+  await load(JSON.stringify(input.legacy));
+  const legacy=bench.slots_session(),checkpoint=bench.slots_recipe();
+  bench.slots_replace({},[]);await load(JSON.stringify(checkpoint));
+  const reopened=bench.slots_session();
+  const rejected=[];
+  for(const text of input.invalid) {
+    await load(text);rejected.push({same:JSON.stringify(bench.slots_session())===JSON.stringify(reopened),error:!!app.panel.error.textContent});
+  }
+  const packageBytes=Buffer.from(BodySlotsFormat.encode(bench.slots_project(),bench)).toString("base64");
+  bench.slots_metadata({namespace:"unfinished:provider"});
+  let captured=null,filename="";
+  globalThis.Blob=class{constructor(parts){this.parts=parts;}};
+  URL.createObjectURL=(blob)=>{captured=blob.parts.join("");return "blob:test";};URL.revokeObjectURL=()=>{};
+  el=(tag,attributes)=>({click(){filename=attributes.download;},remove(){}});
+  SlotsPanel.prototype.download.call(panel,"recipe");
+  const saved=JSON.parse(captured),downloadError=app.panel.error.textContent;
+  SlotsPanel.prototype.download.call(panel,"package");
+  const strictError=!!app.panel.error.textContent;
+  bench.slots_replace({},[]);await load(JSON.stringify(saved));
+  console.log(JSON.stringify({startup,partialCustomization,legacy,reopened,rejected,package:packageBytes,recovery:bench.slots_session(),filename,downloadError,strictError}));
+})().catch((error)=>{console.error(error);process.exitCode=1;});
+'''
+        invalid = [json.dumps([{"method": "slots_set", "args": ["belt", {"position": [90, 80, 70]}]},
+                               {"method": "slots_set", "args": ["belt", {"radius": 0}]}]),
+                   json.dumps([{"method": "slots_replay", "args": [[]]}]),
+                   json.dumps([{"method": "constructor", "args": []}]),
+                   json.dumps([{"method": "slots_project", "args": ["extra"]}]),
+                   '[{"method":"slots_mode","method":"slots_clear","args":["belt"]}]',
+                   '[{"method":"slots_metadata","args":[{"a":1,"\\u0061":2}]}]']
+        for mutate in (lambda row: row.update(version=True), lambda row: row.update(selected="missing"),
+                       lambda row: row["overrides"].append(copy.deepcopy(row["overrides"][0])),
+                       lambda row: row["overrides"][0].update(changes={"anchor": "other"})):
+            invalid_session = copy.deepcopy(expected); mutate(invalid_session)
+            invalid.append(json.dumps([{"method": "slots_restore", "args": [invalid_session]}]))
+        script = Path(self.tmp.name) / "session.cjs"
+        script.write_text("const input=JSON.parse(require('fs').readFileSync(0,'utf8'));\n" + source, encoding="utf-8")
+        process = subprocess.run([shutil.which("node"), str(script)],
+                                 input=json.dumps({"payload": payload, "legacy": legacy, "invalid": invalid}),
+                                 text=True, capture_output=True, timeout=20)
+        self.assertEqual(process.returncode, 0, process.stderr)
+        result = json.loads(process.stdout)
+        self.assertEqual(result["startup"], payload["slots"]["session"])
+        self.assertEqual(result["partialCustomization"]["effective"][0]["radius"], 6)
+        self.assertEqual(result["partialCustomization"]["session"]["project"]["placements"][0]["radius"], 9)
+        self.assertEqual(result["partialCustomization"]["session"]["overrides"][0]["changes"],
+                         {"radius": 6, "center": [1, 0, 0]})
+        self.assertEqual(result["legacy"], expected)
+        self.assertEqual(result["reopened"], expected)
+        self.assertEqual(result["rejected"], [{"same": True, "error": True}] * len(invalid))
+        self.assertEqual(base64.b64decode(result["package"]), expected_package)
+        self.assertEqual(result["recovery"], recovery)
+        self.assertEqual(result["filename"], "unfinished_provider.session.json")
+        self.assertEqual(result["downloadError"], "")
+        self.assertTrue(result["strictError"])
+
+    @unittest.skipUnless(shutil.which("node"), "Node is optional and only used to execute the browser mirror")
+    def test_real_slots_panel_refresh_preserves_unfinished_policy(self):
+        root = Path(__file__).resolve().parent.parent
+        payload = WebPage(self.bench).payload()
+        cases = []
+        for attributes in ({"kind": "holster", "hands": 1, "contents": 1, "opaque": {"kept": True}},
+                           {"kind": {"toString": 1}, "hands": "left", "contents": {"potion": True}},
+                           {"kind": "", "hands": [], "contents": ["unknown"]}):
+            session = self.bench.slots_session()
+            session["project"]["placements"][0].update(anchor="missing", attributes=attributes)
+            session["mode"] = "slots"
+            cases.append(session)
+        cases[1]["project"]["metadata"]["namespace"] = {"toString": 1}
+        scripts = ["core.js", "shapes.js", "view.js", "placements.js", "body_slots.js", "bench.js", "slots_panel.js", "app.js"]
+        source = r'''
+class Element {
+  constructor(tag){this.tag=tag;this.children=[];this.style={};this.value="";this.checked=false;this._text="";}
+  setAttribute(key,value){this[key]=String(value);}
+  addEventListener(){}
+  appendChild(child){this.children.push(child);return child;}
+  set textContent(value){this._text=String(value);this.children=[];}
+  get textContent(){return this._text;}
+  click(){}
+  remove(){}
+}
+const document={getElementById:()=>({textContent:JSON.stringify(input.payload)}),activeElement:null,
+  createElement:(tag)=>new Element(tag),createTextNode:(text)=>({textContent:text}),body:new Element("body")};
+'''
+        source += "\n".join((root / "web" / "js" / name).read_text(encoding="utf-8") for name in scripts)
+        source += r'''
+(async()=>{
+  const bench=new BenchMirror(DATA),app=Object.create(App.prototype);let panel;
+  Object.assign(app,{bench,panel:{error:{textContent:""},refresh(){panel.refresh();}},refreshSlots(){},draw(){}});
+  panel=new SlotsPanel(app,new Element("root"));panel.target.value="author";panel.refresh();
+  const load=async(value)=>{const text=JSON.stringify(value);panel.upload.files=[{size:Buffer.byteLength(text),text:async()=>text}];await panel.load();};
+  let captured=null;
+  globalThis.Blob=class{constructor(parts){this.parts=parts;}};
+  URL.createObjectURL=(blob)=>{captured=blob.parts.join("");return "blob:test";};URL.revokeObjectURL=()=>{};
+  const results=[];
+  for(const session of input.cases) {
+    await load([{method:"slots_restore",args:[session]}]);
+    const imported=bench.slots_session(),importError=app.panel.error.textContent,status=panel.status.textContent;
+    const hands=Object.values(panel.handBoxes).map((box)=>box.checked),contents=Object.values(panel.contentBoxes).map((box)=>box.checked);
+    panel.target.value="effective";panel.refresh();panel.target.value="author";panel.refresh();
+    panel.download("package");const strictError=!!app.panel.error.textContent;
+    panel.download("recipe");const saveError=app.panel.error.textContent,saved=JSON.parse(captured);
+    bench.slots_replace({},[]);await load(saved);
+    results.push({imported,importError,status,hands,contents,strictError,saveError,reopened:bench.slots_session(),reopenError:app.panel.error.textContent});
+  }
+  await load(input.author);
+  console.log(JSON.stringify({results,validStatus:panel.status.textContent,validError:app.panel.error.textContent,
+    validPackage:Buffer.from(BodySlotsFormat.encode(bench.slots_project(),bench)).toString("base64")}));
+})().catch((error)=>{console.error(error);process.exitCode=1;});
+'''
+        script = Path(self.tmp.name) / "unfinished-policy.cjs"
+        script.write_text("const input=JSON.parse(require('fs').readFileSync(0,'utf8'));\n" + source, encoding="utf-8")
+        process = subprocess.run([shutil.which("node"), str(script)],
+                                 input=json.dumps({"payload": payload, "cases": cases, "author": author_project()}),
+                                 text=True, capture_output=True, timeout=20)
+        self.assertEqual(process.returncode, 0, process.stderr)
+        result = json.loads(process.stdout)
+        for session, actual in zip(cases, result["results"]):
+            self.assertEqual(actual["imported"], session)
+            self.assertEqual(actual["reopened"], session)
+            self.assertEqual(actual["importError"], "")
+            self.assertEqual(actual["saveError"], "")
+            self.assertEqual(actual["reopenError"], "")
+            self.assertIn("Unfinished Body Slots fields:", actual["status"])
+            self.assertIn("Preview unavailable:", actual["status"])
+            self.assertTrue(actual["strictError"])
+            self.assertEqual(actual["hands"], [False, False])
+            self.assertEqual(actual["contents"], [False] * len(body_slots.CONTENTS))
+        self.assertEqual(result["validError"], "")
+        self.assertNotIn("Unfinished Body Slots fields:", result["validStatus"])
+        self.assertEqual(base64.b64decode(result["validPackage"]), body_slots.package(self.bench))
 
     @unittest.skipUnless(shutil.which("node"), "Node is optional and only used to execute the browser mirror")
     def test_actual_browser_mirror_matches_facade_and_package(self):

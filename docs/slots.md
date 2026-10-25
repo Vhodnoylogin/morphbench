@@ -9,7 +9,7 @@ python mb.py web body.nif --skeleton skeleton.nif --mode slots --slots-project a
 python mb.py serve --mode slots --nif body.nif --skeleton skeleton.nif --all
 ```
 
-`--slots-project` is optional. The self-contained HTML works over `file://` with no external dependencies or network requests. On the server, switching to another mesh reloads the page: download your work first. When a server is already running, select the mode and upload JSON on its page; mesh, skeleton and project command-line inputs are accepted when starting a new server.
+`--slots-project` is optional. The self-contained HTML works over `file://` with no external dependencies or network requests. On the server, switching to another mesh reloads the page: download a session recipe first, then reopen it on the new page. When a server is already running, select the mode and open author JSON or a session recipe on its page; mesh, skeleton and project command-line inputs are accepted when starting a new server.
 
 ## Create and edit
 
@@ -21,7 +21,7 @@ The orange surface is the access sphere. The white marker is the placement origi
 
 ## Author defaults and effective preview
 
-**Author defaults** changes the project that JSON and provider packages export. **Temporary override preview** changes only position, rotation, access center/radius and enabled state for the selected placement. It cannot change the author anchor, rig or content/hand policy. **Clear preview override** returns to the current author defaults. Editing an author default preserves any explicit preview override for the same stable name.
+**Author defaults** changes the project that JSON and provider packages export. **Temporary override preview** changes only position, rotation, access center/radius and enabled state for the selected placement. It cannot change the author anchor, rig or content/hand policy. Partial customization preserves previously explicit fields, including values equal to the current author default; **Clear preview override** removes them and returns to the current author defaults. Editing an author default preserves any explicit preview override for the same stable name.
 
 The effective preview combines author values and temporary overrides. This is an offline demonstration of placement customization, not the Body Slots saved customization service. No process handles, equipment identities, runtime instances or save records are imported or exported. There is no item-content model preview, per-instance placement or inventory migration in this mode.
 
@@ -29,7 +29,19 @@ The effective preview combines author values and temporary overrides. This is an
 
 - **Download author JSON** saves the exact Body Slots schema-v1 authoring shape.
 - **Download .bslots** saves a deterministic provider package: a 112-byte header and sorted 408-byte copied definitions. It contains author defaults, including authored content filters.
-- **Download session recipe** saves a JSON array of named facade actions, including temporary override actions. Replay it with the CLI to reproduce placement editing independently of the browser.
+- **Download session recipe** saves an editable checkpoint as a JSON array containing a named `slots_restore` facade action. It retains applied author edits, explicit temporary override fields, selected placement and workbench mode. Saving works even while the provider identity or other Body Slots author fields are unfinished. The recipe is editor recovery data; author JSON and package downloads still require valid Body Slots definitions.
+
+Use **Open author JSON or session recipe** to resume a downloaded recipe in the viewer. Older arrays of named editing actions also work; they apply to the current project unless they include a replacement/checkpoint. The complete recipe is checked on a separate candidate before one commit. A rejected action, unknown method, wrong argument count or duplicate JSON member leaves the current session unchanged. Files are limited to 1 MiB; recipes default to at most 4,096 actions.
+
+Recovery data may contain unfinished kind, hand or content policy fields. The panel marks these fields as unfinished, leaves unsupported checklist values unchecked and preserves the original author attributes. Repair them with an explicit author edit before exporting Body Slots definitions. An unavailable anchor remains unavailable independently of policy warnings.
+
+A checkpoint contains placement data, not the source mesh/skeleton, camera or unapplied form fields. Open the intended reference geometry separately; absent anchors remain unavailable. Replay the same checkpoint with the CLI without needing a separate author JSON:
+
+```text
+python mb.py slots --recipe provider.session.json --out edited.json --package edited.bslots --json
+```
+
+An older action recipe can still use a separate starting project:
 
 ```text
 python mb.py slots --project author.json --recipe session.json --out edited.json --package edited.bslots --json
@@ -44,10 +56,10 @@ A recipe action has `method` and `args`, for example:
 ]
 ```
 
-`--action` also accepts one JSON action and can be repeated. Without `--project`, `--provider` starts an empty project; a `slots_add` action supplies its name, anchor and optional opaque author attributes. The CLI works without a mesh for authoring/export. Supply an optional mesh and `--skeleton` for numerical reference-pose preview. Its JSON answer includes the authored project, effective placements, availability/geometry and saved paths. Output files must be new paths and cannot alias inputs. Unknown recipe methods are refused; the CLI never offers arbitrary Python execution.
+`--action` also accepts one JSON action and can be repeated. Without `--project`, `--provider` starts an empty project; a `slots_add` action supplies its name, anchor and optional opaque author attributes. The CLI works without a mesh for authoring/export. Supply an optional mesh and `--skeleton` for numerical reference-pose preview. Its JSON answer includes the authored project, effective placements, availability/geometry, editor session and saved paths. Output files must be new paths and cannot alias inputs. Unknown recipe methods and nested replay are refused; the CLI never offers arbitrary Python execution. Its author/package outputs retain strict Body Slots validation.
 
 ## Layer contract
 
-`morphbench/placements.py` holds generic numeric placement state. `MorphBench.slots_*` is the facade; `PlacementMirror` and `BenchMirror` mirror its actions in the page. Every placement mutation uses `App.invoke`. Body Slots field/category mapping, schema validation and byte encoding belong exclusively to `presenters/body_slots.py` and the page's format adapter. The core imports neither presenter nor another mod's implementation. This mode is offered alongside mesh inspection; the withheld physics commands remain withheld.
+`morphbench/placements.py` holds generic numeric placement state. `Placements` owns all its mutations; `MorphBench.slots_*` delegates to it. `PlacementMirror` and `BenchMirror` mirror these responsibilities in the page. Every placement mutation uses `App.invoke`. `slots_session` returns a copied version-1 editor checkpoint, `slots_recipe` wraps it in a replayable action, and `slots_restore` / `slots_replay` validate before committing. Checkpoints preserve explicit override fields even when a later author edit made their values equal. Body Slots field/category mapping, schema validation and byte encoding belong exclusively to `presenters/body_slots.py` and the page's format adapter. The core imports neither presenter nor another mod's implementation. This mode is offered alongside mesh inspection; the withheld physics commands remain withheld.
 
-Placement display defaults live in `morphbench/config.py`: `placementRadius`, `placementStep`, `placementLimit`, `placementCoordinateLimit`, `placementRotationTolerance`, `placementColour`, `placementAxisColours`, `placementOpacity` and `placementMarkerFraction`. The sphere tessellation reuses `colliderSegments`. Format limits remain part of the fixed public schema and cannot be relaxed by changing these display settings.
+Placement defaults live in `morphbench/config.py`: `placementRadius`, `placementStep`, `placementLimit`, `placementRecipeLimit`, `placementCoordinateLimit`, `placementRotationTolerance`, `placementColour`, `placementAxisColours`, `placementOpacity` and `placementMarkerFraction`. The sphere tessellation reuses `colliderSegments`. Format limits remain part of the fixed public schema and cannot be relaxed by changing these settings.

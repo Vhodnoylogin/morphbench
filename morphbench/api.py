@@ -118,6 +118,30 @@ class MorphBench:
     def slots_effective(self) -> list:
         return self._placements.effective()
 
+    def slots_variant_add(self, name: str, placement: str) -> dict:
+        return self._placements.variant_add(name, placement)
+
+    def slots_variant_select(self, name: str | None) -> str | None:
+        return self._placements.variant_select(name)
+
+    def slots_variant_set(self, name: str, changes: dict) -> dict:
+        return self._placements.variant_set(name, changes)
+
+    def slots_variant_clear(self, name: str) -> dict:
+        return self._placements.variant_clear(name)
+
+    def slots_variant_remove(self, name: str) -> list:
+        return self._placements.variant_remove(name)
+
+    def slots_variants(self) -> list:
+        return self._placements.variants()
+
+    def slots_layer(self, layer: str) -> str:
+        return self._placements.set_layer(layer)
+
+    def slots_variant_preset(self, name: str) -> dict:
+        return self._placements.variant_preset(name)
+
     def slots_anchors(self) -> dict:
         """True skeleton NODE frames only; no ragdoll frames or identity fallback."""
         return {} if self.rig is None else {name: matrix.tolist() for name, matrix in self.rig.matrices.items()}
@@ -130,6 +154,8 @@ class MorphBench:
 
     def slots_state(self) -> dict:
         return {"mode": self._placements.mode, "selected": self._placements.selected,
+                "selectedVariant": self._placements.selected_variant, "editLayer": self._placements.edit_layer,
+                "variants": self.slots_variants(),
                 "project": self.slots_project(), "effective": self.slots_effective(),
                 "preview": self.slots_preview(), "anchors": self.slots_anchors(),
                 "session": self.slots_session()}

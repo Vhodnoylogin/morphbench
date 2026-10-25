@@ -12,9 +12,9 @@ import numpy as np
 from .i18n import t
 
 
-def compose_placement(authored, override):
+def compose_placement(authored, override, variant=None):
     """Pure effective copy; callers cannot edit either source through the result."""
-    return copy.deepcopy({**authored, **override})
+    return copy.deepcopy({**authored, **override, **(variant or {})})
 
 
 # A recipe is data, never a general-purpose facade dispatcher. Arity is checked on
@@ -25,6 +25,10 @@ RECIPE_ARITY = {
     "slots_remove": (1, 1), "slots_metadata": (1, 1), "slots_mode": (0, 1),
     "slots_project": (0, 0), "slots_effective": (0, 0), "slots_preview": (0, 0),
     "slots_state": (0, 0), "slots_restore": (1, 1),
+    "slots_variant_add": (2, 2), "slots_variant_select": (1, 1),
+    "slots_variant_set": (2, 2), "slots_variant_clear": (1, 1),
+    "slots_variant_remove": (1, 1), "slots_variants": (0, 0),
+    "slots_layer": (1, 1), "slots_variant_preset": (1, 1),
 }
 
 
@@ -43,6 +47,9 @@ class Placements:
         self._metadata = {}
         self._authored = {}
         self._overrides = {}
+        self._variants = {}
+        self._selected_variant = None
+        self._edit_layer = "author"
         self._selected = None
         self._mode = "mesh"
 
@@ -53,6 +60,14 @@ class Placements:
     @property
     def selected(self):
         return self._selected
+
+    @property
+    def selected_variant(self):
+        return self._selected_variant
+
+    @property
+    def edit_layer(self):
+        return self._edit_layer
 
     def _fail(self, field):
         raise ValueError(t("slots.invalid", field=field))
@@ -113,6 +128,7 @@ class Placements:
         # Validate the entire candidate before committing anything.
         metadata = self._json(metadata)
         self._metadata, self._authored, self._overrides = metadata, candidate, {}
+        self._variants, self._selected_variant, self._edit_layer = {}, None, "author"
         self._selected = next(iter(sorted(candidate)), None)
         return self.project()
 
@@ -137,6 +153,7 @@ class Placements:
         if name is not None:
             self._require(name)
         self._selected = name
+        self.variant_select(None)
         return name
 
     def clear(self, name):
@@ -148,7 +165,9 @@ class Placements:
         self._require(name)
         del self._authored[name]
         self._overrides.pop(name, None)
+        self._variants = {key: value for key, value in self._variants.items() if value["placement"] != name}
         self._selected = next(iter(sorted(self._authored)), None)
+        self.variant_select(None)
         return self.project()
 
     def set_metadata(self, metadata):
@@ -165,7 +184,7 @@ class Placements:
                              "center": [0, 0, 0], "enabled": True,
                              "attributes": {} if attributes is None else attributes})
         self._authored[name] = row
-        self._selected = name
+        self.select(name)
         return copy.deepcopy(row)
 
     def set(self, name, changes, customize=False):
@@ -184,17 +203,89 @@ class Placements:
     def effective(self):
         return [compose_placement(self._authored[name], self._overrides.get(name, {})) for name in sorted(self._authored)]
 
+    def _variant(self, name):
+        if type(name) is not str or name not in self._variants:
+            self._fail("variant")
+        return self._variants[name]
+
+    def variant_add(self, name, placement):
+        self._require(placement)
+        if (type(name) is not str or not name.strip() or name in self._variants or
+                len(self._variants) >= int(self.cfg["placementVariantLimit"])):
+            self._fail("variant name/count")
+        self._variants[name] = {"name": name, "placement": placement, "changes": {}}
+        self.variant_select(name)
+        self.set_layer("variant")
+        return self._variant_snapshot(name)
+
+    def variant_select(self, name):
+        if name is not None:
+            self._selected = self._variant(name)["placement"]
+        elif self._edit_layer == "variant":
+            self._edit_layer = "definition"
+        self._selected_variant = name
+        return name
+
+    def set_layer(self, layer):
+        if layer not in ("author", "definition", "variant") or (layer == "variant" and self._selected_variant is None):
+            self._fail("editLayer")
+        self._edit_layer = layer
+        return layer
+
+    def variant_set(self, name, changes):
+        variant = self._variant(name)
+        allowed = {"position", "rotation", "center", "radius", "enabled"}
+        if (type(changes) is not dict or not set(changes) <= allowed or
+                (("center" in changes) != ("radius" in changes))):
+            self._fail("variant changes/sphere")
+        placement = variant["placement"]
+        row = self.validate(compose_placement(self._authored[placement], self._overrides.get(placement, {}), changes))
+        # Replacement semantics preserve selected fields even when equal to inheritance.
+        self._variants[name] = {**variant, "changes": {key: row[key] for key in changes}}
+        return self._variant_snapshot(name)
+
+    def variant_clear(self, name):
+        return self.variant_set(name, {})
+
+    def variant_remove(self, name):
+        self._variant(name)
+        del self._variants[name]
+        if self._selected_variant == name:
+            self.variant_select(None)
+        return self.variants()
+
+    def _variant_snapshot(self, name):
+        variant = self._variant(name)
+        placement = variant["placement"]
+        override = self._overrides.get(placement, {})
+        return copy.deepcopy({**variant,
+                              "inherited": compose_placement(self._authored[placement], override),
+                              "effective": compose_placement(self._authored[placement], override, variant["changes"]),
+                              "definitionFields": sorted(override), "variantFields": sorted(variant["changes"])})
+
+    def variants(self):
+        return [self._variant_snapshot(name) for name in sorted(self._variants)]
+
+    def variant_preset(self, name):
+        return copy.deepcopy({**self._variant(name), "metadata": self._metadata})
+
     def session(self):
         """Editable checkpoint, independent of any runtime export format or rig."""
-        return copy.deepcopy({"version": 1, "project": self.project(),
+        return copy.deepcopy({"version": 2, "project": self.project(),
                               "overrides": [{"name": name, "changes": self._overrides[name]}
                                             for name in sorted(self._overrides) if self._overrides[name]],
-                              "selected": self._selected, "mode": self._mode})
+                              "variants": [self._variants[name] for name in sorted(self._variants)],
+                              "selected": self._selected, "selectedVariant": self._selected_variant,
+                              "editLayer": self._edit_layer, "mode": self._mode})
 
     def restore(self, session):
         """Validate a complete checkpoint before publishing any of its fields."""
-        if (type(session) is not dict or set(session) != {"version", "project", "overrides", "selected", "mode"} or
-                type(session["version"]) is not int or session["version"] != 1):
+        if type(session) is not dict or type(session.get("version")) is not int or session["version"] not in (1, 2):
+            self._fail("session")
+        fields = {"version", "project", "overrides", "selected", "mode"}
+        if session["version"] == 2:
+            fields |= {"variants", "selectedVariant", "editLayer"}
+        if set(session) != fields:
             self._fail("session")
         project = session["project"]
         if type(project) is not dict or set(project) != {"metadata", "placements"}:
@@ -217,12 +308,28 @@ class Placements:
             candidate._overrides[name] = {key: row[key] for key in changes}
         candidate.select(session["selected"])
         candidate.set_mode(session["mode"])
+        if session["version"] == 2:
+            variants = session["variants"]
+            if type(variants) is not list or len(variants) > int(self.cfg["placementVariantLimit"]):
+                self._fail("variants")
+            for item in variants:
+                if type(item) is not dict or set(item) != {"name", "placement", "changes"}:
+                    self._fail("variant")
+                candidate.variant_add(item["name"], item["placement"])
+                candidate.variant_set(item["name"], item["changes"])
+            candidate.select(session["selected"])
+            candidate.variant_select(session["selectedVariant"])
+            if candidate.selected != session["selected"]:
+                self._fail("selectedVariant")
+            candidate.set_layer(session["editLayer"])
         self._commit(candidate)
         return self.session()
 
     def _commit(self, candidate):
         self._metadata, self._authored, self._overrides, self._selected, self._mode = (
             candidate._metadata, candidate._authored, candidate._overrides, candidate._selected, candidate._mode)
+        self._variants, self._selected_variant, self._edit_layer = (
+            candidate._variants, candidate._selected_variant, candidate._edit_layer)
 
     def recipe(self):
         return [{"method": "slots_restore", "args": [self.session()]}]
@@ -247,7 +354,11 @@ class Placements:
                  "slots_customize": lambda name, changes: candidate.set(name, changes, customize=True),
                  "slots_clear": candidate.clear, "slots_remove": candidate.remove,
                  "slots_metadata": candidate.set_metadata, "slots_mode": candidate.set_mode,
-                 "slots_restore": candidate.restore}
+                 "slots_restore": candidate.restore,
+                 "slots_variant_add": candidate.variant_add, "slots_variant_select": candidate.variant_select,
+                 "slots_variant_set": candidate.variant_set, "slots_variant_clear": candidate.variant_clear,
+                 "slots_variant_remove": candidate.variant_remove, "slots_layer": candidate.set_layer,
+                 "slots_variant_preset": candidate.variant_preset}
         for action in actions:
             call = calls.get(action["method"])
             if call is not None:
@@ -258,10 +369,17 @@ class Placements:
 
     def preview(self, matrices):
         out = []
+        variant = self._variants.get(self._selected_variant)
         for row in self.effective():
+            active = variant if variant and variant["placement"] == row["name"] else None
+            if active:
+                row = compose_placement(row, active["changes"])
             matrix = matrices.get(row["anchor"])
             item = {"name": row["name"], "anchor": row["anchor"], "enabled": row["enabled"],
                     "customized": bool(self._overrides.get(row["name"])), "available": False}
+            item.update(variant=active["name"] if active else None,
+                        definitionFields=sorted(self._overrides.get(row["name"], {})),
+                        variantFields=sorted(active["changes"]) if active else [])
             if matrix is not None:
                 frame = np.asarray(matrix, dtype=np.float64)
                 if frame.shape != (4, 4) or not np.isfinite(frame).all() or not np.allclose(frame[3], [0, 0, 0, 1], atol=float(self.cfg["placementRotationTolerance"]), rtol=0):

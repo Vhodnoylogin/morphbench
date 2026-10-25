@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -494,6 +495,12 @@ def cmd_web(args) -> int:
 def cmd_slots(args) -> int:
     """Offline placement authoring; replay exactly the facade calls offered on the page."""
     from presenters import body_slots
+    if ((args.editor and (args.out or args.package)) or
+            (not args.editor and (args.session_out or args.preset_out))):
+        raise ValueError(t("slots.outputs"))
+    outputs = [value for value in (args.out, args.package, args.session_out, args.preset_out) if value]
+    if len({os.path.normcase(os.path.abspath(value)) for value in outputs}) != len(outputs):
+        raise ValueError(t("slots.outputs"))
     bench = _bench(args) if args.nif or args.skeleton else MorphBench()
     bench.slots_mode("slots")
     if args.project:
@@ -509,15 +516,28 @@ def cmd_slots(args) -> int:
     except json.JSONDecodeError:
         raise ValueError(t("slots.invalid", field="action JSON")) from None
     bench.slots_replay(actions)
-    schema = body_slots.to_schema(bench)
+    schema = None if args.editor else body_slots.to_schema(bench)
     inputs = (args.project, args.recipe, args.nif, args.tri, args.skeleton, args.hkx)
     saved = []
+    # Prepare every requested document before writing the first output file.
+    documents = []
     if args.out:
-        saved.append(body_slots.write_new(args.out, (json.dumps(schema, ensure_ascii=False, indent=2) + "\n").encode("utf-8"), inputs))
+        documents.append((args.out, (json.dumps(schema, ensure_ascii=False, indent=2) + "\n").encode("utf-8")))
     if args.package:
-        saved.append(body_slots.write_new(args.package, body_slots.package(bench), inputs))
-    result = {"project": schema, "effective": bench.slots_effective(), "preview": bench.slots_preview(),
-              "session": bench.slots_session(), "saved": saved}
+        documents.append((args.package, body_slots.package(bench)))
+    if args.session_out:
+        documents.append((args.session_out, (json.dumps(bench.slots_recipe(), ensure_ascii=False, indent=2) + "\n").encode("utf-8")))
+    if args.preset_out:
+        name = bench.slots_state()["selectedVariant"]
+        if name is None:
+            raise ValueError(t("slots.presetSelection"))
+        preset = body_slots.placement_preset(bench.slots_variant_preset(name))
+        documents.append((args.preset_out, (json.dumps(preset, ensure_ascii=False, indent=2) + "\n").encode("utf-8")))
+    for path, data in documents:
+        saved.append(body_slots.write_new(path, data, inputs))
+    result = bench.slots_state() if args.editor else {
+        "project": schema, "effective": bench.slots_effective(), "preview": bench.slots_preview(), "session": bench.slots_session()}
+    result["saved"] = saved
     print(json.dumps(result, ensure_ascii=False, indent=2))
     return 0
 
@@ -863,6 +883,9 @@ COMMANDS = (
         Arg("--provider", default="morphbench", help_key="cli.opt.slots.provider"),
         Arg("--action", action="append", default=[], help_key="cli.opt.slots.action"),
         Arg("--recipe", default=None, help_key="cli.opt.slots.recipe"),
+        Arg("--editor", action="store_true", help_key="cli.opt.slots.editor"),
+        Arg("--session-out", default=None, help_key="cli.opt.slots.sessionout"),
+        Arg("--preset-out", default=None, help_key="cli.opt.slots.presetout"),
         Arg("--out", default=None, help_key="cli.opt.slots.out"),
         Arg("--package", default=None, help_key="cli.opt.slots.package"),
     )),

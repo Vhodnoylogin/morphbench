@@ -119,6 +119,20 @@ def to_schema(bench):
     return result
 
 
+def placement_preset(snapshot):
+    """Unbound editor patch, never a runtime request or flattened effective row."""
+    template = None
+    provider, key = snapshot["metadata"].get("namespace"), snapshot["placement"]
+    try:
+        ascii_text(provider, 64, "provider", identity=True)
+        ascii_text(key, 64, "key", identity=True)
+        template = {"provider": provider, "key": key}
+    except ValueError:
+        pass  # Generic/unfinished author identities remain usable in the editor.
+    return {"format": "morphbench-placement-preset", "version": 1, "binding": "unbound",
+            "template": template, "changes": snapshot["changes"]}
+
+
 def package(bench):
     schema = to_schema(bench)
     metadata, rows = normalize(schema)

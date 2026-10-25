@@ -196,7 +196,7 @@ class WebPage:
             "colliderColour": [float(x) for x in cfg["colliderColour"]],
             "colliderOpacity": float(cfg["colliderOpacity"]),
             "collidersFollowParts": bool(cfg["collidersFollowParts"]),
-            **{key: cfg[key] for key in ("placementLimit", "placementRecipeLimit", "placementRadius", "placementCoordinateLimit",
+            **{key: cfg[key] for key in ("placementLimit", "placementVariantLimit", "placementRecipeLimit", "placementRadius", "placementCoordinateLimit",
                "placementRotationTolerance", "placementStep", "placementColour", "placementOpacity",
                "placementMarkerFraction", "placementAxisColours", "colliderSegments")},
         }

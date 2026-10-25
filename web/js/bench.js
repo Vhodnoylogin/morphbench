@@ -50,10 +50,18 @@ class BenchMirror {
   slots_recipe() { return this.placements.recipe(); }
   slots_replay(actions) { return this.placements.replay(actions); }
   slots_effective() { return this.placements.effective(); }
+  slots_variant_add(name,placement) { return this.placements.variantAdd(name,placement); }
+  slots_variant_select(name) { return this.placements.variantSelect(name); }
+  slots_variant_set(name,changes) { return this.placements.variantSet(name,changes); }
+  slots_variant_clear(name) { return this.placements.variantClear(name); }
+  slots_variant_remove(name) { return this.placements.variantRemove(name); }
+  slots_variants() { return this.placements.variants(); }
+  slots_layer(layer) { return this.placements.setLayer(layer); }
+  slots_variant_preset(name) { return this.placements.variantPreset(name); }
   slots_anchors() { return this.placements.anchors(); }
   slots_preview() { return this.placements.preview(); }
   slots_meshes() { return this.placements.meshes(); }
-  slots_state() { return {mode:this.placements.mode,selected:this.placements.selected,project:this.slots_project(),effective:this.slots_effective(),preview:this.slots_preview(),anchors:this.slots_anchors(),session:this.slots_session()}; }
+  slots_state() { return {mode:this.placements.mode,selected:this.placements.selected,selectedVariant:this.placements.selectedVariant,editLayer:this.placements.editLayer,variants:this.slots_variants(),project:this.slots_project(),effective:this.slots_effective(),preview:this.slots_preview(),anchors:this.slots_anchors(),session:this.slots_session()}; }
 
   is_open() { return this.summary !== null; }
   // skeleton and capsules: the core has already worked the geometry out, and it travels in the page

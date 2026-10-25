@@ -51,6 +51,14 @@ const BodySlotsFormat = {
         position:row.position,rotation:row.rotation,accessRegion:{shape:"sphere",center:row.center,radius:row.radius},
         hands:this.value(row.attributes,"hands",Object.keys(this.hands)),contents:this.value(row.attributes,"contents",Object.keys(this.contents)),scaleMode:"anchor"}))};
   },
+  preset(snapshot) {
+    let template=null;
+    try {
+      this.text(snapshot.metadata.namespace,64,"provider",true);this.text(snapshot.placement,64,"key",true);
+      template={provider:snapshot.metadata.namespace,key:snapshot.placement};
+    } catch(error) { /* Unfinished/generic author identities need no runtime binding. */ }
+    return {format:"morphbench-placement-preset",version:1,binding:"unbound",template:template,changes:placementClone(snapshot.changes)};
+  },
   encode(project,bench) {
     const schema=this.schema(project),[metadata,rows]=this.normalize(schema);
     const normalized=bench.slots_validate(metadata,rows,this.limits),ordered=normalized.placements;

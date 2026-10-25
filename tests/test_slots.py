@@ -137,7 +137,7 @@ class TestPlacements(PlacementFixture):
     def test_restore_rejects_entire_malformed_session(self):
         self.bench.slots_customize("belt", {"radius": 6})
         original = self.bench.slots_session()
-        mutations = [lambda row: row.update(version=True), lambda row: row.update(version=2),
+        mutations = [lambda row: row.update(version=True), lambda row: row.update(version=3),
                      lambda row: row.update(mode="game"), lambda row: row.update(selected="missing"),
                      lambda row: row.update(extra=True),
                      lambda row: row["overrides"].append(copy.deepcopy(row["overrides"][0])),

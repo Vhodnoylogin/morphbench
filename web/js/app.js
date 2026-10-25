@@ -40,7 +40,7 @@ class App {
     this.lastCall = "bench." + method + "(" + args.map((a) => JSON.stringify(a)).join(", ") + ")";
     if (POSITION_METHODS.has(method)) this.refreshPositions();
     if (COLOUR_METHODS.has(method)) this.refreshColours();
-    if (method.startsWith("slots_") && !["slots_project","slots_state","slots_effective","slots_preview","slots_meshes","slots_anchors","slots_validate","slots_session","slots_recipe"].includes(method)) {
+    if (method.startsWith("slots_") && !["slots_project","slots_state","slots_effective","slots_preview","slots_meshes","slots_anchors","slots_validate","slots_session","slots_recipe","slots_variants","slots_variant_preset"].includes(method)) {
       this.refreshSlots();
     }
     this.panel.refresh();

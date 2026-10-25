@@ -6,13 +6,15 @@ const placementClone = (value) => JSON.parse(JSON.stringify(value, (key,item) =>
       (typeof item === "number" && !Number.isFinite(item))) placementFail("JSON");
   return item;
 }));
-const composePlacement = (author,override) => placementClone(Object.assign({},author,override));
+const composePlacement = (author,override,variant) => placementClone(Object.assign({},author,override,variant));
 const placementMV = (matrix, vector) => matrix.map((row) => dot(row, vector));
 const placementDet = (matrix) => dot(matrix[0], cross(matrix[1], matrix[2]));
 const PLACEMENT_RECIPE_ARITY = {
   slots_replace:[2,2],slots_add:[2,3],slots_select:[1,1],slots_set:[2,2],slots_customize:[2,2],
   slots_clear:[1,1],slots_remove:[1,1],slots_metadata:[1,1],slots_mode:[0,1],
-  slots_project:[0,0],slots_effective:[0,0],slots_preview:[0,0],slots_state:[0,0],slots_restore:[1,1]
+  slots_project:[0,0],slots_effective:[0,0],slots_preview:[0,0],slots_state:[0,0],slots_restore:[1,1],
+  slots_variant_add:[2,2],slots_variant_select:[1,1],slots_variant_set:[2,2],slots_variant_clear:[1,1],
+  slots_variant_remove:[1,1],slots_variants:[0,0],slots_layer:[1,1],slots_variant_preset:[1,1]
 };
 
 // JSON.parse supplies syntax validation and string decoding. This small token walk
@@ -45,6 +47,7 @@ class PlacementMirror {
     this._metadata = {};
     this._authored = new Map();
     this._overrides = new Map();
+    this._variants = new Map();this._selectedVariant = null;this._editLayer = "author";
     this._selected = null;
     this._mode = "mesh";
     this._anchors = state ? placementClone(state.anchors) : {};
@@ -65,6 +68,8 @@ class PlacementMirror {
   }
   get mode() { return this._mode; }
   get selected() { return this._selected; }
+  get selectedVariant() { return this._selectedVariant; }
+  get editLayer() { return this._editLayer; }
   anchors() { return placementClone(this._anchors); }
   fail(field) { placementFail(field); }
   validate(row) {
@@ -91,6 +96,7 @@ class PlacementMirror {
     const candidate = new Map();
     for (const row of rows) { const value = this.validate(row); if (candidate.has(value.name)) this.fail("name"); candidate.set(value.name, value); }
     this._metadata = placementClone(metadata); this._authored = candidate; this._overrides = new Map();
+    this._variants = new Map();this._selectedVariant = null;this._editLayer = "author";
     this._selected = [...candidate.keys()].sort()[0] || null;
     return this.project();
   }
@@ -101,10 +107,11 @@ class PlacementMirror {
     return this._authored.get(name);
   }
   setMode(mode="slots") { if(!["mesh","slots"].includes(mode)) this.fail("mode");this._mode=mode;return mode; }
-  select(name) { if(name!==null) this._require(name);this._selected=name;return name; }
+  select(name) { if(name!==null) this._require(name);this._selected=name;this.variantSelect(null);return name; }
   clear(name) { this._require(name);this._overrides.delete(name);return this.effective(); }
   remove(name) {
     this._require(name);this._authored.delete(name);this._overrides.delete(name);
+    this._variants=new Map([...this._variants].filter(([key,value])=>value.placement!==name));this.variantSelect(null);
     this._selected=[...this._authored.keys()].sort()[0]||null;return this.project();
   }
   setMetadata(metadata) {
@@ -115,7 +122,7 @@ class PlacementMirror {
     if (typeof name!=="string" || this._authored.has(name) || this._authored.size >= this.limits.count) this.fail("name/count");
     const row = this.validate({name: name, anchor: anchor, position: [0,0,0], rotation: [[1,0,0],[0,1,0],[0,0,1]],
       radius: this.cfg.placementRadius, center: [0,0,0], enabled: true, attributes: attributes == null ? {} : attributes});
-    this._authored.set(name, row); this._selected = name; return placementClone(row);
+    this._authored.set(name, row); this.select(name); return placementClone(row);
   }
   set(name, changes, customize) {
     const author = this._require(name), allowed = customize ? ["position","rotation","radius","center","enabled"] : Object.keys(author).filter((key) => key !== "name");
@@ -129,13 +136,54 @@ class PlacementMirror {
     return placementClone(candidate);
   }
   effective() { return [...this._authored.keys()].sort().map((name) => composePlacement(this._authored.get(name), this._overrides.get(name))); }
+  _variant(name) {
+    if(typeof name!=="string"||!this._variants.has(name)) this.fail("variant");
+    return this._variants.get(name);
+  }
+  variantAdd(name,placement) {
+    this._require(placement);
+    if(typeof name!=="string"||!name.trim()||this._variants.has(name)||this._variants.size>=this.cfg.placementVariantLimit) this.fail("variant name/count");
+    this._variants.set(name,{name:name,placement:placement,changes:{}});
+    this.variantSelect(name);this.setLayer("variant");return this._variantSnapshot(name);
+  }
+  variantSelect(name) {
+    if(name!==null) this._selected=this._variant(name).placement;
+    else if(this._editLayer==="variant") this._editLayer="definition";
+    this._selectedVariant=name;return name;
+  }
+  setLayer(layer) {
+    if(!["author","definition","variant"].includes(layer)||(layer==="variant"&&this._selectedVariant===null)) this.fail("editLayer");
+    this._editLayer=layer;return layer;
+  }
+  variantSet(name,changes) {
+    const variant=this._variant(name),allowed=["position","rotation","center","radius","enabled"];
+    if(!changes||typeof changes!=="object"||Array.isArray(changes)||Object.keys(changes).some((key)=>!allowed.includes(key))||
+      (Object.prototype.hasOwnProperty.call(changes,"center")!==Object.prototype.hasOwnProperty.call(changes,"radius"))) this.fail("variant changes/sphere");
+    const row=this.validate(composePlacement(this._authored.get(variant.placement),this._overrides.get(variant.placement),changes)),patch={};
+    for(const key of Object.keys(changes)) patch[key]=row[key];
+    this._variants.set(name,Object.assign({},variant,{changes:patch}));return this._variantSnapshot(name);
+  }
+  variantClear(name) { return this.variantSet(name,{}); }
+  variantRemove(name) {
+    this._variant(name);this._variants.delete(name);if(this._selectedVariant===name) this.variantSelect(null);return this.variants();
+  }
+  _variantSnapshot(name) {
+    const variant=this._variant(name),author=this._authored.get(variant.placement),override=this._overrides.get(variant.placement)||{};
+    return placementClone(Object.assign({},variant,{inherited:composePlacement(author,override),effective:composePlacement(author,override,variant.changes),
+      definitionFields:Object.keys(override).sort(),variantFields:Object.keys(variant.changes).sort()}));
+  }
+  variants() { return [...this._variants.keys()].sort().map((name)=>this._variantSnapshot(name)); }
+  variantPreset(name) { return placementClone(Object.assign({},this._variant(name),{metadata:this._metadata})); }
   session() {
-    return placementClone({version:1,project:this.project(),overrides:[...this._overrides.keys()].sort()
+    return placementClone({version:2,project:this.project(),overrides:[...this._overrides.keys()].sort()
       .filter((name)=>Object.keys(this._overrides.get(name)).length).map((name)=>({name:name,changes:this._overrides.get(name)})),
-      selected:this._selected,mode:this._mode});
+      variants:[...this._variants.keys()].sort().map((name)=>this._variants.get(name)),
+      selected:this._selected,selectedVariant:this._selectedVariant,editLayer:this._editLayer,mode:this._mode});
   }
   restore(session) {
-    if(!session||Array.isArray(session)||typeof session!=="object"||Object.keys(session).sort().join()!==["version","project","overrides","selected","mode"].sort().join()||session.version!==1) this.fail("session");
+    if(!session||Array.isArray(session)||typeof session!=="object"||![1,2].includes(session.version)) this.fail("session");
+    const fields=["version","project","overrides","selected","mode"].concat(session.version===2?["variants","selectedVariant","editLayer"]:[]);
+    if(Object.keys(session).sort().join()!==fields.sort().join()) this.fail("session");
     const project=session.project;
     if(!project||Array.isArray(project)||typeof project!=="object"||Object.keys(project).sort().join()!==["metadata","placements"].sort().join()) this.fail("project");
     const candidate=new PlacementMirror(this.cfg,null,this.limits);
@@ -151,11 +199,22 @@ class PlacementMirror {
       candidate._overrides.set(name,override);
     }
     candidate.select(session.selected);candidate.setMode(session.mode);
+    if(session.version===2) {
+      if(!Array.isArray(session.variants)||session.variants.length>this.cfg.placementVariantLimit) this.fail("variants");
+      for(const item of session.variants) {
+        if(!item||Array.isArray(item)||typeof item!=="object"||Object.keys(item).sort().join()!==["name","placement","changes"].sort().join()) this.fail("variant");
+        candidate.variantAdd(item.name,item.placement);candidate.variantSet(item.name,item.changes);
+      }
+      candidate.select(session.selected);candidate.variantSelect(session.selectedVariant);
+      if(candidate.selected!==session.selected) this.fail("selectedVariant");
+      candidate.setLayer(session.editLayer);
+    }
     this._commit(candidate);return this.session();
   }
   _commit(candidate) {
     this._metadata=candidate._metadata;this._authored=candidate._authored;this._overrides=candidate._overrides;
     this._selected=candidate._selected;this._mode=candidate._mode;
+    this._variants=candidate._variants;this._selectedVariant=candidate._selectedVariant;this._editLayer=candidate._editLayer;
   }
   recipe() { return [{method:"slots_restore",args:[this.session()]}]; }
   replay(actions) {
@@ -171,15 +230,22 @@ class PlacementMirror {
       slots_select:(...args)=>candidate.select(...args),slots_set:(name,changes)=>candidate.set(name,changes,false),
       slots_customize:(name,changes)=>candidate.set(name,changes,true),slots_clear:(...args)=>candidate.clear(...args),
       slots_remove:(...args)=>candidate.remove(...args),slots_metadata:(...args)=>candidate.setMetadata(...args),
-      slots_mode:(...args)=>candidate.setMode(...args),slots_restore:(...args)=>candidate.restore(...args)};
+      slots_mode:(...args)=>candidate.setMode(...args),slots_restore:(...args)=>candidate.restore(...args),
+      slots_variant_add:(...args)=>candidate.variantAdd(...args),slots_variant_select:(...args)=>candidate.variantSelect(...args),
+      slots_variant_set:(...args)=>candidate.variantSet(...args),slots_variant_clear:(...args)=>candidate.variantClear(...args),
+      slots_variant_remove:(...args)=>candidate.variantRemove(...args),slots_layer:(...args)=>candidate.setLayer(...args),
+      slots_variant_preset:(...args)=>candidate.variantPreset(...args)};
     for(const action of actions) if(Object.prototype.hasOwnProperty.call(calls,action.method)) calls[action.method](...action.args);
     this._commit(candidate);return this.session();
   }
   preview() {
-    return this.effective().map((row) => {
+    const selected=this._variants.get(this._selectedVariant);
+    return this.effective().map((source) => {
+      const active=selected&&selected.placement===source.name?selected:null,row=active?composePlacement(source,active.changes):source;
       const frame = this._anchors[row.anchor];
       const item = {name: row.name, anchor: row.anchor, enabled: row.enabled,
-        customized: !!Object.keys(this._overrides.get(row.name) || {}).length, available: false};
+        customized: !!Object.keys(this._overrides.get(row.name) || {}).length, available: false,
+        variant:active?active.name:null,definitionFields:Object.keys(this._overrides.get(row.name)||{}).sort(),variantFields:active?Object.keys(active.changes).sort():[]};
       if (!frame || frame.length !== 4 || frame.some((line) => line.length !== 4 || line.some((x) => !Number.isFinite(x))) || frame[3].some((x,i)=>Math.abs(x-(i===3?1:0))>this.cfg.placementRotationTolerance)) return item;
       const basis = frame.slice(0,3).map((line) => line.slice(0,3)), scale = Math.cbrt(placementDet(basis));
       if (scale <= 0) return item;

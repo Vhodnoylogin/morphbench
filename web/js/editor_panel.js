@@ -134,14 +134,16 @@ class EditorPanel {
       this.groups.dataset.signature=signature;
     }
     const filter=this.filter.value.toLowerCase(),wanted=fields.filter((field)=>(!this.groups.value||field.group===this.groups.value)&&(!filter||((field.label||"")+" "+(field.group||"")).toLowerCase().includes(filter)));
-    const fieldSignature=JSON.stringify(wanted.map((field)=>[field.id,field.value,field.changed]));
+    const fieldSignature=JSON.stringify(wanted.map((field)=>[field.id,field.label]));
     if(fieldSignature!==this.fieldSignature) {
-      this.fieldSignature=fieldSignature;this.fields.textContent="";
+      this.fieldSignature=fieldSignature;this.fields.textContent="";this.physicsInputs=new Map();
       for(const field of wanted) {
         const input=el("input",{type:"number",step:"any",value:String(field.value),"aria-label":field.label+" · "+field.id,on:{change:()=>this.app.invoke("physics_set",field.id,input.value.trim()===""?NaN:Number(input.value))}});
+        this.physicsInputs.set(field.id,input);
         this.fields.appendChild(el("label",{class:"physics-field"},[el("span",{text:field.label,title:field.id}),input]));
       }
     }
+    for(const field of wanted) {const input=this.physicsInputs.get(field.id);if(input!==document.activeElement)input.value=String(field.value);}
     if(!this.rawDirty)this.source.value=this.bench.physics_export();
     const result=this.bench.physics_envelopes();
     const warnings=[...(state.warnings||[]),...(result.warnings||[])];
@@ -169,12 +171,27 @@ class EditorPanel {
     const delta=point.map((x,i)=>x-framed[0][i]);return [rect.width/2+dot(delta,basis.right)*scale,rect.height/2-dot(delta,basis.up)*scale];
   }
   pick(event) {
-    const rect=this.app.canvas.getBoundingClientRect(),at=[event.clientX-rect.left,event.clientY-rect.top],state=this.bench.collider_edit_state();let best=null,distance=this.bench.settings.editorPickPixels;
+    if(!this.bench.view.colliders)return null;
+    const rect=this.app.canvas.getBoundingClientRect(),at=[event.clientX-rect.left,event.clientY-rect.top],state=this.bench.collider_edit_state();
+    const basis=this.bench.view.basis(),scale=this.app.scale/(window.devicePixelRatio||1),tolerance=this.bench.settings.editorPickPixels;
+    const visible=new Set(this.bench.collider_mesh().map((chunk)=>chunk.bone));let best=null,rank=null;
     for(const cap of state.capsules.filter((item)=>item.editable)) {
-      const matrix=state.bodyMatrices[cap.bone],point=this.project(editorPoint(matrix,cap.p1.map((x,i)=>(x+cap.p2[i])/2))),dist=Math.hypot(point[0]-at[0],point[1]-at[1]);
-      if(dist<distance){best=cap;distance=dist;}
+      if(!visible.has(cap.bone))continue;
+      const matrix=state.bodyMatrices[cap.bone],a=editorPoint(matrix,cap.p1),b=editorPoint(matrix,cap.p2),pa=this.project(a),pb=this.project(b);
+      const axis=pb.map((x,i)=>x-pa[i]),length=axis[0]*axis[0]+axis[1]*axis[1];
+      const along=length?clamp(((at[0]-pa[0])*axis[0]+(at[1]-pa[1])*axis[1])/length,0,1):0;
+      const distance=Math.hypot(at[0]-pa[0]-along*axis[0],at[1]-pa[1]-along*axis[1]);
+      const bodyScale=Math.max(...[0,1,2].map((i)=>Math.hypot(matrix[0][i],matrix[1][i],matrix[2][i]))),radius=cap.radius*bodyScale*scale;
+      const outside=Math.max(0,distance-radius);if(outside>tolerance)continue;
+      // Projection picking covers the whole capsule. Where silhouettes overlap, prefer
+      // the foreground body; an actual silhouette hit wins over the outside tolerance.
+      const point=a.map((x,i)=>x+along*(b[i]-x));
+      const depth=dot(point,basis.forward)-Math.sqrt(Math.max(0,radius*radius-distance*distance))/scale;
+      const candidate=[outside>0?1:0,outside>0?outside:depth,depth];
+      if(!rank||candidate[0]<rank[0]||(candidate[0]===rank[0]&&(candidate[1]<rank[1]||(candidate[1]===rank[1]&&candidate[2]<rank[2])))) {best=cap;rank=candidate;}
     }
     if(best)this.app.invoke("collider_select",best.bone,best.index);
+    return best;
   }
   drawOverlay() {
     this.overlay.textContent="";
@@ -182,9 +199,21 @@ class EditorPanel {
     const add=(tag,attrs)=>{const element=document.createElementNS(this.svgNamespace,tag);for(const [key,value] of Object.entries(attrs))element.setAttribute(key,String(value));this.overlay.appendChild(element);};
     try {
       if(mode==="colliders") {
-        const state=this.bench.collider_edit_state(),cap=this.selected();if(!cap)return;
+        const state=this.bench.collider_edit_state(),cap=this.selected();
+        if(!cap||!this.bench.view.colliders||!this.bench.collider_mesh().some((chunk)=>chunk.bone===cap.bone))return;
         const matrix=state.bodyMatrices[cap.bone];
-        for(const point of [cap.p1,cap.p2]){const screen=this.project(editorPoint(matrix,point));add("circle",{cx:screen[0],cy:screen[1],r:5,fill:"#5ce1ce",stroke:"#122725","stroke-width":2});}
+        const endpoints=[cap.p1,cap.p2].map((point)=>this.project(editorPoint(matrix,point)));
+        add("line",{x1:endpoints[0][0],y1:endpoints[0][1],x2:endpoints[1][0],y2:endpoints[1][1],stroke:"#5ce1ce","stroke-width":2});
+        for(const screen of endpoints)add("circle",{cx:screen[0],cy:screen[1],r:5,fill:"#5ce1ce",stroke:"#122725","stroke-width":2});
+        if(cap.editable&&this.bench.view.colliders) {
+          const centre=endpoints[0].map((x,i)=>(x+endpoints[1][i])/2),handle=document.createElementNS(this.svgNamespace,"circle");
+          for(const [key,value] of Object.entries({cx:centre[0],cy:centre[1],r:this.bench.settings.editorPickPixels/2,fill:"#122725",stroke:"#5ce1ce","stroke-width":2}))handle.setAttribute(key,String(value));
+          Object.assign(handle.style,{pointerEvents:"all",cursor:"grab"});
+          const title=document.createElementNS(this.svgNamespace,"title");title.textContent=T.edMove;handle.appendChild(title);
+          handle.addEventListener("pointerdown",(event)=>this.app.startColliderDrag(event,cap));this.overlay.appendChild(handle);
+          const arm=this.bench.settings.editorPickPixels/4;
+          add("path",{d:`M ${centre[0]-arm} ${centre[1]} h ${2*arm} M ${centre[0]} ${centre[1]-arm} v ${2*arm}`,stroke:"#5ce1ce","stroke-width":1.5});
+        }
       }else {
         const result=this.bench.physics_envelopes();
         for(const line of result.lines||[]) {

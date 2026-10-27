@@ -121,18 +121,32 @@ class App {
   bindMouse() {
     const c = this.canvas;
     let drag = null;
+    this.startColliderDrag = (e, cap) => {
+      if(e.button!==0||this.bench.workspace_state().mode!=="colliders"||!cap||!cap.editable) return;
+      if(drag&&drag.pointerId!==e.pointerId)return;
+      e.preventDefault();
+      this.invoke("collider_select",cap.bone,cap.index);
+      drag = {button:0,pointerId:e.pointerId,x:e.clientX,y:e.clientY,collider:{bone:cap.bone,index:cap.index}};
+      c.style.cursor="grabbing";
+      try { c.setPointerCapture(e.pointerId); } catch (_) { /* keep the gesture while over the canvas */ }
+    };
     c.addEventListener("contextmenu", (e) => e.preventDefault());
     c.addEventListener("pointerdown", (e) => {
-      if(this.bench.workspace_state().mode==="colliders"&&e.altKey) {this.editorPanel.pick(e);return;}
-      drag = { button: e.button, x: e.clientX, y: e.clientY, collider:e.shiftKey&&this.bench.workspace_state().mode==="colliders" };
+      if(drag&&drag.pointerId!==e.pointerId)return;
+      if(e.button===0&&this.bench.workspace_state().mode==="colliders") {
+        if(e.altKey) {this.editorPanel.pick(e);return;}
+        if(e.shiftKey) {this.startColliderDrag(e,this.editorPanel.pick(e));return;}
+      }
+      drag = { button: e.button, pointerId:e.pointerId, x: e.clientX, y: e.clientY, collider:null };
       try { c.setPointerCapture(e.pointerId); } catch (_) { /* a pointer without capture is no great loss */ }
     });
     c.addEventListener("pointermove", (e) => {
-      if (!drag) return;
+      if (!drag||drag.pointerId!==e.pointerId) return;
       const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
       drag.x = e.clientX; drag.y = e.clientY;
       if(drag.button===0&&drag.collider) {
-        const state=this.bench.collider_edit_state(),selected=state.selected;
+        const state=this.bench.collider_edit_state(),selected=drag.collider;
+        if(this.bench.workspace_state().mode!=="colliders") {drag=null;c.style.cursor="";return;}
         if(selected) {
           const basis=this.bench.view.basis(),dpr=window.devicePixelRatio||1;
           const world=[0,1,2].map((axis)=>(basis.right[axis]*dx-basis.up[axis]*dy)*dpr/this.scale);
@@ -148,9 +162,10 @@ class App {
         this.invoke("pan_by", rnd(dx * dpr / this.scale, 3), rnd(-dy * dpr / this.scale, 3));
       }
     });
-    const stop = (e) => { drag = null; try { c.releasePointerCapture(e.pointerId); } catch (_) {} };
+    const stop = (e) => { if(!drag||drag.pointerId!==e.pointerId)return;drag = null;c.style.cursor="";try { c.releasePointerCapture(e.pointerId); } catch (_) {} };
     c.addEventListener("pointerup", stop);
     c.addEventListener("pointercancel", stop);
+    c.addEventListener("lostpointercapture", stop);
     // The wheel zooms towards the point under the cursor: the facade's zoom_at with the new
     // zoom and the fractions of the frame.
     c.addEventListener("wheel", (e) => {

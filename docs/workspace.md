@@ -18,9 +18,12 @@ After changing models, confirm the selected skeleton, especially when you named 
 
 ## Collision capsules
 
-In **Colliders → Edit capsules**, choose a capsule from the list or **Alt + click** near its
-centre. Edit its endpoint coordinates and radius, then apply. **Shift + drag** translates the
-selected capsule in the camera plane. The numeric endpoints and translation actions use the
+In **Colliders → Edit capsules**, choose a capsule from the list or **Alt + click** on its
+projected surface. **Shift + left-drag** selects the capsule under the pointer and moves it
+in the camera plane. The selected capsule also has a central circular handle that can be dragged
+without Shift. An empty Shift-drag leaves the scene unchanged. Change the camera angle to move
+along another plane. Edit endpoint coordinates and radius in the inspector, then apply.
+The numeric endpoints and translation actions use the
 Havok body's local frame, in game units; that frame can differ from the skeleton node frame.
 
 Duplicate a supported capsule, remove a bundle member, or reset the capsule edits. A body must
@@ -64,6 +67,21 @@ direct angle limits. Weight interpolation, linear/rotation factors, forces, coll
 and provider integration are not evaluated. Neither mode runs a solver or predicts actual
 motion amplitude, contact or stability. There is no posed-skin preview or manual animation
 scrubbing in this iteration.
+
+### Check the editor without running the game
+
+For a visible range example, open [physics-ranges.xml](examples/physics-ranges.xml) in
+**Physics → Configuration → Open configuration**, with a human skeleton containing
+`NPC Spine1 [Spn1]` and `NPC Spine2 [Spn2]`. This is a diagnostic example, not a game preset.
+Open **Ranges** to see its translation box and angular guides. In **Configuration**, filter
+`linearUpperLimit.x`, change `5` to `15`, and leave the field: the box should extend along one
+axis while the body remains still. Mass and damping changes have no animated preview.
+
+Download the changed configuration, reopen it, and check that the intended parameter changed
+while comments and unrelated settings remain intact. A real CBPC TXT can be checked the same
+way for source editing, but its spatial ranges are not displayed. These checks verify the
+editor and configured limits. To evaluate actual motion, damping and contacts, test the
+exported configuration with its provider in the game.
 
 ## Replay without the UI
 

@@ -51,9 +51,12 @@ class PageAssets:
         "js/placements.js",
         "js/body_slots.js",
         "js/bench.js",
+        "js/physics_workspace.js",
+        "js/editor.js",
         "js/render.js",
         "js/slots_panel.js",
         "js/panel.js",
+        "js/editor_panel.js",
         "js/app.js",
         "js/boot.js",
     )

@@ -2,13 +2,15 @@
 
 // ---- start-up ---------------------------------------------------------------------------------
 const summary = DATA.summary;
-document.getElementById("title").textContent = "morphbench — " + (DATA.names.nif || T.noMesh);
-document.getElementById("subtitle").textContent = summary
+document.getElementById("title").textContent = "morphbench";
+const subtitle = document.getElementById("subtitle");
+subtitle.textContent = DATA.names.nif || (DATA.server ? T.chooseMesh : T.noMesh);
+subtitle.title = summary
   ? T.summaryMorphs + (DATA.names.tri ? DATA.names.tri + " (" + summary.triKind + ")" : T.noTri) +
     T.summaryShapes + summary.shapes + T.summaryVerts + summary.vertices +
     T.summaryBones + summary.bones + T.summarySliders + summary.morphs +
     (DATA.names.skeleton ? T.summarySkeleton + DATA.names.skeleton + T.summaryCapsules + summary.colliders : "")
-  : (DATA.server ? T.chooseMesh : "");
+  : (DATA.server ? T.chooseMesh : T.noMesh);
 try {
   window.mb = new App(DATA);
 } catch (e) {

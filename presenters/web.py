@@ -36,6 +36,7 @@ from __future__ import annotations
 
 import base64
 import json
+import hashlib
 from pathlib import Path
 
 import numpy as np
@@ -199,6 +200,7 @@ class WebPage:
             **{key: cfg[key] for key in ("placementLimit", "placementVariantLimit", "placementRecipeLimit", "placementRadius", "placementCoordinateLimit",
                "placementRotationTolerance", "placementStep", "placementColour", "placementOpacity",
                "placementMarkerFraction", "placementAxisColours", "colliderSegments")},
+            **{key: cfg[key] for key in ("workspaceActionLimit", "physicsMaxChars", "physicsMaxFields", "workspaceRequestLimit", "editorStep", "editorPickPixels")},
         }
 
     # ---- the server: what the page knows about it -------------------------------------
@@ -282,6 +284,14 @@ class WebPage:
         the server, in one dictionary."""
         bench = self.bench
         data = self._body() if bench.is_open() else self._no_body()
+        if not bench.is_open() and bench.has_skeleton():
+            data["colliders"] = self._colliders()
+            data["names"]["skeleton"] = bench.rig.path.name
+            data["names"]["ragdoll"] = self._file_name(bench.ragdoll())
+            data["summary"] = {"nif": None, "tri": None, "triKind": None,
+                               "shapes": 0, "vertices": 0, "bones": len(bench.slots_anchors()),
+                               "morphs": 0, "skeleton": str(bench.rig.path),
+                               "ragdoll": bench.ragdoll(), "colliders": bench.rig.capsule_count()}
         data.update({
             "settings": self._settings(),
             "presets": bench.presets(),
@@ -292,8 +302,20 @@ class WebPage:
             # the language catalogue.
             "texts": section("page."),
             "slots": bench.slots_state(),
+            "workspace": bench.workspace_state(),
+            "colliderEditor": bench.collider_editor_payload(),
+            "physics": bench.physics_state(),
+            "physicsTexts": {"physicsw." + key: value for key, value in section("physicsw.").items()},
+            "source": self.source_identity(bench),
         })
         return data
+
+    @staticmethod
+    def source_identity(bench):
+        """Bind exported edit recipes to the original skeleton bytes, not a display name."""
+        if bench.rig is None:
+            return None
+        return {"skeleton": str(bench.rig.path), "sha256": bench.rig.source_sha256}
 
     def html(self, linked: bool = False) -> str:
         """The finished page as a string.

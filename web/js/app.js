@@ -22,9 +22,13 @@ class App {
     this.refreshPositions();
     this.refreshColours();
     this.panel = new Panel(this, document.getElementById("panel"));
+    this.editorPanel = new EditorPanel(this, document.getElementById("panel"));
+    this.workspace = new WorkspaceUI(this);
     this.bindMouse();
     new ResizeObserver(() => this.draw()).observe(this.canvas.parentElement);
     this.panel.refresh();
+    this.editorPanel.refresh();
+    this.workspace.refresh();
     this.draw();
   }
   // The one door to every action: the name of a facade method and its arguments.
@@ -43,11 +47,24 @@ class App {
     if (method.startsWith("slots_") && !["slots_project","slots_state","slots_effective","slots_preview","slots_meshes","slots_anchors","slots_validate","slots_session","slots_recipe","slots_variants","slots_variant_preset"].includes(method)) {
       this.refreshSlots();
     }
+    if ((method.startsWith("collider_") && !["collider_select","collider_edit_state"].includes(method)) || method === "workspace_replay") this.refreshColliders();
     this.panel.refresh();
+    if(this.editorPanel) this.editorPanel.refresh();
+    if(this.workspace) this.workspace.refresh();
+    if((method==="workspace_mode"||method==="workspace_tab")&&this.bench.server) {
+      const url=new URL(window.location.href),state=this.bench.workspace_state();
+      url.searchParams.set("mode",state.mode);url.searchParams.set("tab",state.tab);window.history.replaceState(null,"",url);
+    }
     this.draw();
     return result;
   }
   refreshSlots() { this.renderer.uploadSlots(this.bench.slots_meshes()); }
+  refreshColliders() {
+    if(!this.renderer) return;
+    for(const name of [...this.renderer.meshes.keys()]) if(name.startsWith("colliders:")||name.startsWith("editable:")) this.renderer.removeMesh(name);
+    for(const chunk of this.bench.collider_meshes()) this.renderer.uploadColliders(chunk);
+    this.renderer.uploadColliders(this.bench.bumper_mesh());
+  }
   // Positions with the sliders applied, and the normals that follow from them, into the
   // buffers; the normals are recomputed after every slider move, because the shading is
   // taken off the deformed body.
@@ -90,6 +107,7 @@ class App {
     if (w !== view.width || h !== view.height) { this.invoke("resize", w, h); return; }
     const r = this.renderer.draw(this.bench);
     if (r) this.scale = r.scale;
+    if(this.editorPanel) this.editorPanel.drawOverlay();
   }
   // The cursor point in fractions of half the shorter side of the canvas, measured from the
   // centre, right and up - out of canvas pixels, allowing for the screen density and for
@@ -105,14 +123,22 @@ class App {
     let drag = null;
     c.addEventListener("contextmenu", (e) => e.preventDefault());
     c.addEventListener("pointerdown", (e) => {
-      drag = { button: e.button, x: e.clientX, y: e.clientY };
+      if(this.bench.workspace_state().mode==="colliders"&&e.altKey) {this.editorPanel.pick(e);return;}
+      drag = { button: e.button, x: e.clientX, y: e.clientY, collider:e.shiftKey&&this.bench.workspace_state().mode==="colliders" };
       try { c.setPointerCapture(e.pointerId); } catch (_) { /* a pointer without capture is no great loss */ }
     });
     c.addEventListener("pointermove", (e) => {
       if (!drag) return;
       const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
       drag.x = e.clientX; drag.y = e.clientY;
-      if (drag.button === 0) {
+      if(drag.button===0&&drag.collider) {
+        const state=this.bench.collider_edit_state(),selected=state.selected;
+        if(selected) {
+          const basis=this.bench.view.basis(),dpr=window.devicePixelRatio||1;
+          const world=[0,1,2].map((axis)=>(basis.right[axis]*dx-basis.up[axis]*dy)*dpr/this.scale);
+          this.invoke("collider_translate",selected.bone,selected.index,editorLocalDelta(state.bodyMatrices[selected.bone],world));
+        }
+      } else if (drag.button === 0) {
         const k = this.bench.settings.orbitSensitivity;
         this.invoke("orbit", rnd(dx * k, 2), rnd(dy * k, 2));
       } else if (drag.button === 2) {

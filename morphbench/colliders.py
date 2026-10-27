@@ -28,6 +28,8 @@ the presentation layer.
 from __future__ import annotations
 
 import struct
+import hashlib
+import copy
 from pathlib import Path
 
 import numpy as np
@@ -212,6 +214,11 @@ class Capsule:
             "total": round(self.total, 3),
         }
 
+    def copy(self) -> "Capsule":
+        """An independent capsule, including the source material and block identity."""
+        return Capsule(self.bone, self.index, self.p1.copy(), self.p2.copy(), self.radius,
+                       self.block, self.material)
+
     def __repr__(self) -> str:
         return "Capsule(%r#%d, length=%.1f, radius=%.1f)" % (
             self.bone, self.index, self.length, self.radius)
@@ -270,14 +277,18 @@ class CollisionBody:
     """One physical body: a bone, its capsules and what that body is to the engine."""
 
     def __init__(self, bone: str, capsules: list[Capsule], physics: dict,
-                 kind: str = "bhkRigidBody"):
+                 kind: str = "bhkRigidBody", shape_kind: str = "bhkCapsuleShape",
+                 editable: bool = True):
         self.bone = bone
         self.capsules = capsules
         self.physics = physics
         self.kind = kind
+        self.shape_kind = shape_kind
+        self.editable = bool(editable)
         # How the body was read out of the file: this snapshot is what tells whether it has
         # changed, and writing replaces the shape of changed bodies only.
         self.original = self._snapshot()
+        self._original_capsules = [cap.copy() for cap in capsules]
 
     def _snapshot(self) -> list[tuple]:
         return [(c.p1.copy(), c.p2.copy(), float(c.radius)) for c in self.capsules]
@@ -287,8 +298,19 @@ class CollisionBody:
         now = self._snapshot()
         if len(now) != len(self.original):
             return True
-        return any(not (np.allclose(a[0], b[0]) and np.allclose(a[1], b[1]) and abs(a[2] - b[2]) < 1e-6)
+        return any(not (np.array_equal(a[0], b[0]) and np.array_equal(a[1], b[1])
+                        and a[2:] == b[2:])
                    for a, b in zip(now, self.original))
+
+    def require_editable(self) -> None:
+        """A partly understood shape cannot safely be replaced by its known capsules."""
+        if not self.editable:
+            raise ValueError(t("colliderEditor.unsupported", bone=self.bone,
+                               kind=self.shape_kind))
+
+    def reset(self) -> None:
+        """Restore the loaded shape, including metadata, without advancing its baseline."""
+        self.capsules = [cap.copy() for cap in self._original_capsules]
 
     @property
     def material(self) -> int:
@@ -305,6 +327,7 @@ class CollisionBody:
         """Replace the shape of the body: with one fitted capsule or with a bundle. The new
         capsules get their numbers in order, the material of the previous shape, and no block
         - writing is what gives them that."""
+        self.require_editable()
         if isinstance(capsules, Capsule):
             capsules = [capsules]
         material = self.material
@@ -353,6 +376,11 @@ class ColliderSet:
                  bumper: CollisionBody | None = None,
                  parents: dict[str, str] | None = None):
         self.path = Path(path)
+        try:
+            with open(self.path, "rb") as stream:
+                self.source_sha256 = hashlib.file_digest(stream, "sha256").hexdigest()
+        except OSError:
+            self.source_sha256 = None
         self.bodies = bodies
         self.matrices = matrices
         self.bumper = bumper
@@ -362,6 +390,11 @@ class ColliderSet:
         self.ragdoll: RagdollMap | None = None
         self.body_matrices: dict[str, np.ndarray] = {}
         self.ragdoll_state: dict = self._state("absent")
+        self.selected: tuple[str, int] | None = None
+        # Unsupported-only shapes have no capsule geometry, but remain visible to an editor
+        # as read-only entries. Mixed lists stay in bodies and are read-only as a whole.
+        self.unsupported: list[dict] = []
+        self.edit_actions: list[dict] = []
 
     # ---- reading: PyNifly and nothing else --------------------------------------------
     @classmethod
@@ -374,12 +407,15 @@ class ColliderSet:
         path = Path(path)
         if not file_exists(path):
             raise FileNotFoundError(t("colliders.noSkeletonFile", path=path))
+        with open(path, "rb") as stream:
+            loaded_digest = hashlib.file_digest(stream, "sha256").hexdigest()
         nif = open_nif(pynifly, path)
         names = cls._enum_names()
         bodies: dict[str, CollisionBody] = {}
         matrices: dict[str, np.ndarray] = {}
         bumper: CollisionBody | None = None
         parents: dict[str, str] = {}
+        unsupported = []
         with reading_nif(path):
             for name, node in nif.nodes.items():
                 up = getattr(node, "parent", None)
@@ -393,16 +429,27 @@ class ColliderSet:
                 body = getattr(col, "body", None) if col is not None else None
                 if body is None:
                     continue
-                caps = cls._capsules_of(name, getattr(body, "shape", None))
+                shape = getattr(body, "shape", None)
+                caps = cls._capsules_of(name, shape)
+                shape_kind = type(shape).__name__
+                editable = cls._shape_editable(shape)
                 if not caps:
+                    if shape is not None:
+                        unsupported.append({"bone": name, "kind": type(body).__name__,
+                                            "shapeKind": shape_kind, "editable": False,
+                                            "changed": False, "count": 0})
                     continue
                 kind = type(body).__name__
-                entry = CollisionBody(name, caps, cls._physics_of(body, names), kind)
+                entry = CollisionBody(name, caps, cls._physics_of(body, names), kind,
+                                      shape_kind, editable)
                 if "Phantom" in kind:
                     bumper = entry
                 else:
                     bodies[name] = entry
         rig = cls(path, bodies, matrices, bumper, parents)
+        if rig.source_sha256 != loaded_digest:
+            raise ValueError(t("workspace.stale"))
+        rig.unsupported = unsupported
         rig.read_ragdoll(hkx, cfg)
         return rig
 
@@ -469,6 +516,19 @@ class ColliderSet:
         m[:3, :3] = rot * float(buf.scale)
         m[:3, 3] = np.asarray(list(buf.translation), dtype=np.float32)
         return m
+
+    @classmethod
+    def _shape_editable(cls, shape) -> bool:
+        """Only replace trees whose complete geometry was understood by the reader."""
+        kind = type(shape).__name__
+        if kind in ("bhkCapsuleShape", "bhkSphereShape"):
+            return True
+        if kind == "bhkListShape":
+            children = list(shape.children)
+            return bool(children) and all(cls._shape_editable(child) for child in children)
+        if kind == "bhkConvexTransformShape":
+            return cls._shape_editable(getattr(shape, "child", None))
+        return False
 
     @classmethod
     def _capsules_of(cls, bone: str, shape, index: int = 0) -> list[Capsule]:
@@ -622,6 +682,148 @@ class ColliderSet:
                         "capsules": [c.as_dict() for c in body.capsules]})
         return out
 
+    # ---- manual editing: body-local numeric state -----------------------------------
+    @staticmethod
+    def _editor_vector(value, field: str) -> np.ndarray:
+        try:
+            if isinstance(value, (list, tuple)) and any(isinstance(item, (bool, np.bool_))
+                                                        for item in value):
+                raise ValueError
+            values = np.asarray(value)
+            if values.shape != (3,) or values.dtype.kind not in "iuf":
+                raise ValueError
+            values = values.astype(np.float64)
+            if (not np.isfinite(values).all()
+                    or np.abs(values).max() > np.finfo(np.float32).max):
+                raise ValueError
+            return values.astype(np.float32)
+        except (TypeError, ValueError, OverflowError):
+            raise ValueError(t("colliderEditor.vector", field=field)) from None
+
+    @staticmethod
+    def _editor_radius(value) -> float:
+        if (isinstance(value, (bool, np.bool_))
+                or not isinstance(value, (int, float, np.integer, np.floating))):
+            raise ValueError(t("colliderEditor.radius"))
+        try:
+            radius = float(value)
+        except (ValueError, OverflowError):
+            raise ValueError(t("colliderEditor.radius")) from None
+        if not np.isfinite(radius) or radius < 0 or radius > np.finfo(np.float32).max:
+            raise ValueError(t("colliderEditor.radius"))
+        return radius
+
+    def _editor_capsule(self, bone: str, index: int, editable: bool = True) -> Capsule:
+        body = self.body(bone)
+        if (isinstance(index, (bool, np.bool_))
+                or not isinstance(index, (int, np.integer))
+                or not 0 <= index < len(body.capsules)):
+            raise IndexError(t("core.capsuleIndex", bone=bone,
+                               count=len(body.capsules), index=index))
+        if editable:
+            body.require_editable()
+        return body.capsules[int(index)]
+
+    def _editor_row(self, capsule: Capsule) -> dict:
+        body = self.body(capsule.bone)
+        # Editing uses full precision; the rounded report rows must never quantise the next
+        # edit or a graphical translation before it reaches the file writer.
+        return {**capsule.as_dict(), "p1": capsule.p1.tolist(), "p2": capsule.p2.tolist(),
+                "radius": capsule.radius, "kind": body.kind, "shapeKind": body.shape_kind,
+                "editable": body.editable, "changed": body.changed}
+
+    def edit_state(self) -> dict:
+        """An independent JSON-ready state in game units, explicitly in each body's frame."""
+        if self.selected is not None:
+            bone, index = self.selected
+            caps = self.body(bone).capsules
+            self.selected = (bone, min(index, len(caps) - 1)) if caps else None
+        return {"available": True, "source": str(self.path), "frame": "body-local",
+                "units": "game", "selected":
+                    ({"bone": self.selected[0], "index": self.selected[1]}
+                     if self.selected is not None else None),
+                "capsules": [self._editor_row(cap) for body in self.bodies.values()
+                             for cap in body.capsules],
+                "bodies": [{"bone": body.bone, "kind": body.kind,
+                            "shapeKind": body.shape_kind, "editable": body.editable,
+                            "changed": body.changed, "count": len(body.capsules)}
+                           for body in self.bodies.values()] + [dict(row) for row in self.unsupported],
+                "changed": self.changed_bodies()}
+
+    def editor_payload(self) -> dict:
+        """Local editable geometry and its distinct body/node world transforms."""
+        return {**self.edit_state(),
+                "editActions": copy.deepcopy(self.edit_actions),
+                "originalCapsules": [{**self._editor_row(cap), "changed": False}
+                                     for body in self.bodies.values() for cap in body._original_capsules],
+                "bodyMatrices": {bone: self.body_matrix(bone).tolist() for bone in self.bodies},
+                "nodeMatrices": {bone: self.matrix(bone).tolist() for bone in self.bodies}}
+
+    def select(self, bone: str | None, index: int = 0) -> dict:
+        if bone is None:
+            self.selected = None
+        else:
+            self._editor_capsule(bone, index, editable=False)
+            self.selected = (bone, int(index))
+        return self.edit_state()
+
+    def set_capsule(self, bone: str, index: int, changes: dict) -> dict:
+        """Validate all fields before changing anything, including the selected capsule."""
+        cap = self._editor_capsule(bone, index)
+        if type(changes) is not dict or not set(changes) <= {"p1", "p2", "radius"}:
+            raise ValueError(t("colliderEditor.changes"))
+        p1 = self._editor_vector(changes["p1"], "p1") if "p1" in changes else cap.p1.copy()
+        p2 = self._editor_vector(changes["p2"], "p2") if "p2" in changes else cap.p2.copy()
+        radius = self._editor_radius(changes["radius"]) if "radius" in changes else cap.radius
+        cap.p1, cap.p2, cap.radius = p1, p2, radius
+        self.selected = (bone, int(index))
+        self.edit_actions.append({"method": "collider_set", "args": [bone, int(index),
+                                  {"p1": p1.tolist(), "p2": p2.tolist(), "radius": radius}]})
+        return self._editor_row(cap)
+
+    def translate(self, bone: str, index: int, delta) -> dict:
+        """Move both ends rigidly by a body-local displacement."""
+        cap = self._editor_capsule(bone, index)
+        offset = self._editor_vector(delta, "delta").astype(np.float64)
+        return self.set_capsule(bone, index,
+                                {"p1": cap.p1.astype(np.float64) + offset,
+                                 "p2": cap.p2.astype(np.float64) + offset})
+
+    def add_capsule(self, bone: str, p1, p2, radius) -> dict:
+        """Append a capsule to an existing supported body, inheriting its material."""
+        body = self.body(bone)
+        body.require_editable()
+        start = self._editor_vector(p1, "p1")
+        end = self._editor_vector(p2, "p2")
+        size = self._editor_radius(radius)
+        index = len(body.capsules)
+        capsule = Capsule(bone, index, start, end, size, material=body.material)
+        body.capsules.append(capsule)
+        self.selected = (bone, index)
+        self.edit_actions.append({"method": "collider_add", "args": [bone, start.tolist(), end.tolist(), size]})
+        return self._editor_row(capsule)
+
+    def remove_capsule(self, bone: str, index: int) -> dict:
+        """Remove one bundle member; keeping a body with no shape is not a safe export."""
+        self._editor_capsule(bone, index)
+        body = self.body(bone)
+        if len(body.capsules) == 1:
+            raise ValueError(t("colliderEditor.lastCapsule", bone=bone))
+        del body.capsules[int(index)]
+        for number, cap in enumerate(body.capsules):
+            cap.index = number
+        self.selected = (bone, 0)
+        self.edit_actions.append({"method": "collider_remove", "args": [bone, int(index)]})
+        return self.edit_state()
+
+    def reset(self) -> dict:
+        """Restore every body's original loaded capsules; ragdoll placement is independent."""
+        for body in self.bodies.values():
+            body.reset()
+        self.selected = None
+        self.edit_actions.clear()
+        return self.edit_state()
+
     @staticmethod
     def _join(capsules: list[Capsule], segments: int) -> tuple[np.ndarray, np.ndarray]:
         verts, tris, base = [], [], 0
@@ -738,11 +940,24 @@ class ColliderSet:
         changed = self.changed_bodies()
         if not changed:
             raise ValueError(t("colliders.nothingChanged"))
+        if self.source_sha256 is not None:
+            with open(self.path, "rb") as stream:
+                if hashlib.file_digest(stream, "sha256").hexdigest() != self.source_sha256:
+                    raise ValueError(t("workspace.stale"))
         pynifly = load_nifly(cfg or Config())
         from pyn.nifdefs import bhkCapsuleShapeProps, bhkListShapeProps  # noqa: WPS433
         nif = open_nif(pynifly, self.path)
         for bone in changed:
             body = self.bodies[bone]
+            body.require_editable()
+            # Direct core callers can hold Capsule objects: never pass invalid geometry to
+            # the native file writer even if they bypassed the validated editor methods.
+            for cap in body.capsules:
+                self._editor_vector(cap.p1, "p1")
+                self._editor_vector(cap.p2, "p2")
+                self._editor_radius(cap.radius)
+            if not body.capsules:
+                raise ValueError(t("colliderEditor.lastCapsule", bone=bone))
             node = nif.nodes[bone]
             target = node.collision_object.body
             caps = body.capsules

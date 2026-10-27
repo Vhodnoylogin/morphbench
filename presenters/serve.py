@@ -36,6 +36,9 @@ game's Data. On the page the same refusal is shown as text in the "Model" sectio
 from __future__ import annotations
 
 import json
+import copy
+import hashlib
+import tempfile
 import socket
 import threading
 import urllib.error
@@ -316,13 +319,57 @@ class WebServer:
         threading.Thread(target=self.httpd.shutdown, daemon=True).start()
         return {"stopping": True, "url": self.url}
 
+    def api_physics_import(self, body):
+        from .physics_document import parse_document
+        if not isinstance(body, dict) or set(body) != {"kind", "text"}:
+            raise ValueError(t("workspace.invalid", field="document"))
+        document = parse_document(body["kind"], body["text"],
+                                  max_chars=int(self.cfg["physicsMaxChars"]),
+                                  max_fields=int(self.cfg["physicsMaxFields"]))
+        return {"document": document}
+
+    def api_workspace(self, body=None):
+        with self.lock:
+            if body is not None:
+                if not isinstance(body, dict) or set(body) != {"actions"}:
+                    raise ValueError(t("workspace.invalid", field="actions"))
+                self.bench.workspace_replay(body["actions"])
+            return {"workspace": self.bench.workspace_state(),
+                    "colliders": self.bench.collider_editor_payload(),
+                    "physics": self.bench.physics_state(),
+                    "envelopes": self.bench.physics_envelopes(),
+                    "text": self.bench.physics_export() if self.bench.physics_state()["document"] else None}
+
+    def api_skeleton(self, recipe):
+        if (not isinstance(recipe, dict) or recipe.get("format") != "morphbench-workspace"
+                or recipe.get("version") != 1):
+            raise ValueError(t("workspace.invalid", field="recipe"))
+        with self.lock:
+            if self.bench.rig is None or recipe.get("source") != WebPage.source_identity(self.bench):
+                raise ValueError(t("workspace.stale"))
+            with open(self.bench.rig.path, "rb") as stream:
+                if hashlib.file_digest(stream, "sha256").hexdigest() != self.bench.rig.source_sha256:
+                    raise ValueError(t("workspace.stale"))
+            clone = copy.copy(self.bench)
+            clone.rig, clone.view, clone._placements = copy.deepcopy(self.bench.rig), copy.deepcopy(self.bench.view), copy.deepcopy(self.bench._placements)
+            if hasattr(clone, "_physics_workspace"):
+                clone._physics_workspace = copy.deepcopy(clone._physics_workspace)
+            clone._workspace_tabs = copy.deepcopy(getattr(self.bench, "_workspace_tabs", {}))
+            clone.collider_reset()
+            clone.workspace_replay(recipe.get("actions"))
+        directory = self.cfg["editorTempDirectory"] or None
+        with tempfile.TemporaryDirectory(prefix="morphbench-export-", dir=directory) as temporary:
+            path = Path(temporary) / "skeleton.nif"
+            clone.collider_save(path)
+            return path.read_bytes()
+
     def page(self, query: Query) -> tuple[str, int]:
         """The page for a request: the meshes under the root, the named body opened, and
         whatever did not work - as text on the panel, not as an empty answer. On a failure
         the listing is taken by the server's root, so that there is something to choose
         from; without a root the listing is empty, and that is not a failure - the folder is
         named on the page."""
-        with_morphs = not query.flag("all")
+        with_morphs = not query.flag("all") if "all" in query.values else self.with_morphs
         error, status = None, 200
         with self.lock:
             bench = self.bench
@@ -331,12 +378,19 @@ class WebServer:
             catalog: list[dict] = []
             try:
                 if query.get("mode") is not None:
-                    bench.slots_mode(query.get("mode"))
+                    bench.workspace_mode(query.get("mode"))
+                if query.get("tab") is not None:
+                    bench.workspace_tab(query.get("tab"))
                 if root is not None:
                     catalog = bench.catalog(root, with_morphs)
                 key = query.key
                 if key is not None:
                     bench.open_entry(key, self._root_required(query), with_morphs)
+                skeleton = query.get("skeleton")
+                if skeleton:
+                    if not bench.env.allows(skeleton):
+                        raise PermissionError(t("workspace.invalid", field="skeleton path"))
+                    bench.open_skeleton(skeleton)
             except Exception as e:  # noqa: BLE001 - any refusal of the facade is shown as text
                 error, status = _message(e), _status_of(e)
                 catalog = []
@@ -489,6 +543,8 @@ class _Handler(BaseHTTPRequestHandler):
                 self._send_json(owner.api_payload(query))
             elif url.path == "/api/root":
                 self._send_json(owner.api_root(query))
+            elif url.path == "/api/workspace":
+                self._send_json(owner.api_workspace())
             elif url.path == "/api/shutdown":
                 self._send_json(owner.api_shutdown())
             elif url.path.startswith(PREFIX):
@@ -502,6 +558,34 @@ class _Handler(BaseHTTPRequestHandler):
                 raise RequestError(404, t("serve.noSuchPath", path=url.path))
         except Exception as e:  # noqa: BLE001 - any refusal goes to the client as a code and a text
             self._send_json({"error": _message(e)}, _status_of(e))
+
+    def do_POST(self) -> None:  # noqa: N802
+        try:
+            path = urlsplit(self.path).path
+            if path not in ("/api/physics/import", "/api/workspace", "/api/workspace/skeleton"):
+                raise RequestError(404, t("serve.noSuchPath", path=path))
+            origin = self.headers.get("Origin")
+            if (origin and urlsplit(origin).netloc != self.headers.get("Host")
+                    or self.headers.get("Sec-Fetch-Site") == "cross-site"
+                    or self.headers.get_content_type() != "application/json"):
+                raise RequestError(403, t("workspace.origin"))
+            length = int(self.headers.get("Content-Length", "0"))
+            if length <= 0 or length > int(self.owner.cfg["workspaceRequestLimit"]):
+                raise RequestError(413, t("workspace.large"))
+            def bad_constant(value):
+                raise ValueError(t("workspace.invalid", field=value))
+            try:
+                body = json.loads(self.rfile.read(length).decode("utf-8"), parse_constant=bad_constant)
+            except (UnicodeError, json.JSONDecodeError):
+                raise ValueError(t("workspace.invalid", field="JSON")) from None
+            if path == "/api/physics/import":
+                self._send_json(self.owner.api_physics_import(body))
+            elif path == "/api/workspace":
+                self._send_json(self.owner.api_workspace(body))
+            else:
+                self._send(self.owner.api_skeleton(body), "application/octet-stream")
+        except Exception as exc:  # noqa: BLE001
+            self._send_json({"error": _message(exc)}, _status_of(exc))
 
     # ---- the journal ------------------------------------------------------------------
     def _quiet(self) -> bool:

@@ -1,5 +1,111 @@
 "use strict";
 
+// Workspace navigation only reflects facade state. Mode and tab changes use the same
+// App.invoke entry point as mesh controls; no hidden UI-only session is maintained here.
+class WorkspaceUI {
+  constructor(app) {
+    this.app = app;
+    this.bench = app.bench;
+    this.modeNav = document.getElementById("mode-nav");
+    this.tabNav = document.getElementById("mode-tabs");
+    this.modes = [
+      { id: "morphs", label: T.wsMorphs, note: T.wsMorphsNote, tabs: ["sliders", "display"],
+        icon: ["M3 4h10M3 8h10M3 12h10", "M6 2v4M10 6v4M5 10v4"] },
+      { id: "colliders", label: T.wsColliders, note: T.wsCollidersNote, tabs: ["edit", "display"],
+        icon: ["M5 3a3 3 0 0 1 5 0l3 6a3 3 0 0 1-5 3L3 6a3 3 0 0 1 2-3Z", "M4 5l7 6"] },
+      { id: "physics", label: T.wsPhysics, note: T.wsPhysicsNote, tabs: ["configuration", "ranges"],
+        icon: ["M8 1v3M8 12v3M1 8h3M12 8h3", "M11.5 4.5a5 5 0 1 1-7 7M5 6l3 2 3-5"] },
+      { id: "slots", label: T.wsSlots, note: T.wsSlotsNote, tabs: ["author", "display"],
+        icon: ["M2 2h5v5H2zM9 2h5v5H9zM2 9h5v5H2zM9 9h5v5H9z"] },
+    ];
+    this.tabLabels = { sliders: T.wsSliders, display: T.wsDisplay, edit: T.wsEdit,
+      configuration: T.wsConfiguration, ranges: T.wsRanges, author: T.wsAuthor };
+    this.modeButtons = new Map();
+    this.tabButtons = new Map();
+    if (!this.modeNav || !this.tabNav) return;
+    this.modeNav.setAttribute("aria-label", T.wsModes);
+    this.tabNav.setAttribute("aria-label", T.wsTabs);
+    this.tabNav.setAttribute("role", "tablist");
+    document.getElementById("model-panel").setAttribute("aria-label", T.wsModels);
+    document.getElementById("panel").setAttribute("role", "tabpanel");
+    document.getElementById("workspace-context").textContent = T.wsModels;
+    document.getElementById("viewport-title").textContent = T.wsViewport;
+    for (const mode of this.modes) {
+      const icon = el("span", { class: "mode-icon", "aria-hidden": "true" });
+      // A fixed SVG template lets the HTML parser select its namespace without an URL in
+      // the offline page. Path data below is static markup, never model or user content.
+      const template = document.createElement("template");
+      template.innerHTML = '<svg viewBox="0 0 16 16"></svg>';
+      const svg = template.content.firstChild;
+      for (const path of mode.icon) {
+        const shape = document.createElementNS(svg.namespaceURI, "path");
+        shape.setAttribute("d", path); svg.appendChild(shape);
+      }
+      icon.appendChild(svg);
+      const button = el("button", { class: "mode-button", type: "button", title: mode.note,
+        "data-workspace-mode": mode.id, on: { click: () => app.invoke("workspace_mode", mode.id) } },
+      [icon, el("span", { text: mode.label }),
+        mode.id === "slots" ? el("span", { class: "mode-badge", text: T.wsExperimental }) : null]);
+      this.modeButtons.set(mode.id, button);
+      this.modeNav.appendChild(button);
+    }
+    this.modeNav.addEventListener("keydown", (event) => this.onNavigate(event, this.modeButtons, "workspace_mode"));
+    this.tabNav.addEventListener("keydown", (event) => this.onNavigate(event, this.tabButtons, "workspace_tab"));
+    this.refresh();
+  }
+  onNavigate(event, buttons, method) {
+    const keys = Array.from(buttons.keys()), nodes = Array.from(buttons.values());
+    const index = nodes.indexOf(document.activeElement);
+    if (index < 0 || !["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+    event.preventDefault();
+    const next = event.key === "Home" ? 0 : event.key === "End" ? keys.length - 1
+      : (index + (event.key === "ArrowRight" ? 1 : -1) + keys.length) % keys.length;
+    this.app.invoke(method, keys[next]);
+    buttons.get(keys[next]).focus();
+  }
+  refresh() {
+    if (!this.modeNav || !this.tabNav) return;
+    const state = typeof this.bench.workspace_state === "function" ? this.bench.workspace_state()
+      : { mode: this.bench.placements && this.bench.placements.mode === "slots" ? "slots" : "morphs" };
+    const mode = this.modes.find((item) => item.id === state.mode) || this.modes[0];
+    const tab = mode.tabs.includes(state.tab) ? state.tab : mode.tabs[0];
+    if (this.activeMode !== mode.id) {
+      this.tabNav.textContent = "";
+      this.tabButtons.clear();
+      for (const name of mode.tabs) {
+        const button = el("button", { class: "context-tab", type: "button", role: "tab",
+          id: "workspace-tab-" + name, "aria-controls": "panel", text: this.tabLabels[name],
+          on: { click: () => this.app.invoke("workspace_tab", name) } });
+        this.tabButtons.set(name, button); this.tabNav.appendChild(button);
+      }
+      this.activeMode = mode.id;
+    }
+    for (const [id, button] of this.modeButtons) {
+      const selected = id === mode.id;
+      button.classList.toggle("on", selected);
+      button.setAttribute("aria-pressed", String(selected));
+      button.tabIndex = selected ? 0 : -1;
+    }
+    for (const [id, button] of this.tabButtons) {
+      const selected = id === tab;
+      button.classList.toggle("on", selected);
+      button.setAttribute("aria-selected", String(selected));
+      button.tabIndex = selected ? 0 : -1;
+    }
+    document.getElementById("panel").setAttribute("aria-labelledby", "workspace-tab-" + tab);
+    const matches = (value, selected) => !value || value.split(/\s+/).includes(selected) || value === "common";
+    for (const section of document.querySelectorAll("[data-mode], [data-tab]")) {
+      section.hidden = !matches(section.getAttribute("data-mode"), mode.id) || !matches(section.getAttribute("data-tab"), tab);
+    }
+    document.body.setAttribute("data-workspace-mode", mode.id);
+    document.getElementById("workspace-description").textContent = mode.note;
+    document.getElementById("workspace-status").textContent = this.bench.is_open() ? T.wsReady : T.wsNoMesh;
+    document.getElementById("viewport-mode").textContent = mode.label;
+    document.getElementById("inspector-title").textContent = mode.label;
+    document.getElementById("inspector-description").textContent = this.tabLabels[tab];
+  }
+}
+
 // ---- side panel ----------------------------------------------------------------------------
 class Panel {
   constructor(app, root) {
@@ -11,20 +117,30 @@ class Panel {
   build() {
     const bench = this.bench, app = this.app, view = bench.view, st = bench.settings;
     const root = this.root;
+    const modelRoot = document.getElementById("model-panel") || root;
+    const viewRoot = document.getElementById("view-tools") || root;
+    root.appendChild(el("div", { class: "inspector-heading" }, [
+      el("h2", { id: "inspector-title" }), el("p", { id: "inspector-description" })]));
 
     // the model: what is open and, when a server is behind the page, what to choose from
-    root.appendChild(this.buildModel());
+    modelRoot.appendChild(this.buildModel());
     this.slotsPanel = new SlotsPanel(app, root);
+    // The shared workspace chooser replaces the older mesh/Slots selector. The underlying
+    // control remains owned by SlotsPanel, while all of its authoring fields are preserved.
+    this.slotsPanel.mode.parentElement.hidden = true;
+    this.slotsPanel.section.setAttribute("data-mode", "slots");
+    this.slotsPanel.section.setAttribute("data-tab", "author");
 
     // view presets
     this.presetButtons = new Map();
     const presetRow = el("div", { class: "row" });
     for (const name of view.preset_names()) {
-      const b = el("button", { text: name, on: { click: () => app.invoke("preset", name) } });
+      const labels={back:T.edBack,below:T.edBelow,front:T.edFront,quarter:T.edQuarter,side:T.edSide,top:T.edTop};
+      const b = el("button", { text: labels[name]||name, on: { click: () => app.invoke("preset", name) } });
       this.presetButtons.set(name, b);
       presetRow.appendChild(b);
     }
-    root.appendChild(el("section", null, [el("h2", { text: T.secView }), presetRow,
+    viewRoot.appendChild(el("section", null, [el("h2", { text: T.secView }), presetRow,
       el("div", { class: "row", style: "margin-top:6px" }, [
         el("button", { text: T.btnZoom11, on: { click: () => { app.invoke("zoom", 1.0); } } }),
         el("button", { text: T.btnResetPan, on: { click: () => app.invoke("pan", 0, 0) } }),
@@ -32,7 +148,7 @@ class Panel {
 
     // aim
     const targets = bench.focus_targets();
-    this.focusSelect = el("select", { on: { change: () => this.onFocus() } });
+    this.focusSelect = el("select", { "aria-label": T.secFocus, on: { change: () => this.onFocus() } });
     this.focusSelect.appendChild(el("option", { value: "", text: T.optWholeModel }));
     const groups = [["shapes", T.grpShapes, "shape"], ["bones", T.grpBones, "bone"], ["morphs", T.grpMorphs, "morph"]];
     for (const [key, title, kind] of groups) {
@@ -42,7 +158,7 @@ class Panel {
       this.focusSelect.appendChild(g);
     }
     this.focusInfo = el("div", { class: "muted" });
-    root.appendChild(el("section", null, [el("h2", { text: T.secFocus }), this.focusSelect, this.focusInfo]));
+    root.appendChild(el("section", { "data-tab": "display" }, [el("h2", { text: T.secFocus }), this.focusSelect, this.focusInfo]));
 
     // mesh shapes
     this.partBoxes = new Map();
@@ -53,9 +169,9 @@ class Panel {
       const s = bench.shape(name);
       parts.appendChild(el("div", { class: "part" }, [
         el("label", null, [box, el("span", { text: name }), el("span", { class: "muted", text: s.count + T.lblVerts })]),
-        el("span", { class: "only", text: T.btnOnly, on: { click: () => app.invoke("only", [name]) } })]));
+        el("button", { class: "only", text: T.btnOnly, on: { click: () => app.invoke("only", [name]) } })]));
     }
-    root.appendChild(el("section", null, [el("h2", { text: T.secShapes }),
+    modelRoot.appendChild(el("section", null, [el("h2", { text: T.secShapes }),
       bench.shape_names().length ? parts : el("div", { class: "muted", text: T.noMesh }),
       el("div", { class: "row", style: "margin-top:6px" }, [
         el("button", { text: T.btnShowAll, on: { click: () => app.invoke("show_all") } })])]));
@@ -80,7 +196,7 @@ class Panel {
         : rag.state === "unreadable" ? say(T.ragdollUnreadable, { reason: rag.reason })
         : rag.file ? say(T.ragdollAbsent, { file: bench.names.ragdoll }) : "";
       const ragClass = rag.state === "read" && !rag.unmatched.length ? "muted" : "warn";
-      root.appendChild(el("section", null, [el("h2", { text: T.secCapsules }),
+      root.appendChild(el("section", { "data-mode": "colliders", "data-tab": "display" }, [el("h2", { text: T.secCapsules }),
         el("div", { class: "current" }, [el("span", { text: bench.names.skeleton }),
           el("span", { class: "muted", text: T.summaryCapsules + bench.summary.colliders })]),
         el("div", { class: ragClass, text: ragText }),
@@ -102,7 +218,7 @@ class Panel {
     this.morphSelect = el("select", { on: { change: () => this.onColour() } });
     this.morphSelect.appendChild(el("option", { value: "", text: T.optNoMorph }));
     for (const m of bench.morphs()) this.morphSelect.appendChild(el("option", { value: m, text: m }));
-    root.appendChild(el("section", null, [el("h2", { text: T.secColour }), modeRow,
+    root.appendChild(el("section", { "data-tab": "display" }, [el("h2", { text: T.secColour }), modeRow,
       el("div", { class: "row", style: "margin-top:6px" }, [el("span", { class: "muted", text: T.colourMorphNote })]),
       this.morphSelect]));
 
@@ -119,7 +235,7 @@ class Panel {
       this.lightPowerInputs[key] = inp;
       powerRow.appendChild(el("label", null, [title + " ", inp]));
     }
-    root.appendChild(el("section", null, [el("h2", { text: T.secLight }),
+    root.appendChild(el("section", { "data-tab": "display" }, [el("h2", { text: T.secLight }),
       el("div", { class: "row" }, [el("label", null, [this.lightFollowBox, T.lblBehindCamera])]),
       el("div", { class: "row", style: "margin-top:6px" }, [this.lightDirLabel].concat(this.lightDirInputs)),
       el("div", { class: "muted", style: "margin-top:6px", text: T.lightPowers }), powerRow,
@@ -132,15 +248,15 @@ class Panel {
     const range = st.sliderRange, step = String(st.sliderStep);
     const sliders = el("div");
     for (const name of bench.morphs()) {
-      const rng = el("input", { type: "range", min: range[0], max: range[1], step: step });
-      const num = el("input", { type: "number", step: step });
+      const rng = el("input", { type: "range", min: range[0], max: range[1], step: step, "aria-label": name });
+      const num = el("input", { type: "number", step: step, "aria-label": name });
       rng.addEventListener("input", () => { num.value = rng.value; app.invoke("set_slider", name, Number(rng.value)); });
       num.addEventListener("change", () => { app.invoke("set_slider", name, Number(num.value) || 0); });
       const row = el("div", { class: "slider" }, [el("span", { class: "name", text: name, title: name }), rng, num]);
       this.sliderRows.set(name, { row, rng, num });
       sliders.appendChild(row);
     }
-    root.appendChild(el("section", null, [el("h2", { text: T.secSliders }),
+    root.appendChild(el("section", { "data-mode": "morphs", "data-tab": "sliders" }, [el("h2", { text: T.secSliders }),
       bench.morphs().length ? sliders : el("div", { class: "muted", text: bench.is_open() ? T.noMorphFile : T.noMesh }),
       el("div", { class: "row", style: "margin-top:6px" }, [
         el("button", { text: T.btnResetSliders, on: { click: () => app.invoke("reset_sliders") } }),
@@ -151,7 +267,7 @@ class Panel {
     for (const name of bench.shape_names()) this.legendSelect.appendChild(el("option", { value: name, text: name }));
     if (bench.shapes.has(st.baseShape)) this.legendSelect.value = st.baseShape;
     this.legend = el("div", { class: "legend" });
-    this.legendSection = el("section", null, [el("h2", { text: T.secLegend }), this.legendSelect, this.legend]);
+    this.legendSection = el("section", { "data-tab": "display" }, [el("h2", { text: T.secLegend }), this.legendSelect, this.legend]);
     root.appendChild(this.legendSection);
 
     // state
@@ -160,10 +276,10 @@ class Panel {
     this.command = el("pre");
     this.note = el("div", { class: "muted" });
     this.error = el("div", { class: "err" });
-    root.appendChild(el("section", null, [el("h2", { text: T.secState }),
+    root.appendChild(el("section", { class: "session-section" }, [el("details", null, [el("summary", { text: T.secState }),
       el("div", { class: "muted", text: T.lastCall }), this.lastCall,
       el("div", { class: "muted", text: T.stateLine }), this.state,
-      el("div", { class: "muted", text: T.sameFrame }), this.command, this.note, this.error]));
+      el("div", { class: "muted", text: T.sameFrame }), this.command]), this.note, this.error]));
   }
 
   // The "Model" section. In a file on disk it is the name of the open mesh and nothing else:
@@ -183,7 +299,8 @@ class Panel {
     const envLine = el("div", { class: "muted", text:
       T.underMo2 + (env.insideMo2 ? T.yes : T.no) + T.rootIs + (srv.root || T.rootUnset) });
     // the mesh list: grouped by the folder below the root, each line is the file and the morph format
-    this.modelSelect = el("select", { on: { change: () => this.onModel() } });
+    this.modelSelect = el("select", { class: "mesh-browser", size: "8", "aria-label": T.chooseMesh,
+      on: { change: () => this.onModel() } });
     this.modelSelect.appendChild(el("option", { value: "",
       text: srv.catalog.length ? T.pickMesh + srv.catalog.length + T.pickMeshEnd : T.noMeshesUnderRoot }));
     const groups = new Map();
@@ -197,19 +314,26 @@ class Panel {
     }
     this.modelSelect.value = currentName;
     // the browse folder, and the sweep that takes meshes without morphs as well
-    this.rootInput = el("input", { type: "text", class: "wide", value: srv.root || "", title: T.browseFolder });
+    this.rootInput = el("input", { type: "text", class: "wide", value: srv.root || "", title: T.browseFolder,
+      "aria-label": T.browseFolder });
     this.allBox = el("input", { type: "checkbox", on: { change: () => this.go({ root: this.rootInput.value }) } });
     this.allBox.checked = !srv.withMorphs;
+    this.skeletonInput=el("input",{type:"text",class:"wide",value:bench.summary&&bench.summary.skeleton||"","aria-label":T.edSkeletonPath});
     return el("section", null, [el("h2", { text: T.secModel }), current, this.modelSelect,
       el("div", { class: "row", style: "margin-top:6px" }, [this.rootInput,
         el("button", { text: T.btnBrowse, on: { click: () => this.go({ root: this.rootInput.value }) } })]),
       el("div", { class: "row" }, [el("label", null, [this.allBox, T.lblWithoutMorphs])]),
+      el("details",null,[el("summary",{text:T.edSkeletonPath}),el("div",{class:"row"},[this.skeletonInput,
+        el("button",{text:T.edLoad,on:{click:()=>this.go({root:srv.root,skeleton:this.skeletonInput.value})}})])]),
       envLine, el("div", { class: "err", text: srv.error || "" })]);
   }
   // Going to the same server with another body or another root: the page holds one body, so
   // changing the model is a reload with a different query, not a second set of geometry.
   go(params) {
-    params.mode=this.bench.placements.mode;
+    const workspace = this.bench.workspace_state();
+    params.mode = workspace.mode;
+    params.tab = workspace.tab;
+    if(params.skeleton===undefined&&this.bench.summary&&this.bench.summary.skeleton)params.skeleton=this.bench.summary.skeleton;
     const q = [];
     for (const k in params) if (params[k] !== undefined && params[k] !== null && params[k] !== "") q.push(k + "=" + encodeURIComponent(params[k]));
     if (this.allBox && this.allBox.checked) q.push("all=1");

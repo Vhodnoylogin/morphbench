@@ -1,0 +1,8 @@
+{
+  "#": "Validation and export safety for manual, body-local capsule editing.",
+  "colliderEditor.changes": "capsule changes must contain only p1, p2 and radius",
+  "colliderEditor.lastCapsule": "keep at least one capsule on %(bone)s: removing an entire collision body is not supported",
+  "colliderEditor.radius": "capsule radius must be a finite, nonnegative number",
+  "colliderEditor.unsupported": "the %(kind)s shape on %(bone)s contains unsupported geometry and cannot be edited safely",
+  "colliderEditor.vector": "%(field)s must contain exactly three finite numbers"
+}

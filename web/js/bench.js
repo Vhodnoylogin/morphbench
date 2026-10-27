@@ -127,6 +127,7 @@ class BenchMirror {
   framing() {
     const shapes = this.visible_shapes().map((n) => this.shape(n)).filter((s) => s.triCount > 0);
     const clouds = shapes.map((shape) => this.deformed(shape.name));
+    if(this.has_skeleton()&&(this.view.colliders||!clouds.length)) for(const mesh of this.collider_meshes()) clouds.push(mesh.pos);
     if(this.placements.mode === "slots") for(const mesh of this.slots_meshes()) clouds.push(new Float32Array(mesh.vertices.flat()));
     if (!clouds.length) throw new Error(T.errAllHidden);
     const lo = [Infinity, Infinity, Infinity], hi = [-Infinity, -Infinity, -Infinity];

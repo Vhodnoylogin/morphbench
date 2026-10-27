@@ -51,9 +51,10 @@ from .morphs import MorphSet
 from .ragdoll import RagdollMap
 from .view import ViewState
 from .placements import Placements
+from .workspace import WorkspaceMixin
 
 
-class MorphBench:
+class MorphBench(WorkspaceMixin):
     """The open pair - a mesh and its morphs - and everything that can be done with it."""
 
     def __init__(self, config: Config | None = None):
@@ -242,10 +243,12 @@ class MorphBench:
             pass
         return None
 
-    def attach(self, model: BodyModel, morph_set: MorphSet | None = None) -> dict:
+    def attach(self, model: BodyModel, morph_set: MorphSet | None = None,
+               rig: ColliderSet | None = None) -> dict:
         """Open objects already built instead of files: this is how the tests put a tiny body
         together in memory and ask the facade about it exactly as about a real one."""
         self.model = model
+        self.rig = rig
         self.morph_set = morph_set
         self.analyzer = self._analyzer() if morph_set is not None else None
         self._sliders.clear()
@@ -856,22 +859,57 @@ class MorphBench:
             out.append(row)
         return out
 
-    def collider_set(self, bone: str, index: int = 0, p1=None, p2=None,
-                     radius: float | None = None) -> dict:
-        """Editing one capsule by numbers: the ends and the radius in its own body's frame, the
-        way the file keeps them."""
+    def collider_edit_state(self) -> dict:
+        """Manual editor state in body-local coordinates and game units, with full precision."""
+        if self.rig is None:
+            return {"available": False, "source": None, "frame": "body-local", "units": "game",
+                    "selected": None, "capsules": [], "bodies": [], "changed": []}
+        return self.rig.edit_state()
+
+    def collider_editor_payload(self) -> dict:
+        """The editable capsules plus distinct body and node world matrices for consumers."""
+        if self.rig is None:
+            return {**self.collider_edit_state(), "bodyMatrices": {}, "nodeMatrices": {}}
+        return self.rig.editor_payload()
+
+    def collider_select(self, bone: str | None, index: int = 0) -> dict:
         self._require_rig()
-        caps = self.rig.body(bone).capsules
-        if not 0 <= index < len(caps):
-            raise IndexError(t("core.capsuleIndex", bone=bone, count=len(caps), index=index))
-        cap = caps[index]
+        return self.rig.select(bone, index)
+
+    def collider_set(self, bone: str, index: int = 0, changes: dict | None = None,
+                     p1=None, p2=None, radius: float | None = None) -> dict:
+        """Atomically edit endpoints/radius in the body's frame; keyword fields remain valid."""
+        self._require_rig()
+        if changes is not None and type(changes) is not dict:
+            raise ValueError(t("colliderEditor.changes"))
+        values = dict(changes or {})
         if p1 is not None:
-            cap.p1 = np.asarray(p1, dtype=np.float32).reshape(3)
+            values["p1"] = p1
         if p2 is not None:
-            cap.p2 = np.asarray(p2, dtype=np.float32).reshape(3)
+            values["p2"] = p2
         if radius is not None:
-            cap.radius = float(radius)
-        return cap.as_dict()
+            values["radius"] = radius
+        return self.rig.set_capsule(bone, index, values)
+
+    def collider_translate(self, bone: str, index: int, delta) -> dict:
+        """Translate both endpoints by one body-local displacement."""
+        self._require_rig()
+        return self.rig.translate(bone, index, delta)
+
+    def collider_add(self, bone: str, p1, p2, radius: float) -> dict:
+        """Add a capsule to an existing supported body, with explicit local geometry."""
+        self._require_rig()
+        return self.rig.add_capsule(bone, p1, p2, radius)
+
+    def collider_remove(self, bone: str, index: int = 0) -> dict:
+        """Remove a bundle member while retaining at least one shape on the body."""
+        self._require_rig()
+        return self.rig.remove_capsule(bone, index)
+
+    def collider_reset(self) -> dict:
+        """Discard edits and fitting since this skeleton was loaded."""
+        self._require_rig()
+        return self.rig.reset()
 
     def collider_save(self, path) -> str:
         """Write the capsules as they stand into a new skeleton file.
@@ -910,12 +948,14 @@ class MorphBench:
         sliders applied, along the axes of the camera, then the aim and the pan. The core
         works it out; the presenters only place the camera by it, and that is how zooming at a
         point knows which frame was on the screen."""
-        if self._placements.mode != "slots":
+        if self._placements.mode != "slots" and self.rig is None:
             self._require()
         chunks = [] if self.model is None else [self.deformed(n) for n in self.visible_shapes()
                   if self.model.shape(n).triangle_count]
         if self._placements.mode == "slots":
             chunks.extend(np.asarray(mesh["vertices"], dtype=np.float32) for mesh in self.slots_meshes())
+        if self.rig is not None and (self.view.colliders or not chunks):
+            chunks.extend(piece["verts"] for piece in self.collider_meshes())
         if not chunks:
             raise RuntimeError(t("core.allHidden"))
         verts = np.vstack(chunks)

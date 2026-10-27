@@ -8,16 +8,30 @@
 __MB_STYLES__
 </head>
 <body>
-<header>
-  <h1 id="title"></h1>
-  <span class="sub" id="subtitle"></span>
+<header class="app-header">
+  <div class="app-identity">
+    <span class="brand-mark" aria-hidden="true"></span>
+    <div class="app-name"><h1 id="title"></h1><span class="sub" id="subtitle"></span></div>
+  </div>
+  <nav id="mode-nav"></nav>
+  <div id="workspace-status" role="status" aria-live="polite"></div>
 </header>
-<main>
-  <canvas id="canvas"></canvas>
-  <div id="hint">__MB_HINT__</div>
-  <div id="nogl">__MB_NOGL__</div>
-</main>
-<aside id="panel"></aside>
+<div class="workspace-toolbar">
+  <span id="workspace-context" class="toolbar-label"></span>
+  <nav id="mode-tabs"></nav>
+  <span id="workspace-description"></span>
+</div>
+<div class="workspace">
+  <aside id="model-panel" class="model-panel"></aside>
+  <main id="viewport">
+    <div class="viewport-heading"><span id="viewport-title"></span><span id="viewport-mode"></span></div>
+    <canvas id="canvas"></canvas>
+    <div id="view-tools" class="viewport-tools"></div>
+    <div id="hint">__MB_HINT__</div>
+    <div id="nogl">__MB_NOGL__</div>
+  </main>
+  <aside id="panel" class="inspector"></aside>
+</div>
 <script id="mb-data" type="application/json">__MB_DATA__</script>
 __MB_SCRIPTS__
 </body>

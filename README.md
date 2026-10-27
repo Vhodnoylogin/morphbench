@@ -35,8 +35,8 @@ point of the tool is to shorten the distance between a guess and its check: anyt
 seen without the game should be seen without the game.
 
 What it does **not** do: it does not author morphs, and it does not build bodies — that is
-BodySlide's job and there is no reason to repeat it. It writes only two things, and each of
-them into a new file: corrected bounding spheres and fitted collision capsules.
+BodySlide's job and there is no reason to repeat it. It writes corrected bounding spheres,
+edited or fitted collision capsules, and edited physics configurations into new files.
 
 ## What it needs
 
@@ -143,6 +143,7 @@ One line each; every option and every `--json` shape is in [docs/cli.md](docs/cl
 | `focus` | where the camera would look at a bone, a morph or a part, in numbers — and, with no key, everything it could be aimed at |
 | `render`, `sheet`, `web` | a PNG frame, a set of views, the browser viewer |
 | `env`, `catalog`, `serve` | whether we are under MO2, what meshes lie under a root, the page with the list |
+| `workspace` | replay mode, capsule and configuration edits; export a new configuration, skeleton or session recipe |
 
 What the bench measures and what each number means is in [docs/physics.md](docs/physics.md).
 That page also explains how to verify generated files in a game test and which conclusions
@@ -199,6 +200,7 @@ from `dependencies.json`.
 | [docs/cli.md](docs/cli.md) | every command of `mb.py`, every option, and what `--json` returns |
 | [docs/page.md](docs/page.md) | the viewer in the browser: what each panel does and what the picture means |
 | [docs/physics.md](docs/physics.md) | what the bench measures — reach spheres and collision capsules |
+| [docs/workspace.md](docs/workspace.md) | the four modes, capsule/configuration editing, session replay and limits |
 | [docs/localisation.md](docs/localisation.md) | how the texts are laid out and how to add a language |
 | [docs/building.md](docs/building.md) | building `morphbench.exe` and the release archive: what is bundled and under what licence |
 | [CLAUDE.md](CLAUDE.md) | the manifest for an AI assistant handed this folder and no history |
@@ -208,6 +210,15 @@ Each of these exists twice, in English and in Russian: `NAME.md` and `NAME.ru.md
 ## Development assistance
 
 Developed with assistance from [Codex (OpenAI)](https://github.com/codex).
+
+## Editing workspace
+
+The viewer separates **Morphs**, **Colliders**, **Physics** and experimental **Slots**, with
+mode tabs above the view, models on the left and an inspector on the right. Edit supported
+collision capsules or existing FSMP XML/CBPC TXT, save a replayable workspace and export new
+files. FSMP overlays show nominal configured limits; CBPC remains a raw parameter inspector.
+The same actions run through `mb.py workspace` and the local HTTP API without a GUI.
+See [the workspace workflow](docs/workspace.md) for controls, automation and offline limits.
 
 ## Offline Slots mode
 

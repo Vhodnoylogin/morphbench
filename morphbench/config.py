@@ -28,6 +28,14 @@ _ROOT = Path(__file__).resolve().parent.parent
 _FILE = _ROOT / "morphbench.json"
 
 DEFAULTS = {
+    "workspaceActionLimit": 4096,
+    "physicsMaxChars": 2000000,
+    "physicsMaxFields": 20000,
+    "workspaceRequestLimit": 12000000,
+    "editorStep": 0.1,
+    "editorHandleRadius": 2.0,
+    "editorPickPixels": 18,
+    "editorTempDirectory": "",
     # Language of the messages: auto - the language of the system, otherwise a language code
     # from the locale folder (en, ru).
     "language": "auto",

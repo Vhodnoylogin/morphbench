@@ -482,7 +482,7 @@ def cmd_web(args) -> int:
     from presenters.web import WebPage
     bench = _bench(args)
     _apply_view(bench, args)
-    bench.slots_mode(args.mode)
+    bench.workspace_mode(args.mode)
     if args.slots_project:
         from presenters import body_slots
         body_slots.load_into(bench, body_slots.read_project(args.slots_project))
@@ -501,7 +501,7 @@ def cmd_slots(args) -> int:
     outputs = [value for value in (args.out, args.package, args.session_out, args.preset_out) if value]
     if len({os.path.normcase(os.path.abspath(value)) for value in outputs}) != len(outputs):
         raise ValueError(t("slots.outputs"))
-    bench = _bench(args) if args.nif or args.skeleton else MorphBench()
+    bench = _bench(args) if args.nif or args.skeleton or getattr(args, "entry", None) is not None else MorphBench()
     bench.slots_mode("slots")
     if args.project:
         body_slots.load_into(bench, body_slots.read_project(args.project))
@@ -556,6 +556,61 @@ def cmd_env(args) -> int:
     return 0
 
 
+def cmd_workspace(args) -> int:
+    """Replay the same bounded document/capsule actions as the workspace UI."""
+    from presenters import body_slots
+    from presenters.physics_document import parse_document
+    from presenters.web import WebPage
+    bench = _bench(args) if args.nif or args.skeleton or getattr(args, "entry", None) is not None else MorphBench()
+    actions = []
+    if args.physics_config:
+        raw = Path(args.physics_config).read_bytes()
+        if len(raw) > int(bench.cfg["physicsMaxChars"]) * 4:
+            raise ValueError(t("workspace.large"))
+        document = parse_document(args.kind, raw.decode("utf-8"),
+                                  max_chars=int(bench.cfg["physicsMaxChars"]),
+                                  max_fields=int(bench.cfg["physicsMaxFields"]))
+        actions.append({"method": "physics_replace", "args": [document]})
+    if args.recipe:
+        recipe = body_slots.read_project(args.recipe)
+        if (not isinstance(recipe, dict) or recipe.get("format") != "morphbench-workspace"
+                or recipe.get("version") != 1 or not isinstance(recipe.get("actions"), list)):
+            raise ValueError(t("workspace.invalid", field="recipe"))
+        if any(str(action.get("method", "")).startswith("collider_") for action in recipe["actions"] if isinstance(action, dict)):
+            if recipe.get("source") != WebPage.source_identity(bench):
+                raise ValueError(t("workspace.stale"))
+        actions += recipe["actions"]
+    actions += [json.loads(value) for value in args.action]
+    if args.mode:
+        actions.append({"method": "workspace_mode", "args": [args.mode]})
+    bench.workspace_replay(actions)
+    recipe = {"format": "morphbench-workspace", "version": 1,
+              "source": WebPage.source_identity(bench), "actions": actions}
+    documents = []
+    if args.config_out:
+        if bench.physics_state()["document"] is None:
+            raise ValueError(t("workspace.invalid", field="document"))
+        documents.append((args.config_out, bench.physics_export().encode("utf-8")))
+    if args.session_out:
+        documents.append((args.session_out, (json.dumps(recipe, ensure_ascii=False, indent=2) + "\n").encode("utf-8")))
+    outputs = [value for value in (args.config_out, args.skeleton_out, args.session_out) if value]
+    inputs = [value for value in (args.nif, args.tri, args.skeleton, args.hkx, args.recipe, args.physics_config) if value]
+    canonical = lambda value: os.path.normcase(os.path.abspath(os.path.normpath(value)))
+    if len({canonical(value) for value in outputs}) != len(outputs):
+        raise ValueError(t("workspace.invalid", field="outputs"))
+    for output in outputs:
+        if Path(output).exists() or any(canonical(output) == canonical(value) for value in inputs):
+            raise ValueError(t("slots.exists", path=output))
+    saved = []
+    if args.skeleton_out:
+        saved.append(bench.collider_save(args.skeleton_out))
+    saved += [body_slots.write_new(path, data, inputs) for path, data in documents]
+    result = {"workspace": bench.workspace_state(), "colliders": bench.collider_editor_payload(),
+              "physics": bench.physics_state(), "envelopes": bench.physics_envelopes(), "saved": saved}
+    print(json.dumps(result, ensure_ascii=False, indent=2))
+    return 0
+
+
 def cmd_catalog(args) -> int:
     """A catalogue of meshes under a root: number, path from the root, morph format."""
     bench = MorphBench()
@@ -579,7 +634,7 @@ def cmd_serve(args) -> int:
     from presenters.serve import ServerLink, WebServer
     bench = MorphBench()
     cfg = bench.cfg
-    bench.slots_mode(args.mode)
+    bench.workspace_mode(args.mode)
     if args.slots_project:
         from presenters import body_slots
         body_slots.load_into(bench, body_slots.read_project(args.slots_project))
@@ -875,8 +930,18 @@ COMMANDS = (
         Arg("--prefix", default="view"),
     )),
     Command("web", "cli.cmd.web", cmd_web, mesh=MESH_OPTIONAL, args=VIEW_ARGS + (
-        Arg("--mode", choices=("mesh", "slots"), default="mesh", help_key="cli.opt.slots.mode"),
+        Arg("--mode", choices=("mesh", "morphs", "colliders", "physics", "slots"), default="mesh", help_key="cli.opt.workspace.mode"),
         Arg("--slots-project", default=None, help_key="cli.opt.slots.project"),
+    )),
+    Command("workspace", "cli.cmd.workspace", cmd_workspace, mesh=MESH_OPTIONAL, args=(
+        Arg("--physics-config", default=None, help_key="cli.opt.workspace.config"),
+        Arg("--kind", choices=("fsmp", "cbpc"), default="fsmp", help_key="cli.opt.workspace.kind"),
+        Arg("--recipe", default=None, help_key="cli.opt.workspace.recipe"),
+        Arg("--action", action="append", default=[], help_key="cli.opt.workspace.action"),
+        Arg("--mode", choices=("morphs", "colliders", "physics", "slots"), default=None, help_key="cli.opt.workspace.mode"),
+        Arg("--config-out", default=None, help_key="cli.opt.workspace.configout"),
+        Arg("--skeleton-out", default=None, help_key="cli.opt.workspace.skeletonout"),
+        Arg("--session-out", default=None, help_key="cli.opt.workspace.sessionout"),
     )),
     Command("slots", "cli.cmd.slots", cmd_slots, mesh=MESH_OPTIONAL, args=(
         Arg("--project", default=None, help_key="cli.opt.slots.project"),
@@ -897,7 +962,7 @@ COMMANDS = (
         Arg("--find", default=None, help_key="cli.opt.catalog.find"),
     )),
     Command("serve", "cli.cmd.serve", cmd_serve, mesh=MESH_NONE, args=(
-        Arg("--mode", choices=("mesh", "slots"), default="mesh", help_key="cli.opt.slots.mode"),
+        Arg("--mode", choices=("mesh", "morphs", "colliders", "physics", "slots"), default="mesh", help_key="cli.opt.workspace.mode"),
         Arg("--slots-project", default=None, help_key="cli.opt.slots.project"),
         Arg("--skeleton", default=None, help_key="cli.opt.top.skeleton"),
         Arg("--root", default=None, help_key="cli.opt.serve.root"),

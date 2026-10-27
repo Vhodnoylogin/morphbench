@@ -101,6 +101,7 @@ class Renderer {
   upload(shape) {
     const gl = this.gl;
     if (!shape.triCount) return;
+    this.removeMesh(shape.name);
     const vao = gl.createVertexArray();
     gl.bindVertexArray(vao);
     const pos = gl.createBuffer(), nrm = gl.createBuffer(), col = gl.createBuffer();
@@ -113,6 +114,11 @@ class Renderer {
     gl.bindVertexArray(null);
     this.meshes.set(shape.name, { vao, pos, nrm, col, idx, count: shape.tris.length,
       type: shape.tris instanceof Uint32Array ? gl.UNSIGNED_INT : gl.UNSIGNED_SHORT });
+  }
+  removeMesh(name) {
+    const item=this.meshes.get(name);if(!item)return;
+    for(const key of ["pos","nrm","col","idx"])this.gl.deleteBuffer(item[key]);
+    this.gl.deleteVertexArray(item.vao);this.meshes.delete(name);
   }
   _refill(buffer, data) {
     if (!buffer) return;

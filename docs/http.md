@@ -25,7 +25,7 @@ version; the client must not assume the process on the same port comes from the 
 
 ## Supported routes
 
-All routes below use GET. The default address is `http://127.0.0.1:8767`; the host and port
+The following table uses GET. The default address is `http://127.0.0.1:8767`; the host and port
 come from the settings. Source and protocol details are in `presenters/serve.py`.
 
 | Route | Result |
@@ -37,6 +37,7 @@ come from the settings. Source and protocol details are in `presenters/serve.py`
 | `/api/payload` | Return the currently open mesh's payload |
 | `/api/root` | Current root and mesh count |
 | `/api/root?root=<folder>` | Set the browse root; under MO2 it must remain within the game's Data |
+| `/api/workspace` | Current mode, capsule editor, physics document, nominal limits and exported configuration text |
 | `/api/shutdown` | Stop the server after returning the response |
 
 Catalogue and payload requests can also supply `root=<folder>`. To open a mesh without TRI,
@@ -45,6 +46,34 @@ pass `all=1` to both the catalogue and the payload request, for example
 A payload request without
 an open mesh returns an error. Opening a payload changes the server's selected mesh;
 setting a root and shutting down are actions even though their routes use GET.
+
+## Workspace requests
+
+These POST routes require UTF-8 JSON and `Content-Type: application/json`. Cross-origin
+browser requests are rejected; local scripts can omit `Origin`. Input size, numeric-field
+count and replay action count are bounded by the workspace settings.
+
+| Route | JSON body | Result |
+|---|---|---|
+| `/api/physics/import` | `{"kind":"fsmp","text":"<system/>"}`; use `cbpc` for TXT | `{"document":...}`; parse only, without changing server state |
+| `/api/workspace` | `{"actions":[{"method":"workspace_mode","args":["physics"]}]}` | Apply the bounded action batch and return workspace state |
+| `/api/workspace/skeleton` | A `morphbench-workspace` version-1 recipe, including its `source` and `actions` | New skeleton NIF bytes as `application/octet-stream` |
+
+Workspace state contains `workspace`, `colliders`, `physics`, `envelopes` and `text`.
+`text` is the current source-preserving configuration export, or `null` before import.
+Parsing does not install the document: replay `physics_replace` with the returned document,
+then `physics_set` with an imported field ID and a finite number. Saved physics state retains
+the original normalized `document` and an `edits` map for replay.
+
+Allowed action methods are `workspace_mode`, `workspace_tab`, `physics_replace`, `physics_set`,
+`collider_select`, `collider_set`, `collider_translate`, `collider_add`, `collider_remove` and
+`collider_reset`. Every action has exactly `method` and an `args` array. A rejected batch leaves
+the previous editable state intact. Mode names are `morphs`, `colliders`, `physics` and `slots`;
+the [workspace guide](workspace.md) describes tabs, coordinate spaces and recipe examples.
+
+Skeleton download verifies the original skeleton path/hash and its current bytes, then replays
+the recipe on a copy. The endpoint returns bytes; it accepts no arbitrary output filesystem
+path. Save the result to a new file. Unsupported shapes remain read-only.
 
 ## Example
 
@@ -66,15 +95,41 @@ payload = get("/api/payload?" + urlencode({"name": entries[0]["name"]}))
 print(environment["insideMo2"], payload["summary"])
 ```
 
+To import a configuration and install it into server state, using the same `client` and `base`:
+
+```python
+from pathlib import Path
+from urllib.request import Request
+
+def post(route, body):
+    request = Request(base + route, method="POST",
+                      data=json.dumps(body, ensure_ascii=False).encode("utf-8"),
+                      headers={"Content-Type": "application/json"})
+    with client.open(request, timeout=60) as response:
+        return json.load(response)
+
+parsed = post("/api/physics/import", {
+    "kind": "fsmp", "text": Path("physics.xml").read_bytes().decode("utf-8")})
+state = post("/api/workspace", {"actions": [
+    {"method": "physics_replace", "args": [parsed["document"]]},
+    {"method": "workspace_mode", "args": ["physics"]}]})
+print(state["physics"]["fields"], state["text"])
+```
+
 No browser is needed for these calls. JSON errors contain an `error` field and use HTTP
 error status codes. A failed request must not be interpreted as an empty successful result.
 
 ## Scope
 
-The current API supplies catalogue, environment and viewer payload operations. It does
-not expose arbitrary `MorphBench` methods or NIF-writing commands. For numerical batch
-analysis and new-file output, use the documented `mb.py` commands or the Python facade.
-Sliders changed in the browser are not automatically a server-side batch recipe.
+The API supplies catalogue, environment, viewer payload and bounded workspace operations;
+it does not expose arbitrary `MorphBench` methods. Workspace browser edits stay local until
+their recipe is submitted; GET does not collect unsent browser edits. Morph sliders changed
+in the browser are not automatically a server-side batch recipe. Use `mb.py workspace` for
+file-based replay and new-path exports.
+
+FSMP overlays are nominal rest-frame limits, not motion simulation. Unresolved defaults,
+inheritance and unsupported semantics withhold previews. CBPC returns raw parameters only;
+its clamps are not final displacement or direct angular limits. See [workspace.md](workspace.md).
 
 See [cli.md](cli.md) for computations, [building.md](building.md) for packaging and
 [../CLAUDE.md](../CLAUDE.md) for implementation contracts.

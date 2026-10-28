@@ -61,6 +61,9 @@ def _bench(args) -> MorphBench:
         bench.open_skeleton(args.skeleton)
     if getattr(args, "hkx", None):
         bench.open_ragdoll(args.hkx)
+    bench.respect_file_visibility(bool(getattr(args, "respect_file_visibility", False)
+                                      or getattr(args, "show_file_hidden", False)),
+                                  bool(getattr(args, "show_file_hidden", False)))
     return bench
 
 
@@ -124,6 +127,24 @@ def _out(args, data, columns=None, empty=None) -> None:
 def cmd_summary(args) -> int:
     data = _bench(args).summary()
     _out(args, data if args.json else text.summary(data))
+    return 0
+
+
+def cmd_visibility(args) -> int:
+    report = _bench(args).file_visibility()
+    if args.json:
+        _out(args, report)
+        return 0
+    def label(hidden):
+        return t("visibility.unknown") if hidden is None else t("visibility.hidden") if hidden else t("visibility.visible")
+    rows = [{"name": row["name"], "local": label(row["localHidden"]),
+             "inherited": label(row["inheritedHidden"]), "file": label(row["effectiveHidden"]),
+             "complete": _yesno(row["complete"]), "inspection": _yesno(row["inspectionVisible"])}
+            for row in report["shapes"]]
+    print(t("visibility.scope"))
+    _out(args, rows, [("name", t("visibility.colName")), ("local", t("visibility.colLocal")),
+                     ("inherited", t("visibility.colInherited")), ("file", t("visibility.colFile")),
+                     ("complete", t("visibility.colComplete")), ("inspection", t("visibility.colInspection"))])
     return 0
 
 
@@ -591,6 +612,8 @@ def cmd_workspace(args) -> int:
     actions += [json.loads(value) for value in args.action]
     if args.mode:
         actions.append({"method": "workspace_mode", "args": [args.mode]})
+    if args.respect_file_visibility or args.show_file_hidden:
+        actions.append({"method": "respect_file_visibility", "args": [True, args.show_file_hidden]})
     bench.workspace_replay(actions)
     recipe = {"format": "morphbench-workspace", "version": 1,
               "source": WebPage.source_identity(bench), "actions": actions}
@@ -806,6 +829,8 @@ class Command:
             parser.add_argument("--tri", default=None)
             parser.add_argument("--skeleton", default=None, help=t("cli.opt.top.skeleton"))
             parser.add_argument("--hkx", default=None, help=t("cli.opt.top.hkx"))
+            parser.add_argument("--respect-file-visibility", action="store_true", help=t("cli.opt.top.fileVisibility"))
+            parser.add_argument("--show-file-hidden", action="store_true", help=t("cli.opt.top.fileHidden"))
             self._json(parser)
         for arg in self.args:
             arg.add_to(parser)
@@ -853,6 +878,7 @@ VIEW_ARGS = (
 #: Every command of the workbench, in the order `--help` lists them.
 COMMANDS = (
     Command("summary", "cli.cmd.summary", cmd_summary),
+    Command("visibility", "cli.cmd.visibility", cmd_visibility),
     Command("shapes", "cli.cmd.shapes", cmd_shapes),
     Command("bones", "cli.cmd.bones", cmd_bones, args=(
         Arg("--shape", default=None),

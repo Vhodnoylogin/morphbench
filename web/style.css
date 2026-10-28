@@ -94,6 +94,8 @@ section h3 { margin: 12px 0 6px; font-size: 12px; font-weight: 600; }
 .parts .part:last-child { border-bottom: 0; }
 .parts label { display: flex; align-items: center; gap: 5px; flex: 1; min-width: 0; font-size: 12px; }
 .parts label > span:first-of-type { overflow-wrap: anywhere; }
+.parts .part-name { display: grid; min-width: 0; gap: 2px; }
+.parts .file-state { color: var(--muted); font-size: 10px; font-weight: normal; }
 .parts label .muted { margin-left: auto; flex: none; font-size: 10px; }
 .parts .only { color: var(--muted); font-size: 10px; cursor: pointer; min-height: 21px; padding: 1px 5px; background: transparent; }
 .parts .only:hover { color: var(--accent); }

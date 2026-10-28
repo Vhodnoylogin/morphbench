@@ -9,6 +9,7 @@ here.
 from __future__ import annotations
 
 import sys
+from copy import deepcopy
 from contextlib import contextmanager
 from pathlib import Path
 
@@ -17,6 +18,7 @@ import numpy as np
 from .bounds import Sphere
 from .config import Config
 from .environment import file_exists
+from .file_visibility import read_file_visibility, unknown_visibility
 from .i18n import t
 
 
@@ -192,6 +194,7 @@ class Shape:
         # for checking it and for patching it.
         self.bound: Sphere | None = None
         self.block: int = -1
+        self.file_visibility = unknown_visibility()
         # The dominant bone of each vertex is worked out once: the shapes do not change.
         self._dominant: np.ndarray | None = None
 
@@ -311,6 +314,7 @@ class BodyModel:
         nif = open_nif(pynifly, path)
         shapes: dict[str, Shape] = {}
         with reading_nif(path):
+            visibility = read_file_visibility(nif, pynifly, cfg["visibilityGraphLimit"])
             for s in nif.shapes:
                 verts = np.asarray(s.verts, dtype=np.float32).reshape(-1, 3)
                 tris = np.asarray(s.tris, dtype=np.int32).reshape(-1, 3)
@@ -327,6 +331,8 @@ class BodyModel:
                     shape.bound = Sphere(list(pr.boundingSphereCenter),
                                          float(pr.boundingSphereRadius))
                 shape.block = int(getattr(s, "id", -1))
+                shape.file_visibility = deepcopy(visibility.get(
+                    shape.block, unknown_visibility(shape.block, "shape-unresolved")))
                 shapes[s.name] = shape
         return cls(path, shapes)
 

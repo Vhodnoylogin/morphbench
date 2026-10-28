@@ -161,14 +161,26 @@ class Panel {
     root.appendChild(el("section", { "data-tab": "display" }, [el("h2", { text: T.secFocus }), this.focusSelect, this.focusInfo]));
 
     // mesh shapes
+    this.fileRespectBox=el("input",{type:"checkbox",on:{change:()=>app.invoke("respect_file_visibility",this.fileRespectBox.checked,bench.view.showFileHidden)}});
+    this.fileHiddenBox=el("input",{type:"checkbox",on:{change:()=>app.invoke("respect_file_visibility",bench.view.respectFileVisibility,this.fileHiddenBox.checked)}});
+    this.fileVisibilitySummary=el("p",{class:"muted"});
+    modelRoot.appendChild(el("section",null,[
+      el("label",{class:"row"},[this.fileRespectBox,T.visibilityRespect]),
+      el("label",{class:"row"},[this.fileHiddenBox,T.visibilityShowHidden]),
+      this.fileVisibilitySummary,
+      el("details",null,[el("summary",{text:T.visibilityHelp}),el("p",{class:"muted",text:T.visibilityScope})])
+    ]));
     this.partBoxes = new Map();
     const parts = el("div", { class: "parts" });
+    const fileStates=new Map(bench.file_visibility().shapes.map((row)=>[row.name,row]));
     for (const name of bench.shape_names()) {
       const box = el("input", { type: "checkbox", on: { change: () => this.onPart(name, box.checked) } });
       this.partBoxes.set(name, box);
       const s = bench.shape(name);
+      const metadata=fileStates.get(name),stateText=!metadata||metadata.state==="unknown"?T.visibilityUnknown:
+        metadata.localHidden?T.visibilityLocalHidden:metadata.inheritedHidden?T.visibilityInheritedHidden:T.visibilityVisible;
       parts.appendChild(el("div", { class: "part" }, [
-        el("label", null, [box, el("span", { text: name }), el("span", { class: "muted", text: s.count + T.lblVerts })]),
+        el("label", null, [box, el("span",{class:"part-name"},[el("span",{text:name}),el("small",{class:"file-state",text:stateText})]), el("span", { class: "muted", text: s.count + T.lblVerts })]),
         el("button", { class: "only", text: T.btnOnly, on: { click: () => app.invoke("only", [name]) } })]));
     }
     modelRoot.appendChild(el("section", null, [el("h2", { text: T.secShapes }),
@@ -413,6 +425,11 @@ class Panel {
 
     // shapes
     for (const [name, box] of this.partBoxes) box.checked = view.is_visible(name);
+    this.fileRespectBox.checked=view.respectFileVisibility;
+    this.fileHiddenBox.checked=view.showFileHidden;this.fileHiddenBox.disabled=!view.respectFileVisibility;
+    const fileState=bench.file_visibility();
+    this.fileVisibilitySummary.textContent=say(T.visibilitySummary,{visible:fileState.counts.visible,hidden:fileState.counts.hidden,
+      unknown:fileState.counts.unknown,included:fileState.counts.inspectionVisible});
 
     // capsules
     if (this.colliderBox) { this.colliderBox.checked = view.colliders; this.bumperBox.checked = view.bumper; }
@@ -473,6 +490,8 @@ class Panel {
     if (state.colouring !== "shade") parts.push("--colour", state.colouring);
     if (state.highlightMorph) parts.push("--morph", q(state.highlightMorph));
     if (state.visible !== null) parts.push("--only", q(state.visible.join(",")));
+    if(state.respectFileVisibility)parts.push("--respect-file-visibility");
+    if(state.respectFileVisibility&&state.showFileHidden)parts.push("--show-file-hidden");
     if (Math.abs(state.zoom - 1.0) > 1e-9) parts.push("--zoom", fmt(state.zoom));
     if (state.pan[0] !== 0 || state.pan[1] !== 0) parts.push("--pan=" + state.pan[0] + "," + state.pan[1]);
     if (state.width !== st.imageWidth || state.height !== st.imageHeight)

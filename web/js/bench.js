@@ -30,6 +30,7 @@ class BenchMirror {
       ? raw.bodies.map((b) => new ColliderMesh("colliders:" + b.bone, b, b.bone)) : null;
     this._bumperMesh = raw && raw.bumper ? new ColliderMesh("colliders:bumper", raw.bumper) : null;
     this.view = new ViewMirror(data.settings, data.presets, data.view);
+    this._fileVisibility = data.fileVisibility || {source:this.summary?this.summary.nif:null,scope:"nif-file",runtimeEvaluated:false,complete:false,shapes:[]};
     this._sliders = new Map(Object.entries(data.sliders));
     this.placements = new PlacementMirror(data.settings, data.slots);
   }
@@ -93,7 +94,31 @@ class BenchMirror {
   shape(name) { const s = this.shapes.get(name); if (!s) throw new Error(say(T.errNoShape, { name })); return s; }
   morphs() { return this.morphList.slice(); }
   presets() { return this.view.presets; }
-  visible_shapes() { return this.shape_names().filter((n) => this.view.is_visible(n)); }
+  visible_shapes() { return this.shape_names().filter((name) => this._inspection_exclusion(name)===null); }
+  respect_file_visibility(on=true,show_hidden=false) {
+    if(typeof on!=="boolean"||typeof show_hidden!=="boolean")throw new Error(T.visibilityPolicyInvalid);
+    this.view.respectFileVisibility=on;this.view.showFileHidden=show_hidden;return this.view_state();
+  }
+  _inspection_exclusion(name) {
+    if(!this.view.is_visible(name))return "viewer-hidden";
+    if(!this.view.respectFileVisibility)return null;
+    const row=this._fileVisibility.shapes.find((item)=>item.name===name);
+    if(!row||row.complete!==true||!["visible","hidden"].includes(row.state))return "file-unknown";
+    if(row.state==="hidden"&&!this.view.showFileHidden)return "file-hidden";
+    return null;
+  }
+  file_visibility() {
+    const base=this._fileVisibility,counts={visible:0,hidden:0,unknown:0,viewerVisible:0,inspectionVisible:0};
+    const shapes=this.shape_names().map((name)=>{
+      const original=base.shapes.find((item)=>item.name===name),row=original?JSON.parse(JSON.stringify(original)):
+        {block:-1,localFlags:null,localHidden:null,ancestors:[],ancestryComplete:false,complete:false,inheritedHidden:null,effectiveHidden:null,state:"unknown",issues:["not-read"]};
+      const exclusion=this._inspection_exclusion(name);
+      Object.assign(row,{name,viewerVisible:this.view.is_visible(name),inspectionVisible:exclusion===null,exclusion});
+      counts[row.state]++;counts.viewerVisible+=Number(row.viewerVisible);counts.inspectionVisible+=Number(row.inspectionVisible);return row;
+    });
+    return {source:base.source,scope:"nif-file",runtimeEvaluated:false,respectFileVisibility:this.view.respectFileVisibility,
+      showFileHidden:this.view.showFileHidden,complete:base.source!==null&&shapes.every((row)=>row.complete),counts,shapes};
+  }
 
   // sliders
   set_slider(name, value) {

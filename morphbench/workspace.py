@@ -277,6 +277,7 @@ class WorkspaceMixin:
         """Bounded allowlist; numerical calls only, never arbitrary attribute access."""
         allowed = {
             "workspace_mode": (1, 1), "workspace_tab": (1, 1),
+            "respect_file_visibility": (1, 2),
             "physics_replace": (1, 1), "physics_set": (2, 2),
             "ppb_replace": (1, 1), "ppb_set": (2, 2),
             "ppb_to_collider": (3, 3), "ppb_from_collider": (3, 3),
@@ -300,12 +301,13 @@ class WorkspaceMixin:
         before = (copy.deepcopy(self.rig), copy.deepcopy(getattr(self, "_physics_workspace", None)),
                   self.workspace_state(), copy.deepcopy(getattr(self, "_workspace_tabs", {})), self._placements.mode,
                   self.view.colliders, self.view.bumper, copy.deepcopy(getattr(self, "_ppb_workspace", None)),
-                  copy.deepcopy(getattr(self, "_ppb_binding", None)))
+                  copy.deepcopy(getattr(self, "_ppb_binding", None)),
+                  self.view.respect_file_visibility, self.view.show_file_hidden)
         try:
             for action in actions:
                 getattr(self, action["method"])(*action["args"])
         except Exception:
-            self.rig, physics, state, tabs, placement_mode, colliders, bumper, ppb, binding = before
+            self.rig, physics, state, tabs, placement_mode, colliders, bumper, ppb, binding, respect_file, show_hidden = before
             self._ppb_binding = binding
             if physics is None:
                 self.__dict__.pop("_physics_workspace", None)
@@ -319,5 +321,6 @@ class WorkspaceMixin:
             self.slots_mode(placement_mode)
             self.view.colliders = colliders
             self.view.bumper = bumper
+            self.view.respect_file_visibility, self.view.show_file_hidden = respect_file, show_hidden
             raise
         return self.workspace_state()

@@ -306,6 +306,7 @@ class WebPage:
             "colliderEditor": bench.collider_editor_payload(),
             "physics": bench.physics_state(),
             "ppb": bench.ppb_state(),
+            "fileVisibility": bench.file_visibility(),
             "physicsTexts": {"physicsw." + key: value for key, value in section("physicsw.").items()},
             "source": self.source_identity(bench),
         })

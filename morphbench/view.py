@@ -29,6 +29,8 @@ class ViewState:
         # Panning: the frame shifted along the screen axes - right and up - in model units.
         self.pan = np.zeros(2, dtype=np.float32)
         self.visible: set[str] | None = None      # None - everything is visible
+        self.respect_file_visibility = False
+        self.show_file_hidden = False
         self.colouring = "shade"
         # The capsule layer over the body: a flag, because what is on show is the core's
         # business, and drawing it is the business of the presentation layer.
@@ -285,6 +287,8 @@ class ViewState:
                 "colouring": self.colouring,
                 "highlightMorph": self.highlight_morph,
                 "visible": None if self.visible is None else sorted(self.visible),
+                "respectFileVisibility": self.respect_file_visibility,
+                "showFileHidden": self.show_file_hidden,
                 "colliders": self.colliders, "bumper": self.bumper,
                 "width": self.width, "height": self.height,
                 "light": self.light_state(precise),

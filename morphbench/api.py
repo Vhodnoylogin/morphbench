@@ -980,7 +980,50 @@ class MorphBench(WorkspaceMixin):
 
     def visible_shapes(self) -> list[str]:
         self._require()
-        return [n for n in self.model.shape_names() if self.view.is_visible(n)]
+        return [name for name in self.model.shape_names() if self._inspection_exclusion(name) is None]
+
+    def respect_file_visibility(self, on: bool = True, show_hidden: bool = False) -> dict:
+        """Filter inspection by complete static NIF visibility; never infer runtime visibility.
+
+        Viewer show/hide selections remain independent. Unknown file ancestry is excluded
+        while this policy is enabled, including when known hidden shapes are shown explicitly.
+        """
+        if type(on) is not bool or type(show_hidden) is not bool:
+            raise ValueError(t("visibility.policyInvalid"))
+        self.view.respect_file_visibility, self.view.show_file_hidden = on, show_hidden
+        return self.view_state()
+
+    def _inspection_exclusion(self, name):
+        if not self.view.is_visible(name):
+            return "viewer-hidden"
+        if not self.view.respect_file_visibility:
+            return None
+        metadata = self.model.shape(name).file_visibility
+        if metadata.get("complete") is not True or metadata.get("state") not in ("visible", "hidden"):
+            return "file-unknown"
+        if metadata["state"] == "hidden" and not self.view.show_file_hidden:
+            return "file-hidden"
+        return None
+
+    def file_visibility(self) -> dict:
+        """Copied native metadata plus independent viewer selection and inspection inclusion."""
+        rows = []
+        counts = {"visible": 0, "hidden": 0, "unknown": 0, "viewerVisible": 0, "inspectionVisible": 0}
+        for name in self.model.shape_names() if self.model is not None else []:
+            row = copy.deepcopy(self.model.shape(name).file_visibility)
+            exclusion = self._inspection_exclusion(name)
+            row.update({"name": name, "viewerVisible": self.view.is_visible(name),
+                        "inspectionVisible": exclusion is None, "exclusion": exclusion})
+            counts[row["state"]] += 1
+            counts["viewerVisible"] += int(row["viewerVisible"])
+            counts["inspectionVisible"] += int(row["inspectionVisible"])
+            rows.append(row)
+        return {"source": str(self.model.path) if self.model is not None else None,
+                "scope": "nif-file", "runtimeEvaluated": False,
+                "respectFileVisibility": self.view.respect_file_visibility,
+                "showFileHidden": self.view.show_file_hidden,
+                "complete": self.model is not None and all(row["complete"] for row in rows),
+                "counts": counts, "shapes": rows}
 
     def vertex_normals(self, shape_name: str) -> np.ndarray:
         """Vertex normals of a shape with the sliders applied - for smooth shading."""

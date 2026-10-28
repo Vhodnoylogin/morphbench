@@ -60,6 +60,9 @@ python mb.py serve --no-browser --root <папка-мешей>
 | `/api/workspace/skeleton` | Рецепт `morphbench-workspace` версии 1, включая `source` и `actions` | Байты нового NIF скелета как `application/octet-stream` |
 
 Состояние содержит `workspace`, `colliders`, `physics`, `envelopes` и `text`.
+Также возвращается `fileVisibility`: статические сведения файла и отдельный результат выбора
+просмотрщика/политики. В пакетах разрешён `respect_file_visibility(on,show_hidden=false)`.
+Неполная цепочка родителей не даёт подтверждённого состояния; см. [видимость](visibility.ru.md).
 `text` — текущий экспорт конфигурации с сохранением исходного текста либо `null` до импорта.
 Разбор не устанавливает документ: воспроизведите `physics_replace` с возвращённым документом,
 затем `physics_set` с идентификатором импортированного поля и конечным числом. Сохранённое

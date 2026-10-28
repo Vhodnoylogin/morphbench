@@ -11,6 +11,8 @@ class ViewMirror {
     this.yaw = init.yaw; this.pitch = init.pitch; this.zoom = init.zoom;
     this.pan = init.pan ? init.pan.slice() : [0, 0];
     this.visible = init.visible === null ? null : new Set(init.visible);
+    this.respectFileVisibility = !!init.respectFileVisibility;
+    this.showFileHidden = !!init.showFileHidden;
     this.colouring = init.colouring;
     // The capsule layer over the body and the bumper are two separate flags, as in the core;
     // a saved state from before these keys existed means "off".
@@ -167,6 +169,7 @@ class ViewMirror {
       pan: [rnd(this.pan[0], 2), rnd(this.pan[1], 2)],
       colouring: this.colouring, highlightMorph: this.highlightMorph,
       visible: this.visible === null ? null : Array.from(this.visible).sort(),
+      respectFileVisibility: this.respectFileVisibility, showFileHidden: this.showFileHidden,
       colliders: this.colliders, bumper: this.bumper,
       width: this.width, height: this.height,
       light: this.light_state(),

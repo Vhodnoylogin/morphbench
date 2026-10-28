@@ -60,6 +60,9 @@ count and replay action count are bounded by the workspace settings.
 | `/api/workspace/skeleton` | A `morphbench-workspace` version-1 recipe, including its `source` and `actions` | New skeleton NIF bytes as `application/octet-stream` |
 
 Workspace state contains `workspace`, `colliders`, `physics`, `envelopes` and `text`.
+It also includes `fileVisibility`: static native file evidence plus separate viewer/policy
+inclusion. `respect_file_visibility(on,show_hidden=false)` is an allowlisted workspace action.
+Unknown ancestry is never promoted to a confirmed file state; see [visibility](visibility.md).
 `text` is the current source-preserving configuration export, or `null` before import.
 Parsing does not install the document: replay `physics_replace` with the returned document,
 then `physics_set` with an imported field ID and a finite number. Saved physics state retains

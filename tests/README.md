@@ -61,6 +61,11 @@ the text of the exception: what is under test is the bench's reading, not PyNifl
 
 ## Skeleton and PPB checks
 
+`test_file_visibility.py` verifies native local/inherited flags through generated NIFs and
+malformed/ambiguous graph doubles. `test_visibility_policy.py` verifies independent file and
+viewer policies, conservative unknown handling, visible-surface fit/coverage, CLI/native
+rendering, copied payloads, HTTP actions and actual JS parity/rollback/recipe recovery.
+
 `test_skeleton_open.py` covers exact standalone NIF identity, finite empty bounds, native
 node/capsule framing, failed-load rollback, strict page/API JSON and startup error display.
 `test_ppb_document.py` covers lossless PPB numeric spans, actual slot/child bounds, duplicate

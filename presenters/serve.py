@@ -338,6 +338,7 @@ class WebServer:
                     "colliders": self.bench.collider_editor_payload(),
                     "physics": self.bench.physics_state(),
                     "ppb": self.bench.ppb_state(),
+                    "fileVisibility": self.bench.file_visibility(),
                     "ppbText": self.bench.ppb_export() if self.bench.ppb_state()["document"] else None,
                     "envelopes": self.bench.physics_envelopes(),
                     "text": self.bench.physics_export() if self.bench.physics_state()["document"] else None}

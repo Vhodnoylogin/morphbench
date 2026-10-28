@@ -28,6 +28,7 @@ _ROOT = Path(__file__).resolve().parent.parent
 _FILE = _ROOT / "morphbench.json"
 
 DEFAULTS = {
+    "visibilityGraphLimit": 100000,
     "workspaceActionLimit": 4096,
     "physicsMaxChars": 2000000,
     "physicsMaxFields": 20000,

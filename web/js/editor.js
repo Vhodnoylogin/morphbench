@@ -103,7 +103,8 @@ class EditorState {
     }
     if(this.binding)actions.push({method:"ppb_link",args:[this.binding.capsule,this.binding.bone,this.binding.index]});
     if(this.state.available){const selected=this.state.selected;actions.push({method:"collider_select",args:selected?[selected.bone,selected.index]:[null]});}
-    actions.push({method:"workspace_mode",args:[this.mode]},{method:"workspace_tab",args:[this.tabs[this.mode]||WORKSPACE_TABS[this.mode][0]]});
+    actions.push({method:"respect_file_visibility",args:[this.bench.view.respectFileVisibility,this.bench.view.showFileHidden]},
+      {method:"workspace_mode",args:[this.mode]},{method:"workspace_tab",args:[this.tabs[this.mode]||WORKSPACE_TABS[this.mode][0]]});
     return {format:"morphbench-workspace",version:1,source:DATA.source||null,actions};
   }
 }
@@ -237,20 +238,20 @@ Object.assign(BenchMirror.prototype,{
   },
   workspace_recipe() {return editorOwner(this).recipe();},
   workspace_replay(actions) {
-    const allowed={workspace_mode:[1,1],workspace_tab:[1,1],physics_replace:[1,1],physics_set:[2,2],ppb_replace:[1,1],ppb_set:[2,2],ppb_link:[3,3],ppb_unlink:[0,0],ppb_to_collider:[3,3],ppb_from_collider:[3,3],collider_select:[1,2],collider_set:[3,3],collider_translate:[3,3],collider_add:[4,4],collider_remove:[1,2],collider_reset:[0,0]};
+    const allowed={workspace_mode:[1,1],workspace_tab:[1,1],respect_file_visibility:[1,2],physics_replace:[1,1],physics_set:[2,2],ppb_replace:[1,1],ppb_set:[2,2],ppb_link:[3,3],ppb_unlink:[0,0],ppb_to_collider:[3,3],ppb_from_collider:[3,3],collider_select:[1,2],collider_set:[3,3],collider_translate:[3,3],collider_add:[4,4],collider_remove:[1,2],collider_reset:[0,0]};
     if(!Array.isArray(actions)||actions.length>this.settings.workspaceActionLimit) editorError("actions");
     for(const action of actions) {
       if(!action||Object.keys(action).sort().join()!=="args,method"||!Object.hasOwn(allowed,action.method)||!Array.isArray(action.args)) editorError("action");
       const range=allowed[action.method];if(action.args.length<range[0]||action.args.length>range[1]) editorError("arguments");
     }
-    const owner=editorOwner(this),before={state:editorClone(owner.state),actions:editorClone(owner.actions),mode:owner.mode,tabs:editorClone(owner.tabs),physics:owner.physics.state(),ppb:owner.ppb.state(),binding:editorClone(owner.binding),placementMode:this.placements.mode,colliders:this.view.colliders,bumper:this.view.bumper};
+    const owner=editorOwner(this),before={state:editorClone(owner.state),actions:editorClone(owner.actions),mode:owner.mode,tabs:editorClone(owner.tabs),physics:owner.physics.state(),ppb:owner.ppb.state(),binding:editorClone(owner.binding),placementMode:this.placements.mode,colliders:this.view.colliders,bumper:this.view.bumper,respectFileVisibility:this.view.respectFileVisibility,showFileHidden:this.view.showFileHidden};
     try {for(const action of actions) this[action.method](...action.args);}
     catch(error) {
       Object.assign(owner,{state:before.state,actions:before.actions,mode:before.mode,tabs:before.tabs,binding:before.binding});
       const limits={max_chars:this.settings.physicsMaxChars,max_fields:this.settings.physicsMaxFields};
       owner.physics=new PhysicsWorkspaceMirror(null,DATA.physicsTexts||{},limits);if(before.physics.document) {owner.physics.replace(before.physics.document);for(const [id,value] of Object.entries(before.physics.edits||{})) owner.physics.set(id,value);}
       owner.ppb=new PhysicsWorkspaceMirror(null,DATA.physicsTexts||{},limits);if(before.ppb.document){owner.ppb.replace(before.ppb.document);for(const [id,value] of Object.entries(before.ppb.edits||{}))owner.ppb.set(id,value);}
-      this.slots_mode(before.placementMode);this.view.colliders=before.colliders;this.view.bumper=before.bumper;owner.rebuild();throw error;
+      this.slots_mode(before.placementMode);this.view.colliders=before.colliders;this.view.bumper=before.bumper;this.view.respectFileVisibility=before.respectFileVisibility;this.view.showFileHidden=before.showFileHidden;owner.rebuild();throw error;
     }
     return this.workspace_state();
   }

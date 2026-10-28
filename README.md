@@ -22,6 +22,7 @@ Development of the next collider/physics workspace continues on
 [`feature/collider-physics-ppb`](https://github.com/Vhodnoylogin/morphbench/tree/feature/collider-physics-ppb).
 It includes visual capsule editing, bidirectional source-preserving [PPB tuning editing](docs/ppb.md)
 and the skeleton-only blank-page fix. These changes are not included in the public 0.7.1-r2 archive.
+It also distinguishes [native file visibility](docs/visibility.md) from the viewer's shape selection.
 
 ## Why this and not BodySlide
 

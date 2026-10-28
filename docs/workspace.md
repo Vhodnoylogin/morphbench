@@ -41,10 +41,17 @@ recipe can produce a new NIF through the CLI without a browser.
 In **Colliders → PPB**, open an existing `PPB_tuning.txt`. Choose a source capsule record
 and the target NIF capsule independently. Edit supported numeric fields, copy source geometry
 to the selected capsule, or move a capsule visually and copy its geometry back to the source.
-Neither import nor numeric source edits apply geometry implicitly. Copying preserves `Enable`;
+Import and unlinked numeric source edits do not apply geometry implicitly. Copying preserves `Enable`;
 it does not activate an override. Download the edited tuning to a **new file** or retain the
 source and edits in a workspace recipe. Comments, unknown commands, duplicates and line endings
 are preserved. Incomplete or ambiguous source records cannot transfer geometry.
+
+For continuous visual editing, choose **Link these records for visual editing**. This copies
+the source geometry into the selected working capsule; subsequent moves, endpoint/radius edits
+and active PPB numeric edits keep text and geometry synchronized. `Enable` remains independent.
+The banner identifies the explicit pair. **Unlink and keep edits** ends synchronization.
+Resetting or changing the capsule list, fitting, or replacing either source ends it too;
+workspace recipes restore it. See [the PPB workflow](ppb.md#visual-source-editing).
 
 The picture shows the NIF geometry or the manual values you copied into it. It does not resolve
 PPB's actor-specific rules, mirroring, auto-fit or runtime shape changes. See [PPB details](ppb.md)

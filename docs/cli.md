@@ -607,7 +607,7 @@ The full list is in the comments of `morphbench/config.py`, which are the author
 Use `--ppb-config PPB_tuning.txt` to import PPB tuning independently of `--physics-config`.
 `--ppb-out new.txt` writes edited PPB text to a new path; `--session-out edits.json` preserves
 source and actions. Replay via `--recipe edits.json --ppb-out another.txt`. `--action` accepts
-`ppb_replace`, `ppb_set`, `ppb_to_collider` and `ppb_from_collider`, with the same arguments as
+`ppb_replace`, `ppb_set`, `ppb_to_collider`, `ppb_from_collider`, `ppb_link` and `ppb_unlink`, with the same arguments as
 the [HTTP workspace](http.md). Transfers require explicitly chosen records and a skeleton;
 source-only edits need neither mesh nor game. Existing input/output guards apply.
 See [PPB scope](ppb.md) and the [workspace guide](workspace.md).

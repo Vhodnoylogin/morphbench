@@ -79,6 +79,11 @@ For PPB, the same parser route accepts `{"kind":"ppb","text":"..."}`. Apply its 
 document with `ppb_replace`; edit existing fields with `ppb_set(fieldId,value)`. Choose both
 records explicitly for `ppb_to_collider(capsuleId,bone,index)` or
 `ppb_from_collider(capsuleId,bone,index)`. These methods are also allowlisted batch actions.
+`ppb_link(capsuleId,bone,index)` starts explicit bidirectional source editing; `ppb_unlink()`
+ends it while retaining edits. The separate PPB state's `binding` is null or
+`{capsule,bone,index}`. While linked, `ppb_set`, `collider_set` and `collider_translate` update
+the linked geometry and source spans atomically. Linking copies source geometry into the
+working capsule; it does not infer a runtime PPB match. Invalid edits preserve both owners.
 `GET /api/workspace` includes separate `ppb` state and `ppbText` (null before import).
 Importing PPB does not change the skeleton or the independent FSMP/CBPC document. Source-only
 editing can run without a mesh. Capsule transfers require a loaded target rig; recipes bind

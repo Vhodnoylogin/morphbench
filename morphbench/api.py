@@ -245,6 +245,7 @@ class MorphBench(WorkspaceMixin):
             candidate._workspace_tabs = {}
             candidate.workspace_mode("colliders" if rig is not None else "morphs")
         summary = candidate.summary()
+        candidate._ppb_binding = None
         self.__dict__.update(candidate.__dict__)
         return summary
 
@@ -266,13 +267,16 @@ class MorphBench(WorkspaceMixin):
                rig: ColliderSet | None = None) -> dict:
         """Open objects already built instead of files: this is how the tests put a tiny body
         together in memory and ask the facade about it exactly as about a real one."""
-        self.model = model
-        self.rig = rig
-        self.morph_set = morph_set
-        self.analyzer = self._analyzer() if morph_set is not None else None
-        self._sliders.clear()
-        self.view.focus_all()
-        return self.summary()
+        candidate = copy.copy(self)
+        candidate.model, candidate.rig, candidate.morph_set = model, rig, morph_set
+        candidate.analyzer = candidate._analyzer() if morph_set is not None else None
+        candidate._sliders = {}
+        candidate.view = copy.deepcopy(self.view)
+        candidate.view.focus_all()
+        summary = candidate.summary()
+        candidate._ppb_binding = None
+        self.__dict__.update(candidate.__dict__)
+        return summary
 
     def _analyzer(self) -> Analyzer:
         """The analyser gets every threshold from the settings: the single place they are
@@ -687,8 +691,11 @@ class MorphBench(WorkspaceMixin):
         (`skeletonFile` of the settings, in the same folder); this method is for when it lies
         somewhere else.
         """
-        self.rig = ColliderSet.from_nif(path, self.cfg)
-        return self.rig.summary()
+        candidate = ColliderSet.from_nif(path, self.cfg)
+        summary = candidate.summary()
+        self.rig = candidate
+        self._ppb_binding = None
+        return summary
 
     def open_ragdoll(self, path) -> dict:
         """Take the ragdoll of the open skeleton from a skeleton.hkx named outright.
@@ -859,25 +866,31 @@ class MorphBench(WorkspaceMixin):
         count = max(1, int(bundle))
         method = str(split or self.cfg["bundleSplit"])
         min_points = int(self.cfg["bundleMinPoints"])
+        # A later body's fit can fail after earlier bodies have been accepted.
+        # Keep the live rig and its PPB binding together until the entire fit succeeds.
+        rig = copy.deepcopy(self.rig) if apply else self.rig
         out = []
         for bone in self.collider_bones(needle):
             pts = self.covered_skin_points(bone, min_weight)
             if count == 1:
-                one = self.rig.fit(bone, pts, pct)
+                one = rig.fit(bone, pts, pct)
                 fitted = [] if one is None else [one]
             else:
-                fitted = self.rig.fit_bundle(bone, pts, count, method, pct, min_points)
+                fitted = rig.fit_bundle(bone, pts, count, method, pct, min_points)
             if not fitted:
                 out.append({"bone": bone, "points": int(pts.shape[0]), "fitted": False})
                 continue
-            before = self.rig.body(bone).capsules
+            before = rig.body(bone).capsules
             row = {"bone": bone, "points": int(pts.shape[0]), "fitted": True,
                    "was": before[0].as_dict(), "wasCount": len(before),
                    "now": fitted[0].as_dict(), "count": len(fitted),
                    "capsules": [c.as_dict() for c in fitted]}
             if apply:
-                self.rig.apply_fit(bone, fitted)
+                rig.apply_fit(bone, fitted)
             out.append(row)
+        if apply:
+            self.rig = rig
+            self._ppb_binding = None
         return out
 
     def collider_edit_state(self) -> dict:
@@ -910,27 +923,37 @@ class MorphBench(WorkspaceMixin):
             values["p2"] = p2
         if radius is not None:
             values["radius"] = radius
+        if self._ppb_target(bone, index):
+            return self._ppb_edit_collider(bone, index, changes=values)
         return self.rig.set_capsule(bone, index, values)
 
     def collider_translate(self, bone: str, index: int, delta) -> dict:
         """Translate both endpoints by one body-local displacement."""
         self._require_rig()
+        if self._ppb_target(bone, index):
+            return self._ppb_edit_collider(bone, index, delta=delta)
         return self.rig.translate(bone, index, delta)
 
     def collider_add(self, bone: str, p1, p2, radius: float) -> dict:
         """Add a capsule to an existing supported body, with explicit local geometry."""
         self._require_rig()
-        return self.rig.add_capsule(bone, p1, p2, radius)
+        result = self.rig.add_capsule(bone, p1, p2, radius)
+        self._ppb_binding = None
+        return result
 
     def collider_remove(self, bone: str, index: int = 0) -> dict:
         """Remove a bundle member while retaining at least one shape on the body."""
         self._require_rig()
-        return self.rig.remove_capsule(bone, index)
+        result = self.rig.remove_capsule(bone, index)
+        self._ppb_binding = None
+        return result
 
     def collider_reset(self) -> dict:
         """Discard edits and fitting since this skeleton was loaded."""
         self._require_rig()
-        return self.rig.reset()
+        result = self.rig.reset()
+        self._ppb_binding = None
+        return result
 
     def collider_save(self, path) -> str:
         """Write the capsules as they stand into a new skeleton file.

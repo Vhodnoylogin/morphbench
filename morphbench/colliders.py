@@ -131,7 +131,9 @@ class Capsule:
     @property
     def length(self) -> float:
         """Length of the axis between the ends - without the caps on them."""
-        return float(np.linalg.norm(self.p2 - self.p1))
+        # Two finite file-space float32 endpoints can have a distance larger than
+        # float32. Measure in doubles so editor summaries remain valid JSON.
+        return float(np.linalg.norm(self.p2.astype(np.float64) - self.p1.astype(np.float64)))
 
     @property
     def total(self) -> float:

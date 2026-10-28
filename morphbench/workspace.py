@@ -112,6 +112,7 @@ class WorkspaceMixin:
                         or any(not isinstance(ident, str) or ident not in bindings.values() for ident in ids)):
                     raise ValueError(t("physicsw.document"))
         self._ppb_workspace = candidate
+        self._ppb_binding = None
         return self.ppb_state()
 
     @staticmethod
@@ -125,10 +126,28 @@ class WorkspaceMixin:
         return result
 
     def ppb_set(self, field_id, value):
-        return self._ppb_owner().set(field_id, self._ppb_value(value))
+        candidate = copy.deepcopy(self._ppb_owner())
+        candidate.set(field_id, self._ppb_value(value))
+        self._ppb_commit_source(candidate, {field_id})
+        return self.ppb_state()
+
+    def _ppb_commit_source(self, candidate, changed_ids):
+        """Publish source edits and their bound geometry together, after validation."""
+        binding = getattr(self, "_ppb_binding", None)
+        if binding:
+            ids, _ = self._ppb_geometry(binding["capsule"])
+            if changed_ids.intersection(ids):
+                _, values = self._ppb_geometry(binding["capsule"], candidate.state())
+                self._require_rig()
+                rig = copy.deepcopy(self.rig)
+                rig.set_capsule(binding["bone"], binding["index"],
+                                {"p1": values[:3], "p2": values[3:6], "radius": values[6]})
+                self.rig = rig
+        self._ppb_workspace = candidate
 
     def ppb_state(self):
         state = self._ppb_owner().state()
+        state["binding"] = copy.deepcopy(getattr(self, "_ppb_binding", None))
         fields = {field["id"]: field["value"] for field in state["fields"]}
         for cap in state.get("capsules", []):
             if not isinstance(cap, dict):
@@ -145,13 +164,13 @@ class WorkspaceMixin:
     def ppb_export(self):
         return self._ppb_owner().export_text()
 
-    def _ppb_geometry(self, capsule_id):
+    def _ppb_geometry(self, capsule_id, state=None):
         """Validated generic field bindings supplied by the format adapter.
 
         The user chooses a source group and a target capsule explicitly. No bone,
         side, child ordering, missing defaults or runtime provider state is guessed.
         """
-        state = self.ppb_state()
+        state = self.ppb_state() if state is None else state
         capsules = state.get("capsules", [])
         if not isinstance(capsules, list):
             raise ValueError(t("ppbw.transfer"))
@@ -160,7 +179,7 @@ class WorkspaceMixin:
             raise ValueError(t("ppbw.transfer"))
         capsule = matches[0]
         geometry = capsule.get("geometry")
-        if capsule.get("transfer_supported") is not True or capsule.get("frame") != "body-local" or not isinstance(geometry, dict):
+        if capsule.get("geometry_supported") is not True or capsule.get("frame") != "body-local" or not isinstance(geometry, dict):
             raise ValueError(t("ppbw.transfer"))
         fields = {field["id"]: field for field in state["fields"]}
         ids = []
@@ -172,12 +191,65 @@ class WorkspaceMixin:
         ids.append(geometry.get("radius"))
         if (any(not isinstance(ident, str) or ident not in fields for ident in ids)
                 or len(set(ids)) != 7
-                or any(fields[ident].get("editable", True) is False for ident in ids)):
+                or any(fields[ident].get("editable", True) is False or fields[ident].get("active") is not True for ident in ids)):
             raise ValueError(t("ppbw.transfer"))
-        values = [fields[ident]["value"] for ident in ids]
+        values = [self._ppb_value(fields[ident]["value"]) for ident in ids]
         if values[-1] <= 0:
             raise ValueError(t("ppbw.transfer"))
         return ids, values
+
+    def ppb_link(self, capsule_id, bone, index):
+        """Explicitly bind one current source record to an existing editable NIF capsule."""
+        _, values = self._ppb_geometry(capsule_id)
+        self._require_rig()
+        candidate = copy.deepcopy(self.rig)
+        candidate.set_capsule(bone, index, {"p1": values[:3], "p2": values[3:6], "radius": values[6]})
+        self.rig = candidate
+        self._ppb_binding = {"capsule": capsule_id, "bone": bone, "index": int(index)}
+        return self.ppb_state()
+
+    def ppb_unlink(self):
+        """Detach the live binding while retaining both owners' current edits."""
+        self._ppb_binding = None
+        return self.ppb_state()
+
+    def _ppb_target(self, bone, index):
+        binding = getattr(self, "_ppb_binding", None)
+        return bool(binding and binding["bone"] == bone and binding["index"] == index)
+
+    def _ppb_edit_collider(self, bone, index, changes=None, delta=None):
+        """Stage both owners; only the explicitly edited geometry spans are written back."""
+        binding = self._ppb_binding
+        ids, _ = self._ppb_geometry(binding["capsule"])
+        rig, owner = copy.deepcopy(self.rig), copy.deepcopy(self._ppb_owner())
+        if delta is None:
+            result = rig.set_capsule(bone, index, changes)
+            for key in ("p1", "p2", "radius"):
+                if key in changes:
+                    raw = [changes[key]] if key == "radius" else changes[key]
+                    for value in raw:
+                        self._ppb_value(float(value))
+            touched = set(changes)
+        else:
+            result = rig.translate(bone, index, delta)
+            # Check before float32 rounding too: an underflow must not silently become zero.
+            for value in delta:
+                self._ppb_value(float(value))
+            previous = self.rig._editor_capsule(bone, index)
+            offset = rig._editor_vector(delta, "delta")
+            for endpoint in (previous.p1, previous.p2):
+                for value, displacement in zip(endpoint, offset):
+                    self._ppb_value(float(value) + float(displacement))
+            touched = {"p1", "p2"}
+        values = [self._ppb_value(value) for value in result["p1"] + result["p2"] + [result["radius"]]]
+        if values[-1] <= 0:
+            raise ValueError(t("ppbw.transfer"))
+        for key, indices in (("p1", range(3)), ("p2", range(3, 6)), ("radius", (6,))):
+            if key in touched:
+                for number in indices:
+                    owner.set(ids[number], values[number])
+        self.rig, self._ppb_workspace = rig, owner
+        return result
 
     def ppb_to_collider(self, capsule_id, bone, index):
         """Copy explicit source geometry to one user-selected existing NIF capsule."""
@@ -195,14 +267,10 @@ class WorkspaceMixin:
         if cap["radius"] <= 0:
             raise ValueError(t("ppbw.transfer"))
         values = [self._ppb_value(value) for value in cap["p1"] + cap["p2"] + [cap["radius"]]]
-        owner = self._ppb_owner()
-        before = copy.deepcopy(owner)
-        try:
-            for ident, value in zip(ids, values):
-                owner.set(ident, value)
-        except Exception:
-            self._ppb_workspace = before
-            raise
+        owner = copy.deepcopy(self._ppb_owner())
+        for ident, value in zip(ids, values):
+            owner.set(ident, value)
+        self._ppb_commit_source(owner, set(ids))
         return self.ppb_state()
 
     def workspace_replay(self, actions):
@@ -212,6 +280,7 @@ class WorkspaceMixin:
             "physics_replace": (1, 1), "physics_set": (2, 2),
             "ppb_replace": (1, 1), "ppb_set": (2, 2),
             "ppb_to_collider": (3, 3), "ppb_from_collider": (3, 3),
+            "ppb_link": (3, 3), "ppb_unlink": (0, 0),
             "collider_select": (1, 2), "collider_set": (3, 3),
             "collider_translate": (3, 3), "collider_add": (4, 4),
             "collider_remove": (1, 2), "collider_reset": (0, 0),
@@ -230,12 +299,14 @@ class WorkspaceMixin:
         # Preserve all editable owners if a later action is invalid.
         before = (copy.deepcopy(self.rig), copy.deepcopy(getattr(self, "_physics_workspace", None)),
                   self.workspace_state(), copy.deepcopy(getattr(self, "_workspace_tabs", {})), self._placements.mode,
-                  self.view.colliders, self.view.bumper, copy.deepcopy(getattr(self, "_ppb_workspace", None)))
+                  self.view.colliders, self.view.bumper, copy.deepcopy(getattr(self, "_ppb_workspace", None)),
+                  copy.deepcopy(getattr(self, "_ppb_binding", None)))
         try:
             for action in actions:
                 getattr(self, action["method"])(*action["args"])
         except Exception:
-            self.rig, physics, state, tabs, placement_mode, colliders, bumper, ppb = before
+            self.rig, physics, state, tabs, placement_mode, colliders, bumper, ppb, binding = before
+            self._ppb_binding = binding
             if physics is None:
                 self.__dict__.pop("_physics_workspace", None)
             else:

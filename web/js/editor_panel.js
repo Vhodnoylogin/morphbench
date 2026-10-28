@@ -28,6 +28,7 @@ class EditorPanel {
       const cap=this.bench.collider_edit_state().capsules[Number(this.capsuleSelect.value)];if(cap)this.app.invoke("collider_select",cap.bone,cap.index);
     }}});section.appendChild(this.capsuleSelect);
     section.appendChild(el("p",{class:"muted",text:T.edFrame}));
+    this.ppbEditStatus=el("p",{class:"ppb-binding",hidden:true});section.appendChild(this.ppbEditStatus);
     this.capsuleFields={};
     for(const [key,label] of [["p1",T.edP1],["p2",T.edP2],["radius",T.edRadius]]) {
       const count=key==="radius"?1:3,fields=[];
@@ -37,7 +38,11 @@ class EditorPanel {
     }
     this.apply=this.button(T.edApply,()=>{
       const cap=this.selected();if(!cap)return;
-      const changes={};for(const key of ["p1","p2","radius"]) {const values=this.capsuleFields[key].map((field)=>field.value.trim()===""?NaN:Number(field.value));changes[key]=key==="radius"?values[0]:values;}
+      const changes={};for(const key of ["p1","p2","radius"]) {
+        const values=this.capsuleFields[key].map((field)=>field.value.trim()===""?NaN:Number(field.value));
+        if(key==="radius") {if(values[0]!==cap.radius)changes.radius=values[0];}
+        else if(values.some((value,index)=>value!==cap[key][index]))changes[key]=values;
+      }
       this.app.invoke("collider_set",cap.bone,cap.index,changes);
     });
     this.duplicate=this.button(T.edAdd,()=>{const cap=this.selected();if(cap)this.app.invoke("collider_add",cap.bone,cap.p1,cap.p2,cap.radius);});
@@ -59,7 +64,7 @@ class EditorPanel {
       const recipe=placementParseJSON(await file.text());
       if(recipe.format!=="morphbench-workspace"||recipe.version!==1) throw Error(T.edInvalid);
       if(!Array.isArray(recipe.actions))throw Error(T.edInvalid);
-      if(recipe.actions.some((action)=>String(action.method).startsWith("collider_")||["ppb_to_collider","ppb_from_collider"].includes(action.method))&&JSON.stringify(recipe.source)!==JSON.stringify(DATA.source)) throw Error(T.edStale);
+      if(recipe.actions.some((action)=>String(action.method).startsWith("collider_")||["ppb_to_collider","ppb_from_collider","ppb_link"].includes(action.method))&&JSON.stringify(recipe.source)!==JSON.stringify(DATA.source)) throw Error(T.edStale);
       this.app.invoke("workspace_replay",recipe.actions);
     }catch(error){this.fail(error);}
   }
@@ -83,6 +88,11 @@ class EditorPanel {
       if(this.ppbTarget.value!==""&&cap)this.app.invoke("collider_select",cap.bone,cap.index);
     }}});
     section.appendChild(el("label",{class:"slot-field"},[T.edPpbTarget,this.ppbTarget]));
+    this.ppbLink=this.button(T.edPpbLink,()=>{const cap=this.selected();if(cap)this.app.invoke("ppb_link",this.ppbGroup.value,cap.bone,cap.index);});
+    this.ppbUnlink=this.button(T.edPpbUnlink,()=>this.app.invoke("ppb_unlink"));
+    section.appendChild(el("div",{class:"row editor-actions"},[this.ppbLink,this.ppbUnlink]));
+    this.ppbLinkStatus=el("p",{class:"ppb-binding",hidden:true});section.appendChild(this.ppbLinkStatus);
+    section.appendChild(el("details",null,[el("summary",{text:T.edPpbLinkHelpTitle}),el("p",{class:"muted",text:T.edPpbLinkHelp})]));
     this.ppbFields=el("div",{class:"physics-fields"});section.appendChild(this.ppbFields);
     const transfer=(method)=>{const cap=this.selected();if(cap)this.app.invoke(method,this.ppbGroup.value,cap.bone,cap.index);};
     this.ppbTo=this.button(T.edPpbTo,()=>transfer("ppb_to_collider"));
@@ -122,7 +132,10 @@ class EditorPanel {
       collider.capsules.forEach((cap,index)=>this.ppbTarget.appendChild(el("option",{value:String(index),text:cap.bone+" · "+cap.index})));
       this.ppbTarget.dataset.signature=targetSignature;
     }
-    const selected=this.selected(),targetIndex=selected?collider.capsules.findIndex((cap)=>cap.bone===selected.bone&&cap.index===selected.index):-1;
+    const binding=state.binding,selected=this.selected(),target=binding||selected;
+    if(binding)this.ppbGroup.value=binding.capsule;
+    this.ppbGroup.disabled=!!binding;this.ppbTarget.disabled=!!binding;
+    const targetIndex=target?collider.capsules.findIndex((cap)=>cap.bone===target.bone&&cap.index===target.index):-1;
     this.ppbTarget.value=targetIndex<0?"":String(targetIndex);
     const cap=capsules.find((item)=>item.id===this.ppbGroup.value),fields=(state.fields||[]).filter((field)=>cap&&field.group===cap.id),fieldSignature=JSON.stringify(fields.map((field)=>[field.id,field.label]));
     if(this.ppbFieldSignature!==fieldSignature) {
@@ -136,6 +149,16 @@ class EditorPanel {
     for(const field of fields){const input=this.ppbInputs.get(field.id);if(input!==document.activeElement)input.value=String(field.value);}
     this.ppbTo.disabled=!cap||!cap.transfer_supported||!selected||!selected.editable;
     this.ppbFrom.disabled=!cap||!cap.transfer_supported||!selected;
+    this.ppbLink.disabled=!!binding||!cap||!cap.transfer_supported||!selected||!selected.editable;
+    this.ppbUnlink.disabled=!binding;
+    this.ppbLink.hidden=!!binding;this.ppbUnlink.hidden=!binding;
+    if(binding) {
+      const record=capsules.find((item)=>item.id===binding.capsule);
+      const text=say(T.edPpbLinked,{record:record?record.slot+(record.index?" · C"+record.index:" · 0"):binding.capsule,bone:binding.bone,index:binding.index});
+      this.ppbLinkStatus.textContent=this.ppbEditStatus.textContent=text;
+    }
+    this.ppbLinkStatus.hidden=this.ppbEditStatus.hidden=!binding;
+    if(binding){this.ppbTo.disabled=true;this.ppbFrom.disabled=true;}
     this.ppbNote.textContent=state.document?Array.from(new Set((state.warnings||[]).filter((warning)=>!warning.group||(cap&&warning.group===cap.id)).map((warning)=>warning.message||warning.code))).join("\n"):T.edPpbEmpty;
     if(!this.ppbRawDirty)this.ppbSource.value=state.document?this.bench.ppb_export():"";
   }
@@ -170,7 +193,7 @@ class EditorPanel {
         const recipe=placementParseJSON(text);
         if(recipe.format!=="morphbench-workspace"||recipe.version!==1)throw Error(T.edInvalid);
         // A configuration workspace can travel without a mesh; capsule recipes still bind their original source.
-        const capsuleActions=recipe.actions.some((action)=>String(action.method).startsWith("collider_")||["ppb_to_collider","ppb_from_collider"].includes(action.method));
+        const capsuleActions=recipe.actions.some((action)=>String(action.method).startsWith("collider_")||["ppb_to_collider","ppb_from_collider","ppb_link"].includes(action.method));
         if(capsuleActions&&JSON.stringify(recipe.source)!==JSON.stringify(DATA.source))throw Error(T.edStale);
         this.app.invoke("workspace_replay",recipe.actions);return;
       }

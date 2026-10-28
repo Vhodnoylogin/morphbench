@@ -15,6 +15,31 @@ bone, transform coordinates between different bodies or create a missing list ch
 the source's `Enable` number remains separate; copying geometry does not activate a runtime
 override. The session retains the source document and numeric edits for replay.
 
+## Visual source editing
+
+Select a complete PPB record and an editable NIF capsule, then choose **Link these records for
+visual editing**. Linking starts by copying that record's geometry into the selected capsule
+in the working copy. The banner names both ends of the link; it does not claim that PPB would
+choose this capsule in the game. Only one link is active at a time.
+
+Move the linked capsule with Shift + left-drag, or drag its centre handle. These moves update
+the six endpoint fields in the source. The capsule editor can also change the endpoints and
+radius; editing the active PPB geometry fields updates the capsule immediately. A radius-only
+edit leaves the other numeric spans untouched. `Enable`, earlier duplicate assignments and
+unrelated records remain separate. The link requires a positive radius and representable
+provider values; a rejected edit leaves both text and geometry unchanged.
+
+**Unlink and keep edits** ends synchronization without discarding changes. A successful source
+or skeleton replacement, capsule reset, fitting, duplication or removal also ends the link;
+it cannot silently move to a renumbered list child. Editing a different capsule does not alter
+the linked record. A workspace recipe restores the final values and explicit link, bound to
+the original skeleton identity. Export the edited tuning and, if wanted, the scratch NIF to
+new files. Neither linking nor exporting changes installed mod files.
+
+For automation, the same facade methods are `ppb_link(capsuleId,bone,index)` and `ppb_unlink()`.
+`ppb_state().binding` is null or `{capsule,bone,index}`. While linked, ordinary `ppb_set`,
+`collider_set` and `collider_translate` keep the two owners synchronized atomically.
+
 ## Supported source subset
 
 The adapter recognizes the case-sensitive form

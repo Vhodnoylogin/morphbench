@@ -608,7 +608,7 @@ python mb.py serve --stop
 `--ppb-config PPB_tuning.txt` импортирует настройки PPB независимо от `--physics-config`.
 `--ppb-out new.txt` записывает изменённый текст в новый путь; `--session-out edits.json`
 сохраняет исходник и действия. Воспроизведение: `--recipe edits.json --ppb-out another.txt`.
-`--action` принимает `ppb_replace`, `ppb_set`, `ppb_to_collider` и `ppb_from_collider` с теми же
+`--action` принимает `ppb_replace`, `ppb_set`, `ppb_to_collider`, `ppb_from_collider`, `ppb_link` и `ppb_unlink` с теми же
 аргументами, что [HTTP API](http.ru.md). Для переноса нужны явно выбранные записи и скелет;
 для правки текста меш и игра не нужны. Действуют прежние запреты перезаписи входных файлов.
 См. [границы PPB](ppb.ru.md) и [руководство редактора](workspace.ru.md).

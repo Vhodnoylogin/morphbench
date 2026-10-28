@@ -67,6 +67,9 @@ node/capsule framing, failed-load rollback, strict page/API JSON and startup err
 precedence, BOM and unsupported syntax. `test_ppb_workspace.py` exercises explicit transfers,
 source preservation, atomic document validation, native export isolation, CLI/HTTP replay and
 the actual browser mirror. Synthetic fixtures are used; game/runtime equivalence is not tested.
+`test_ppb_link.py` checks explicit bidirectional source links, active duplicate fields,
+atomic invalid-edit rejection, lifecycle detachment, independent capsules, recipe recovery
+and Python/actual-JS parity.
 
 ## Slots mode checks
 

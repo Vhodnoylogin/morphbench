@@ -584,7 +584,7 @@ def cmd_workspace(args) -> int:
         if (not isinstance(recipe, dict) or recipe.get("format") != "morphbench-workspace"
                 or recipe.get("version") != 1 or not isinstance(recipe.get("actions"), list)):
             raise ValueError(t("workspace.invalid", field="recipe"))
-        if any(str(action.get("method", "")).startswith("collider_") or action.get("method") in ("ppb_to_collider", "ppb_from_collider") for action in recipe["actions"] if isinstance(action, dict)):
+        if any(str(action.get("method", "")).startswith("collider_") or action.get("method") in ("ppb_to_collider", "ppb_from_collider", "ppb_link") for action in recipe["actions"] if isinstance(action, dict)):
             if recipe.get("source") != WebPage.source_identity(bench):
                 raise ValueError(t("workspace.stale"))
         actions += recipe["actions"]

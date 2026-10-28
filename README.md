@@ -20,7 +20,7 @@ the module contents and Git LFS were verified on 2026-10-03. The old local and r
 
 Development of the next collider/physics workspace continues on
 [`feature/collider-physics-ppb`](https://github.com/Vhodnoylogin/morphbench/tree/feature/collider-physics-ppb).
-It includes visual capsule editing, source-preserving [PPB tuning integration](docs/ppb.md)
+It includes visual capsule editing, bidirectional source-preserving [PPB tuning editing](docs/ppb.md)
 and the skeleton-only blank-page fix. These changes are not included in the public 0.7.1-r2 archive.
 
 ## Why this and not BodySlide

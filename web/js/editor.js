@@ -9,6 +9,11 @@ const editorVector = (value) => {
   return value.map(Math.fround);
 };
 const editorPoint = (matrix,point) => matrix.slice(0,3).map((row)=>row[0]*point[0]+row[1]*point[1]+row[2]*point[2]+row[3]);
+const editorPPBCopy = (owner) => {
+  const state=owner.ppb.state(),copy=new PhysicsWorkspaceMirror(null,DATA.physicsTexts||{},{max_chars:owner.bench.settings.physicsMaxChars,max_fields:owner.bench.settings.physicsMaxFields});
+  if(state.document){copy.replace(state.document);for(const [id,value] of Object.entries(state.edits||{}))copy.set(id,value);}
+  return copy;
+};
 function editorLocalDelta(matrix,world) {
   const a=matrix.slice(0,3).map((row)=>row.slice(0,3)),det=dot(a[0],cross(a[1],a[2]));
   if(!Number.isFinite(det)||Math.abs(det)<1e-10) editorError("frame");
@@ -54,6 +59,7 @@ class EditorState {
       this.ppb.replace(DATA.ppb.document);
       for(const [id,value] of Object.entries(DATA.ppb.edits||{}))this.ppb.set(id,value);
     }
+    this.binding=editorClone((DATA.ppb||{}).binding||null);
   }
   record(method,args) {
     const last=this.actions[this.actions.length-1];
@@ -85,7 +91,6 @@ class EditorState {
     if(this.state.available) {
       actions.push({method:"collider_reset",args:[]});
       actions.push(...editorClone(this.actions));
-      const selected=this.state.selected;actions.push({method:"collider_select",args:selected?[selected.bone,selected.index]:[null]});
     }
     if(physics.document) {
       actions.push({method:"physics_replace",args:[physics.document]});
@@ -96,6 +101,8 @@ class EditorState {
       actions.push({method:"ppb_replace",args:[ppb.document]});
       for(const [id,value] of Object.entries(ppb.edits||{}))actions.push({method:"ppb_set",args:[id,value]});
     }
+    if(this.binding)actions.push({method:"ppb_link",args:[this.binding.capsule,this.binding.bone,this.binding.index]});
+    if(this.state.available){const selected=this.state.selected;actions.push({method:"collider_select",args:selected?[selected.bone,selected.index]:[null]});}
     actions.push({method:"workspace_mode",args:[this.mode]},{method:"workspace_tab",args:[this.tabs[this.mode]||WORKSPACE_TABS[this.mode][0]]});
     return {format:"morphbench-workspace",version:1,source:DATA.source||null,actions};
   }
@@ -117,13 +124,14 @@ Object.assign(BenchMirror.prototype,{
     const next=editorClone(cap);
     for(const key of ["p1","p2"]) if(Object.hasOwn(changes,key)) next[key]=editorVector(changes[key]);
     if(Object.hasOwn(changes,"radius")) {if(typeof changes.radius!=="number"||!Number.isFinite(changes.radius)||!Number.isFinite(Math.fround(changes.radius))||changes.radius<0) editorError("radius");next.radius=changes.radius;}
-    owner.record("collider_set",[bone,index,changes]);Object.assign(cap,next);owner.state.selected={bone,index};owner.rebuild();return editorClone(cap);
+    const ppb=this._ppb_collider_source(bone,index,next,changes);
+    owner.record("collider_set",[bone,index,changes]);Object.assign(cap,next);if(ppb)owner.ppb=ppb;owner.state.selected={bone,index};owner.rebuild();return editorClone(cap);
   },
   collider_translate(bone,index,delta) {
     const owner=editorOwner(this),cap=owner.capsule(bone,index),vec=editorVector(delta);
-    const p1=editorVector(cap.p1.map((x,i)=>x+vec[i])),p2=editorVector(cap.p2.map((x,i)=>x+vec[i]));
-    owner.record("collider_set",[bone,index,{p1,p2}]);
-    cap.p1=p1;cap.p2=p2;owner.state.selected={bone,index};owner.rebuild();return editorClone(cap);
+    const p1=cap.p1.map((x,i)=>x+vec[i]),p2=cap.p2.map((x,i)=>x+vec[i]);
+    if(this._ppb_target(bone,index)){delta.forEach((value)=>this._ppb_value(value));p1.concat(p2).forEach((value)=>this._ppb_value(value));}
+    return this.collider_set(bone,index,{p1,p2});
   },
   collider_add(bone,p1,p2,radius) {
     const owner=editorOwner(this),body=owner.state.bodies.find((b)=>b.bone===bone&&b.editable);
@@ -131,15 +139,15 @@ Object.assign(BenchMirror.prototype,{
     if(typeof radius!=="number"||!Number.isFinite(radius)||!Number.isFinite(Math.fround(radius))||radius<0) editorError("radius");
     const index=Math.max(-1,...owner.state.capsules.filter((c)=>c.bone===bone).map((c)=>c.index))+1;
     owner.record("collider_add",[bone,p1,p2,radius]);
-    const cap={bone,index,p1,p2,radius,kind:body.kind,shapeKind:body.shapeKind,editable:true,changed:true};owner.state.capsules.push(cap);owner.state.selected={bone,index};owner.rebuild();return editorClone(cap);
+    const cap={bone,index,p1,p2,radius,kind:body.kind,shapeKind:body.shapeKind,editable:true,changed:true};owner.state.capsules.push(cap);owner.state.selected={bone,index};owner.binding=null;owner.rebuild();return editorClone(cap);
   },
   collider_remove(bone,index=0) {
     const owner=editorOwner(this);owner.capsule(bone,index);
     const caps=owner.state.capsules.filter((c)=>c.bone===bone);if(caps.length<=1) editorError("last capsule");
     owner.record("collider_remove",[bone,index]);owner.state.capsules=owner.state.capsules.filter((c)=>!(c.bone===bone&&c.index===index));
-    owner.state.capsules.filter((c)=>c.bone===bone).forEach((c,i)=>c.index=i);owner.state.selected={bone,index:0};owner.rebuild();return this.collider_edit_state();
+    owner.state.capsules.filter((c)=>c.bone===bone).forEach((c,i)=>c.index=i);owner.state.selected={bone,index:0};owner.binding=null;owner.rebuild();return this.collider_edit_state();
   },
-  collider_reset() {const owner=editorOwner(this);if(!owner.state.available)editorError("skeleton");owner.state=editorClone(owner.original);owner.actions=[];owner.rebuild();return this.collider_edit_state();},
+  collider_reset() {const owner=editorOwner(this);if(!owner.state.available)editorError("skeleton");owner.state=editorClone(owner.original);owner.actions=[];owner.binding=null;owner.rebuild();return this.collider_edit_state();},
   physics_replace(document) {if(!document||!["fsmp","cbpc"].includes(document.kind))editorError("document");return editorOwner(this).physics.replace(document);},
   physics_set(id,value) {return editorOwner(this).physics.set(id,value);},
   physics_state() {return editorOwner(this).physics.state();},
@@ -163,12 +171,28 @@ Object.assign(BenchMirror.prototype,{
         if(new Set(ids.filter((id)=>typeof id==="string")).size!==8||ids.some((id)=>typeof id!=="string"||!bindings.includes(id)))editorError("PPB binding");
       }
     }
-    editorOwner(this).ppb=candidate;return this.ppb_state();
+    const owner=editorOwner(this);owner.ppb=candidate;owner.binding=null;return this.ppb_state();
   },
-  _ppb_value(value) {if(typeof value!=="number"||!Number.isFinite(value)||Math.abs(value)>3.4028234663852886e38||(value!==0&&Math.fround(value)===0))editorError("PPB number");return value;},
-  ppb_set(id,value) {return editorOwner(this).ppb.set(id,this._ppb_value(value));},
+  _ppb_value(value) {if(typeof value!=="number"||!Number.isFinite(value)||Math.abs(value)>3.4028234663852886e38||(value!==0&&Math.fround(value)===0))editorOwner(this).ppb._fail("ppbw.float");return value;},
+  ppb_set(id,value) {
+    const owner=editorOwner(this),candidate=editorPPBCopy(owner);candidate.set(id,this._ppb_value(value));
+    this._ppb_commit_source(candidate,[id]);return this.ppb_state();
+  },
+  _ppb_commit_source(candidate,changedIds) {
+    const owner=editorOwner(this);
+    if(owner.binding){
+      const {ids}=this._ppb_geometry(owner.binding.capsule);
+      if(changedIds.some((id)=>ids.includes(id))){
+        const {values}=this._ppb_geometry(owner.binding.capsule,candidate.state()),{bone,index}=owner.binding,cap=owner.capsule(bone,index);
+        const changes={p1:editorVector(values.slice(0,3)),p2:editorVector(values.slice(3,6)),radius:values[6]};
+        owner.record("collider_set",[bone,index,changes]);Object.assign(cap,changes);owner.state.selected={bone,index};owner.rebuild();
+      }
+    }
+    owner.ppb=candidate;
+  },
   ppb_state() {
-    const state=editorOwner(this).ppb.state(),fields=new Map(state.fields.map((field)=>[field.id,field.value]));
+    const owner=editorOwner(this),state=owner.ppb.state(),fields=new Map(state.fields.map((field)=>[field.id,field.value]));
+    state.binding=editorClone(owner.binding);
     for(const cap of state.capsules||[]) {
       if(!cap||typeof cap!=="object")continue;
       const geometry=cap.geometry,ids=geometry&&Array.isArray(geometry.p1)&&Array.isArray(geometry.p2)?geometry.p1.concat(geometry.p2,[geometry.radius]):[];
@@ -177,39 +201,55 @@ Object.assign(BenchMirror.prototype,{
     return state;
   },
   ppb_export() {return editorOwner(this).ppb.export_text();},
-  _ppb_geometry(capsuleId) {
-    const state=this.ppb_state(),matches=(Array.isArray(state.capsules)?state.capsules:[]).filter((item)=>item&&item.id===capsuleId);
-    if(matches.length!==1)editorError("PPB capsule");
+  _ppb_geometry(capsuleId,state=this.ppb_state()) {
+    const matches=(Array.isArray(state.capsules)?state.capsules:[]).filter((item)=>item&&item.id===capsuleId);
+    if(matches.length!==1)editorOwner(this).ppb._fail("ppbw.transfer");
     const capsule=matches[0],geometry=capsule.geometry;
-    if(capsule.transfer_supported!==true||capsule.frame!=="body-local"||!geometry||!Array.isArray(geometry.p1)||geometry.p1.length!==3||!Array.isArray(geometry.p2)||geometry.p2.length!==3)editorError("PPB geometry");
+    if(capsule.geometry_supported!==true||capsule.frame!=="body-local"||!geometry||!Array.isArray(geometry.p1)||geometry.p1.length!==3||!Array.isArray(geometry.p2)||geometry.p2.length!==3)editorOwner(this).ppb._fail("ppbw.transfer");
     const ids=geometry.p1.concat(geometry.p2,[geometry.radius]),fields=new Map(state.fields.map((field)=>[field.id,field]));
-    if(new Set(ids).size!==7||ids.some((id)=>typeof id!=="string"||!fields.has(id)||fields.get(id).editable===false))editorError("PPB fields");
-    const values=ids.map((id)=>fields.get(id).value);if(values[6]<=0)editorError("PPB radius");
+    if(new Set(ids).size!==7||ids.some((id)=>typeof id!=="string"||!fields.has(id)||fields.get(id).editable===false||fields.get(id).active!==true))editorOwner(this).ppb._fail("ppbw.transfer");
+    const values=ids.map((id)=>this._ppb_value(fields.get(id).value));if(values[6]<=0)editorOwner(this).ppb._fail("ppbw.transfer");
     return {ids,values};
+  },
+  ppb_link(capsuleId,bone,index) {
+    const {values}=this._ppb_geometry(capsuleId),owner=editorOwner(this),cap=owner.capsule(bone,index),changes={p1:editorVector(values.slice(0,3)),p2:editorVector(values.slice(3,6)),radius:values[6]};
+    owner.record("collider_set",[bone,index,changes]);Object.assign(cap,changes);owner.state.selected={bone,index};owner.binding={capsule:capsuleId,bone,index};owner.rebuild();return this.ppb_state();
+  },
+  ppb_unlink() {editorOwner(this).binding=null;return this.ppb_state();},
+  _ppb_target(bone,index) {const binding=editorOwner(this).binding;return !!binding&&binding.bone===bone&&binding.index===index;},
+  _ppb_collider_source(bone,index,next,changes) {
+    if(!this._ppb_target(bone,index))return null;
+    const owner=editorOwner(this),{ids}=this._ppb_geometry(owner.binding.capsule),candidate=editorPPBCopy(owner),values=next.p1.concat(next.p2,[next.radius]).map((value)=>this._ppb_value(value));
+    if(values[6]<=0)owner.ppb._fail("ppbw.transfer");
+    for(const [key,indices] of [["p1",[0,1,2]],["p2",[3,4,5]],["radius",[6]]])if(Object.hasOwn(changes,key)){
+      (key==="radius"?[changes[key]]:changes[key]).forEach((value)=>this._ppb_value(value));
+      indices.forEach((i)=>candidate.set(ids[i],values[i]));
+    }
+    return candidate;
   },
   ppb_to_collider(capsuleId,bone,index) {const {values}=this._ppb_geometry(capsuleId);return this.collider_set(bone,index,{p1:values.slice(0,3),p2:values.slice(3,6),radius:values[6]});},
   ppb_from_collider(capsuleId,bone,index) {
     const {ids}=this._ppb_geometry(capsuleId),owner=editorOwner(this),cap=owner.capsule(bone,index,false),values=cap.p1.concat(cap.p2,[cap.radius]).map((value)=>this._ppb_value(value));
     if(cap.radius<=0)editorError("PPB radius");
-    const before=owner.ppb.state();
-    try {ids.forEach((id,i)=>owner.ppb.set(id,values[i]));}
-    catch(error){owner.ppb.replace(before.document);for(const [id,value] of Object.entries(before.edits||{}))owner.ppb.set(id,value);throw error;}
+    const candidate=editorPPBCopy(owner);ids.forEach((id,i)=>candidate.set(id,values[i]));
+    this._ppb_commit_source(candidate,ids);
     return this.ppb_state();
   },
   workspace_recipe() {return editorOwner(this).recipe();},
   workspace_replay(actions) {
-    const allowed={workspace_mode:[1,1],workspace_tab:[1,1],physics_replace:[1,1],physics_set:[2,2],ppb_replace:[1,1],ppb_set:[2,2],ppb_to_collider:[3,3],ppb_from_collider:[3,3],collider_select:[1,2],collider_set:[3,3],collider_translate:[3,3],collider_add:[4,4],collider_remove:[1,2],collider_reset:[0,0]};
+    const allowed={workspace_mode:[1,1],workspace_tab:[1,1],physics_replace:[1,1],physics_set:[2,2],ppb_replace:[1,1],ppb_set:[2,2],ppb_link:[3,3],ppb_unlink:[0,0],ppb_to_collider:[3,3],ppb_from_collider:[3,3],collider_select:[1,2],collider_set:[3,3],collider_translate:[3,3],collider_add:[4,4],collider_remove:[1,2],collider_reset:[0,0]};
     if(!Array.isArray(actions)||actions.length>this.settings.workspaceActionLimit) editorError("actions");
     for(const action of actions) {
       if(!action||Object.keys(action).sort().join()!=="args,method"||!Object.hasOwn(allowed,action.method)||!Array.isArray(action.args)) editorError("action");
       const range=allowed[action.method];if(action.args.length<range[0]||action.args.length>range[1]) editorError("arguments");
     }
-    const owner=editorOwner(this),before={state:editorClone(owner.state),actions:editorClone(owner.actions),mode:owner.mode,tabs:editorClone(owner.tabs),physics:owner.physics.state(),ppb:owner.ppb.state(),placementMode:this.placements.mode,colliders:this.view.colliders,bumper:this.view.bumper};
+    const owner=editorOwner(this),before={state:editorClone(owner.state),actions:editorClone(owner.actions),mode:owner.mode,tabs:editorClone(owner.tabs),physics:owner.physics.state(),ppb:owner.ppb.state(),binding:editorClone(owner.binding),placementMode:this.placements.mode,colliders:this.view.colliders,bumper:this.view.bumper};
     try {for(const action of actions) this[action.method](...action.args);}
     catch(error) {
-      Object.assign(owner,{state:before.state,actions:before.actions,mode:before.mode,tabs:before.tabs});
-      owner.physics=new PhysicsWorkspaceMirror(null,DATA.physicsTexts||{});if(before.physics.document) {owner.physics.replace(before.physics.document);for(const [id,value] of Object.entries(before.physics.edits||{})) owner.physics.set(id,value);}
-      owner.ppb=new PhysicsWorkspaceMirror(null,DATA.physicsTexts||{});if(before.ppb.document){owner.ppb.replace(before.ppb.document);for(const [id,value] of Object.entries(before.ppb.edits||{}))owner.ppb.set(id,value);}
+      Object.assign(owner,{state:before.state,actions:before.actions,mode:before.mode,tabs:before.tabs,binding:before.binding});
+      const limits={max_chars:this.settings.physicsMaxChars,max_fields:this.settings.physicsMaxFields};
+      owner.physics=new PhysicsWorkspaceMirror(null,DATA.physicsTexts||{},limits);if(before.physics.document) {owner.physics.replace(before.physics.document);for(const [id,value] of Object.entries(before.physics.edits||{})) owner.physics.set(id,value);}
+      owner.ppb=new PhysicsWorkspaceMirror(null,DATA.physicsTexts||{},limits);if(before.ppb.document){owner.ppb.replace(before.ppb.document);for(const [id,value] of Object.entries(before.ppb.edits||{}))owner.ppb.set(id,value);}
       this.slots_mode(before.placementMode);this.view.colliders=before.colliders;this.view.bumper=before.bumper;owner.rebuild();throw error;
     }
     return this.workspace_state();

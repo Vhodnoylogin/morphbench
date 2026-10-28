@@ -18,6 +18,11 @@ The project was extracted from Skyrim-Mods on 2026-10-02. All 42 retained histor
 the module contents and Git LFS were verified on 2026-10-03. The old local and remote
 `Skyrim-Mods/morphbench` branches were deleted after verification; historical checkouts remain.
 
+Development of the next collider/physics workspace continues on
+[`feature/collider-physics-ppb`](https://github.com/Vhodnoylogin/morphbench/tree/feature/collider-physics-ppb).
+It includes visual capsule editing, source-preserving [PPB tuning integration](docs/ppb.md)
+and the skeleton-only blank-page fix. These changes are not included in the public 0.7.1-r2 archive.
+
 ## Why this and not BodySlide
 
 **BodySlide builds the body; morphbench checks it.** BodySlide is where sliders are authored and

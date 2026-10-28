@@ -602,6 +602,16 @@ back to the file.
 
 The full list is in the comments of `morphbench/config.py`, which are the authority.
 
+## `workspace`: collider and source editing
+
+Use `--ppb-config PPB_tuning.txt` to import PPB tuning independently of `--physics-config`.
+`--ppb-out new.txt` writes edited PPB text to a new path; `--session-out edits.json` preserves
+source and actions. Replay via `--recipe edits.json --ppb-out another.txt`. `--action` accepts
+`ppb_replace`, `ppb_set`, `ppb_to_collider` and `ppb_from_collider`, with the same arguments as
+the [HTTP workspace](http.md). Transfers require explicitly chosen records and a skeleton;
+source-only edits need neither mesh nor game. Existing input/output guards apply.
+See [PPB scope](ppb.md) and the [workspace guide](workspace.md).
+
 ## `slots`: offline anchor placement authoring
 
 `python mb.py slots --project author.json --recipe session.json --out edited.json --package edited.bslots --json` replays the same named `slots_*` facade actions used by the Slots UI. `--action` accepts one `{method,args}` JSON object and may be repeated. `--provider` starts a new empty project when no author JSON is supplied. An optional mesh and `--skeleton` enable numerical reference-pose preview; authoring/export needs neither. JSON output contains `{project,effective,preview,saved}`. Author JSON and packages contain author defaults; recipe overrides affect only the effective offline preview. Outputs must be new files and cannot overwrite inputs. See [slots.md](slots.md) for actions and limits.

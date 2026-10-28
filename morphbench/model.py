@@ -350,6 +350,8 @@ class BodyModel:
         return sorted(seen)
 
     def bounds(self) -> tuple[np.ndarray, np.ndarray]:
+        if not self.vertex_count:
+            return np.zeros(3, np.float32), np.zeros(3, np.float32)
         lo = np.array([np.inf] * 3, np.float32)
         hi = np.array([-np.inf] * 3, np.float32)
         for s in self.shapes.values():

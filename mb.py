@@ -571,12 +571,20 @@ def cmd_workspace(args) -> int:
                                   max_chars=int(bench.cfg["physicsMaxChars"]),
                                   max_fields=int(bench.cfg["physicsMaxFields"]))
         actions.append({"method": "physics_replace", "args": [document]})
+    if args.ppb_config:
+        raw = Path(args.ppb_config).read_bytes()
+        if len(raw) > int(bench.cfg["physicsMaxChars"]) * 4:
+            raise ValueError(t("workspace.large"))
+        document = parse_document("ppb", raw.decode("utf-8"),
+                                  max_chars=int(bench.cfg["physicsMaxChars"]),
+                                  max_fields=int(bench.cfg["physicsMaxFields"]))
+        actions.append({"method": "ppb_replace", "args": [document]})
     if args.recipe:
         recipe = body_slots.read_project(args.recipe)
         if (not isinstance(recipe, dict) or recipe.get("format") != "morphbench-workspace"
                 or recipe.get("version") != 1 or not isinstance(recipe.get("actions"), list)):
             raise ValueError(t("workspace.invalid", field="recipe"))
-        if any(str(action.get("method", "")).startswith("collider_") for action in recipe["actions"] if isinstance(action, dict)):
+        if any(str(action.get("method", "")).startswith("collider_") or action.get("method") in ("ppb_to_collider", "ppb_from_collider") for action in recipe["actions"] if isinstance(action, dict)):
             if recipe.get("source") != WebPage.source_identity(bench):
                 raise ValueError(t("workspace.stale"))
         actions += recipe["actions"]
@@ -591,10 +599,12 @@ def cmd_workspace(args) -> int:
         if bench.physics_state()["document"] is None:
             raise ValueError(t("workspace.invalid", field="document"))
         documents.append((args.config_out, bench.physics_export().encode("utf-8")))
+    if args.ppb_out:
+        documents.append((args.ppb_out, bench.ppb_export().encode("utf-8")))
     if args.session_out:
         documents.append((args.session_out, (json.dumps(recipe, ensure_ascii=False, indent=2) + "\n").encode("utf-8")))
-    outputs = [value for value in (args.config_out, args.skeleton_out, args.session_out) if value]
-    inputs = [value for value in (args.nif, args.tri, args.skeleton, args.hkx, args.recipe, args.physics_config) if value]
+    outputs = [value for value in (args.config_out, args.ppb_out, args.skeleton_out, args.session_out) if value]
+    inputs = [value for value in (args.nif, args.tri, args.skeleton, args.hkx, args.recipe, args.physics_config, args.ppb_config) if value]
     canonical = lambda value: os.path.normcase(os.path.abspath(os.path.normpath(value)))
     if len({canonical(value) for value in outputs}) != len(outputs):
         raise ValueError(t("workspace.invalid", field="outputs"))
@@ -606,7 +616,7 @@ def cmd_workspace(args) -> int:
         saved.append(bench.collider_save(args.skeleton_out))
     saved += [body_slots.write_new(path, data, inputs) for path, data in documents]
     result = {"workspace": bench.workspace_state(), "colliders": bench.collider_editor_payload(),
-              "physics": bench.physics_state(), "envelopes": bench.physics_envelopes(), "saved": saved}
+              "physics": bench.physics_state(), "ppb": bench.ppb_state(), "envelopes": bench.physics_envelopes(), "saved": saved}
     print(json.dumps(result, ensure_ascii=False, indent=2))
     return 0
 
@@ -935,6 +945,8 @@ COMMANDS = (
     )),
     Command("workspace", "cli.cmd.workspace", cmd_workspace, mesh=MESH_OPTIONAL, args=(
         Arg("--physics-config", default=None, help_key="cli.opt.workspace.config"),
+        Arg("--ppb-config", default=None, help_key="cli.opt.workspace.ppbconfig"),
+        Arg("--ppb-out", default=None, help_key="cli.opt.workspace.ppbout"),
         Arg("--kind", choices=("fsmp", "cbpc"), default="fsmp", help_key="cli.opt.workspace.kind"),
         Arg("--recipe", default=None, help_key="cli.opt.workspace.recipe"),
         Arg("--action", action="append", default=[], help_key="cli.opt.workspace.action"),

@@ -47,7 +47,7 @@ class App {
     if (method.startsWith("slots_") && !["slots_project","slots_state","slots_effective","slots_preview","slots_meshes","slots_anchors","slots_validate","slots_session","slots_recipe","slots_variants","slots_variant_preset"].includes(method)) {
       this.refreshSlots();
     }
-    if ((method.startsWith("collider_") && !["collider_select","collider_edit_state"].includes(method)) || method === "workspace_replay") this.refreshColliders();
+    if ((method.startsWith("collider_") && !["collider_select","collider_edit_state"].includes(method)) || method === "ppb_to_collider" || method === "workspace_replay") this.refreshColliders();
     this.panel.refresh();
     if(this.editorPanel) this.editorPanel.refresh();
     if(this.workspace) this.workspace.refresh();

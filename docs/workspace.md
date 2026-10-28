@@ -36,6 +36,28 @@ it replays the recipe against the original skeleton and downloads a new NIF. Cap
 bind the skeleton's path and SHA-256, so a different or changed source is rejected. The same
 recipe can produce a new NIF through the CLI without a browser.
 
+## PPB capsule tuning
+
+In **Colliders → PPB**, open an existing `PPB_tuning.txt`. Choose a source capsule record
+and the target NIF capsule independently. Edit supported numeric fields, copy source geometry
+to the selected capsule, or move a capsule visually and copy its geometry back to the source.
+Neither import nor numeric source edits apply geometry implicitly. Copying preserves `Enable`;
+it does not activate an override. Download the edited tuning to a **new file** or retain the
+source and edits in a workspace recipe. Comments, unknown commands, duplicates and line endings
+are preserved. Incomplete or ambiguous source records cannot transfer geometry.
+
+The picture shows the NIF geometry or the manual values you copied into it. It does not resolve
+PPB's actor-specific rules, mirroring, auto-fit or runtime shape changes. See [PPB details](ppb.md)
+for the supported format, Hand child numbering and provider version reviewed.
+
+```text
+python mb.py workspace --ppb-config PPB_tuning.txt --ppb-out edited-tuning.txt --session-out edits.json
+```
+
+Opening a skeleton-only NIF from the model list now loads that exact file as a skeleton and
+shows its available capsules. A NIF without surface geometry no longer produces invalid page
+data. Explicitly associating another skeleton with an open body still preserves the body.
+
 ## Physics configuration
 
 In **Physics → Configuration**, open an existing **FSMP XML** or **CBPC TXT**. Raw XML/TXT

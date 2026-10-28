@@ -1,10 +1,25 @@
 "use strict";
 
 // ---- page data and the substitution of texts ----------------------------------------------
-const DATA = JSON.parse(document.getElementById("mb-data").textContent);
+const DATA = (() => {
+  const node = document.getElementById("mb-data");
+  try {
+    const data = JSON.parse(node.textContent);
+    if (!data || typeof data !== "object" || !data.texts || !data.settings || !data.names) {
+      throw new Error(node.getAttribute("data-startup-error"));
+    }
+    return data;
+  } catch (error) {
+    const box = document.getElementById("nogl");
+    box.style.display = "flex";
+    box.textContent = node.getAttribute("data-startup-error") + " " + (error.message || error);
+    console.error(error);
+    return null;
+  }
+})();
 // The page's texts arrive ready-made from the language catalogue: the script carries none of
 // them, and neither does the core.
-const T = DATA.texts;
+const T = DATA ? DATA.texts : {};
 // Substitution BY NAME, not by position: another language puts the words in another order.
 function say(text, values) {
   return String(text).replace(/%\((\w+)\)s/g, (whole, name) =>

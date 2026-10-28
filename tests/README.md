@@ -59,6 +59,15 @@ suites that have to write a real file are **skipped** with a reason - a skip doe
 a failure. A refusal from the PyNifly API itself while creating a file is a skip too, carrying
 the text of the exception: what is under test is the bench's reading, not PyNifly.
 
+## Skeleton and PPB checks
+
+`test_skeleton_open.py` covers exact standalone NIF identity, finite empty bounds, native
+node/capsule framing, failed-load rollback, strict page/API JSON and startup error display.
+`test_ppb_document.py` covers lossless PPB numeric spans, actual slot/child bounds, duplicate
+precedence, BOM and unsupported syntax. `test_ppb_workspace.py` exercises explicit transfers,
+source preservation, atomic document validation, native export isolation, CLI/HTTP replay and
+the actual browser mirror. Synthetic fixtures are used; game/runtime equivalence is not tested.
+
 ## Slots mode checks
 
 `test_slot_variants.py` covers three-layer variants, grouped spheres, explicit equal-valued fields, v1/v2 recovery and rejected-batch atomicity, source lifecycle, copied reads, unchanged authored bytes, explicit-only unbound presets and CLI editor roundtrips/output guards. Node executes the actual JS owner/facade and SlotsPanel handlers on synthetic data; this is not visual browser QA.

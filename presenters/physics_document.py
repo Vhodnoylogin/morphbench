@@ -29,6 +29,9 @@ def parse_document(kind, text, *, max_chars=2_000_000, max_fields=20_000):
     Limits are parser resource ceilings, configurable by the caller. IDs are source-order IDs,
     stable for the lifetime of this imported document, not names (which need not be unique).
     """
+    if isinstance(kind, str) and kind.lower() == "ppb":
+        from .ppb_document import parse_document as parse_ppb
+        return parse_ppb(text, max_chars=max_chars, max_fields=max_fields)
     aliases = {"xml": "fsmp", "smp": "fsmp", "fsmp": "fsmp", "txt": "cbpc", "cbpc": "cbpc"}
     if not isinstance(kind, str) or kind.lower() not in aliases:
         raise ValueError(t("physicsw.kind"))

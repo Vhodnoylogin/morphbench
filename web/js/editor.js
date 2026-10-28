@@ -1,7 +1,7 @@
 "use strict";
 // Numerical browser facade for mode and body-local capsule edits. Text formats
 // are recognized by the server adapter; this owner keeps normalized documents.
-const WORKSPACE_TABS = {morphs:["sliders","display"],colliders:["edit","display"],physics:["configuration","ranges"],slots:["author","display"]};
+const WORKSPACE_TABS = {morphs:["sliders","display"],colliders:["edit","ppb","display"],physics:["configuration","ranges"],slots:["author","display"]};
 const editorClone = (value) => JSON.parse(JSON.stringify(value));
 const editorError = (field) => { throw new Error(say(T["edInvalid"] || T.slotsInvalid,{field})); };
 const editorVector = (value) => {
@@ -49,6 +49,11 @@ class EditorState {
       this.physics.replace(DATA.physics.document);
       for(const [id,value] of Object.entries(DATA.physics.edits||{})) this.physics.set(id,value);
     }
+    this.ppb=new PhysicsWorkspaceMirror(null,DATA.physicsTexts||{},{max_chars:this.bench.settings.physicsMaxChars,max_fields:this.bench.settings.physicsMaxFields});
+    if(DATA.ppb&&DATA.ppb.document) {
+      this.ppb.replace(DATA.ppb.document);
+      for(const [id,value] of Object.entries(DATA.ppb.edits||{}))this.ppb.set(id,value);
+    }
   }
   record(method,args) {
     const last=this.actions[this.actions.length-1];
@@ -85,6 +90,11 @@ class EditorState {
     if(physics.document) {
       actions.push({method:"physics_replace",args:[physics.document]});
       for(const [id,value] of Object.entries(physics.edits||{})) actions.push({method:"physics_set",args:[id,value]});
+    }
+    const ppb=this.ppb.state();
+    if(ppb.document) {
+      actions.push({method:"ppb_replace",args:[ppb.document]});
+      for(const [id,value] of Object.entries(ppb.edits||{}))actions.push({method:"ppb_set",args:[id,value]});
     }
     actions.push({method:"workspace_mode",args:[this.mode]},{method:"workspace_tab",args:[this.tabs[this.mode]||WORKSPACE_TABS[this.mode][0]]});
     return {format:"morphbench-workspace",version:1,source:DATA.source||null,actions};
@@ -130,24 +140,76 @@ Object.assign(BenchMirror.prototype,{
     owner.state.capsules.filter((c)=>c.bone===bone).forEach((c,i)=>c.index=i);owner.state.selected={bone,index:0};owner.rebuild();return this.collider_edit_state();
   },
   collider_reset() {const owner=editorOwner(this);if(!owner.state.available)editorError("skeleton");owner.state=editorClone(owner.original);owner.actions=[];owner.rebuild();return this.collider_edit_state();},
-  physics_replace(document) {return editorOwner(this).physics.replace(document);},
+  physics_replace(document) {if(!document||!["fsmp","cbpc"].includes(document.kind))editorError("document");return editorOwner(this).physics.replace(document);},
   physics_set(id,value) {return editorOwner(this).physics.set(id,value);},
   physics_state() {return editorOwner(this).physics.state();},
   physics_export() {return editorOwner(this).physics.export_text();},
   physics_envelopes() {return editorOwner(this).physics.envelopes(this.slots_anchors());},
+  ppb_replace(document) {
+    if(!document||document.kind!=="ppb")editorError("document");
+    const candidate=new PhysicsWorkspaceMirror(null,DATA.physicsTexts||{},{max_chars:this.settings.physicsMaxChars,max_fields:this.settings.physicsMaxFields});
+    candidate.replace(document);
+    const normalized=candidate.state(),fields=new Map(normalized.fields.map((field)=>[field.id,field])),groups=new Set(normalized.groups.map((group)=>group.id)),seen=new Set();
+    for(const field of normalized.fields)this._ppb_value(field.value);
+    if(!Array.isArray(normalized.capsules))editorError("PPB capsules");
+    for(const cap of normalized.capsules) {
+      if(!cap||typeof cap!=="object"||typeof cap.id!=="string"||seen.has(cap.id)||!groups.has(cap.id)||typeof cap.geometry_supported!=="boolean"||!cap.fields||Array.isArray(cap.fields)||typeof cap.fields!=="object"||!cap.geometry||Array.isArray(cap.geometry)||typeof cap.geometry!=="object")editorError("PPB capsule");
+      seen.add(cap.id);
+      const bindings=Object.values(cap.fields),geometry=cap.geometry;
+      if(bindings.some((id)=>typeof id!=="string"||!fields.has(id)||fields.get(id).group!==cap.id||fields.get(id).active!==true))editorError("PPB binding");
+      if(["p1","p2"].some((key)=>!Array.isArray(geometry[key])||geometry[key].length!==3))editorError("PPB geometry");
+      if(cap.geometry_supported) {
+        const ids=geometry.p1.concat(geometry.p2,[geometry.radius,geometry.enabled]);
+        if(new Set(ids.filter((id)=>typeof id==="string")).size!==8||ids.some((id)=>typeof id!=="string"||!bindings.includes(id)))editorError("PPB binding");
+      }
+    }
+    editorOwner(this).ppb=candidate;return this.ppb_state();
+  },
+  _ppb_value(value) {if(typeof value!=="number"||!Number.isFinite(value)||Math.abs(value)>3.4028234663852886e38||(value!==0&&Math.fround(value)===0))editorError("PPB number");return value;},
+  ppb_set(id,value) {return editorOwner(this).ppb.set(id,this._ppb_value(value));},
+  ppb_state() {
+    const state=editorOwner(this).ppb.state(),fields=new Map(state.fields.map((field)=>[field.id,field.value]));
+    for(const cap of state.capsules||[]) {
+      if(!cap||typeof cap!=="object")continue;
+      const geometry=cap.geometry,ids=geometry&&Array.isArray(geometry.p1)&&Array.isArray(geometry.p2)?geometry.p1.concat(geometry.p2,[geometry.radius]):[];
+      cap.transfer_supported=cap.geometry_supported===true&&ids.length===7&&ids.every((id)=>typeof id==="string"&&fields.has(id))&&fields.get(ids[6])>0;
+    }
+    return state;
+  },
+  ppb_export() {return editorOwner(this).ppb.export_text();},
+  _ppb_geometry(capsuleId) {
+    const state=this.ppb_state(),matches=(Array.isArray(state.capsules)?state.capsules:[]).filter((item)=>item&&item.id===capsuleId);
+    if(matches.length!==1)editorError("PPB capsule");
+    const capsule=matches[0],geometry=capsule.geometry;
+    if(capsule.transfer_supported!==true||capsule.frame!=="body-local"||!geometry||!Array.isArray(geometry.p1)||geometry.p1.length!==3||!Array.isArray(geometry.p2)||geometry.p2.length!==3)editorError("PPB geometry");
+    const ids=geometry.p1.concat(geometry.p2,[geometry.radius]),fields=new Map(state.fields.map((field)=>[field.id,field]));
+    if(new Set(ids).size!==7||ids.some((id)=>typeof id!=="string"||!fields.has(id)||fields.get(id).editable===false))editorError("PPB fields");
+    const values=ids.map((id)=>fields.get(id).value);if(values[6]<=0)editorError("PPB radius");
+    return {ids,values};
+  },
+  ppb_to_collider(capsuleId,bone,index) {const {values}=this._ppb_geometry(capsuleId);return this.collider_set(bone,index,{p1:values.slice(0,3),p2:values.slice(3,6),radius:values[6]});},
+  ppb_from_collider(capsuleId,bone,index) {
+    const {ids}=this._ppb_geometry(capsuleId),owner=editorOwner(this),cap=owner.capsule(bone,index,false),values=cap.p1.concat(cap.p2,[cap.radius]).map((value)=>this._ppb_value(value));
+    if(cap.radius<=0)editorError("PPB radius");
+    const before=owner.ppb.state();
+    try {ids.forEach((id,i)=>owner.ppb.set(id,values[i]));}
+    catch(error){owner.ppb.replace(before.document);for(const [id,value] of Object.entries(before.edits||{}))owner.ppb.set(id,value);throw error;}
+    return this.ppb_state();
+  },
   workspace_recipe() {return editorOwner(this).recipe();},
   workspace_replay(actions) {
-    const allowed={workspace_mode:[1,1],workspace_tab:[1,1],physics_replace:[1,1],physics_set:[2,2],collider_select:[1,2],collider_set:[3,3],collider_translate:[3,3],collider_add:[4,4],collider_remove:[1,2],collider_reset:[0,0]};
+    const allowed={workspace_mode:[1,1],workspace_tab:[1,1],physics_replace:[1,1],physics_set:[2,2],ppb_replace:[1,1],ppb_set:[2,2],ppb_to_collider:[3,3],ppb_from_collider:[3,3],collider_select:[1,2],collider_set:[3,3],collider_translate:[3,3],collider_add:[4,4],collider_remove:[1,2],collider_reset:[0,0]};
     if(!Array.isArray(actions)||actions.length>this.settings.workspaceActionLimit) editorError("actions");
     for(const action of actions) {
       if(!action||Object.keys(action).sort().join()!=="args,method"||!Object.hasOwn(allowed,action.method)||!Array.isArray(action.args)) editorError("action");
       const range=allowed[action.method];if(action.args.length<range[0]||action.args.length>range[1]) editorError("arguments");
     }
-    const owner=editorOwner(this),before={state:editorClone(owner.state),actions:editorClone(owner.actions),mode:owner.mode,tabs:editorClone(owner.tabs),physics:owner.physics.state(),placementMode:this.placements.mode,colliders:this.view.colliders,bumper:this.view.bumper};
+    const owner=editorOwner(this),before={state:editorClone(owner.state),actions:editorClone(owner.actions),mode:owner.mode,tabs:editorClone(owner.tabs),physics:owner.physics.state(),ppb:owner.ppb.state(),placementMode:this.placements.mode,colliders:this.view.colliders,bumper:this.view.bumper};
     try {for(const action of actions) this[action.method](...action.args);}
     catch(error) {
       Object.assign(owner,{state:before.state,actions:before.actions,mode:before.mode,tabs:before.tabs});
       owner.physics=new PhysicsWorkspaceMirror(null,DATA.physicsTexts||{});if(before.physics.document) {owner.physics.replace(before.physics.document);for(const [id,value] of Object.entries(before.physics.edits||{})) owner.physics.set(id,value);}
+      owner.ppb=new PhysicsWorkspaceMirror(null,DATA.physicsTexts||{});if(before.ppb.document){owner.ppb.replace(before.ppb.document);for(const [id,value] of Object.entries(before.ppb.edits||{}))owner.ppb.set(id,value);}
       this.slots_mode(before.placementMode);this.view.colliders=before.colliders;this.view.bumper=before.bumper;owner.rebuild();throw error;
     }
     return this.workspace_state();

@@ -75,6 +75,15 @@ Skeleton download verifies the original skeleton path/hash and its current bytes
 the recipe on a copy. The endpoint returns bytes; it accepts no arbitrary output filesystem
 path. Save the result to a new file. Unsupported shapes remain read-only.
 
+For PPB, the same parser route accepts `{"kind":"ppb","text":"..."}`. Apply its normalized
+document with `ppb_replace`; edit existing fields with `ppb_set(fieldId,value)`. Choose both
+records explicitly for `ppb_to_collider(capsuleId,bone,index)` or
+`ppb_from_collider(capsuleId,bone,index)`. These methods are also allowlisted batch actions.
+`GET /api/workspace` includes separate `ppb` state and `ppbText` (null before import).
+Importing PPB does not change the skeleton or the independent FSMP/CBPC document. Source-only
+editing can run without a mesh. Capsule transfers require a loaded target rig; recipes bind
+its path/hash. See [PPB scope](ppb.md); runtime overrides are not resolved.
+
 ## Example
 
 ```python

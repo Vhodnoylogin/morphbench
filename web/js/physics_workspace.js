@@ -21,7 +21,7 @@ class PhysicsWorkspaceMirror {
     const plain=(value)=>value===null||typeof value==="string"||typeof value==="boolean"||
       (typeof value==="number"&&Number.isFinite(value))||(Array.isArray(value)&&value.every(plain))||
       (value&&Object.getPrototypeOf(value)===Object.prototype&&Object.values(value).every(plain));
-    if(!document||!plain(document)||typeof document.text!=="string"||!["fsmp","cbpc"].includes(document.kind)||
+    if(!document||!plain(document)||typeof document.text!=="string"||!["fsmp","cbpc","ppb"].includes(document.kind)||
       !Array.isArray(document.fields)||!["records","groups","warnings"].every((key)=>document[key]===undefined||Array.isArray(document[key])))this._fail("physicsw.document");
     const candidate=this._clone(document),source=Array.from(candidate.text),ids=new Set(),spans=[];
     if(source.length>this._maxChars||candidate.fields.length>this._maxFields)this._fail("physicsw.size");

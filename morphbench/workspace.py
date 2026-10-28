@@ -6,13 +6,14 @@ documents and never imports an XML/TXT presenter or runs a physics solver.
 from __future__ import annotations
 
 import copy
+import struct
 
 from .i18n import t
 
 
 WORKSPACE_TABS = {
     "morphs": ("sliders", "display"),
-    "colliders": ("edit", "display"),
+    "colliders": ("edit", "ppb", "display"),
     "physics": ("configuration", "ranges"),
     "slots": ("author", "display"),
 }
@@ -50,6 +51,8 @@ class WorkspaceMixin:
         return self._physics_workspace
 
     def physics_replace(self, document):
+        if not isinstance(document, dict) or document.get("kind") not in ("fsmp", "cbpc"):
+            raise ValueError(t("physicsw.document"))
         return self._physics_owner().replace(document)
 
     def physics_set(self, field_id, value):
@@ -64,11 +67,151 @@ class WorkspaceMixin:
     def physics_envelopes(self):
         return self._physics_owner().envelopes(self.slots_anchors())
 
+    def _ppb_owner(self):
+        """Separate source document; it is never applied to a skeleton implicitly."""
+        if not hasattr(self, "_ppb_workspace"):
+            from .physics_workspace import PhysicsWorkspace
+            self._ppb_workspace = PhysicsWorkspace(max_chars=int(self.cfg["physicsMaxChars"]),
+                                                   max_fields=int(self.cfg["physicsMaxFields"]))
+        return self._ppb_workspace
+
+    def ppb_replace(self, document):
+        if not isinstance(document, dict) or document.get("kind") != "ppb":
+            raise ValueError(t("physicsw.document"))
+        from .physics_workspace import PhysicsWorkspace
+        candidate = PhysicsWorkspace(max_chars=int(self.cfg["physicsMaxChars"]),
+                                     max_fields=int(self.cfg["physicsMaxFields"]))
+        candidate.replace(document)
+        normalized = candidate.state()
+        for field in normalized["fields"]:
+            self._ppb_value(field.get("value"))
+        capsules = normalized.get("capsules")
+        if not isinstance(capsules, list):
+            raise ValueError(t("physicsw.document"))
+        fields = {field["id"]: field for field in normalized["fields"]}
+        groups = {group["id"] for group in normalized["groups"]}
+        seen = set()
+        for cap in capsules:
+            if (not isinstance(cap, dict) or not isinstance(cap.get("id"), str)
+                    or cap["id"] in seen or cap["id"] not in groups
+                    or type(cap.get("geometry_supported")) is not bool
+                    or not isinstance(cap.get("fields"), dict) or not isinstance(cap.get("geometry"), dict)):
+                raise ValueError(t("physicsw.document"))
+            seen.add(cap["id"])
+            bindings = cap["fields"]
+            if any(not isinstance(ident, str) or ident not in fields
+                   or fields[ident].get("group") != cap["id"] or fields[ident].get("active") is not True
+                   for ident in bindings.values()):
+                raise ValueError(t("physicsw.document"))
+            geometry = cap["geometry"]
+            if any(not isinstance(geometry.get(key), list) or len(geometry[key]) != 3 for key in ("p1", "p2")):
+                raise ValueError(t("physicsw.document"))
+            if cap["geometry_supported"]:
+                ids = geometry["p1"] + geometry["p2"] + [geometry.get("radius"), geometry.get("enabled")]
+                if (len(set(ident for ident in ids if isinstance(ident, str))) != 8
+                        or any(not isinstance(ident, str) or ident not in bindings.values() for ident in ids)):
+                    raise ValueError(t("physicsw.document"))
+        self._ppb_workspace = candidate
+        return self.ppb_state()
+
+    @staticmethod
+    def _ppb_value(value):
+        from .physics_workspace import _finite
+        result = _finite(value)
+        # The provider's source scalar is an IEEE-754 float, not a user-adjustable limit.
+        if (abs(result) > float.fromhex("0x1.fffffep+127")
+                or result != 0 and struct.unpack("f", struct.pack("f", result))[0] == 0):
+            raise ValueError(t("ppbw.float"))
+        return result
+
+    def ppb_set(self, field_id, value):
+        return self._ppb_owner().set(field_id, self._ppb_value(value))
+
+    def ppb_state(self):
+        state = self._ppb_owner().state()
+        fields = {field["id"]: field["value"] for field in state["fields"]}
+        for cap in state.get("capsules", []):
+            if not isinstance(cap, dict):
+                continue
+            geometry = cap.get("geometry", {})
+            ids = (geometry.get("p1", []) + geometry.get("p2", []) + [geometry.get("radius")]
+                   if isinstance(geometry, dict) and isinstance(geometry.get("p1"), list)
+                   and isinstance(geometry.get("p2"), list) else [])
+            cap["transfer_supported"] = (cap.get("geometry_supported") is True and len(ids) == 7
+                                         and all(isinstance(ident, str) and ident in fields for ident in ids)
+                                         and fields[ids[-1]] > 0)
+        return state
+
+    def ppb_export(self):
+        return self._ppb_owner().export_text()
+
+    def _ppb_geometry(self, capsule_id):
+        """Validated generic field bindings supplied by the format adapter.
+
+        The user chooses a source group and a target capsule explicitly. No bone,
+        side, child ordering, missing defaults or runtime provider state is guessed.
+        """
+        state = self.ppb_state()
+        capsules = state.get("capsules", [])
+        if not isinstance(capsules, list):
+            raise ValueError(t("ppbw.transfer"))
+        matches = [item for item in capsules if isinstance(item, dict) and item.get("id") == capsule_id]
+        if len(matches) != 1:
+            raise ValueError(t("ppbw.transfer"))
+        capsule = matches[0]
+        geometry = capsule.get("geometry")
+        if capsule.get("transfer_supported") is not True or capsule.get("frame") != "body-local" or not isinstance(geometry, dict):
+            raise ValueError(t("ppbw.transfer"))
+        fields = {field["id"]: field for field in state["fields"]}
+        ids = []
+        for key in ("p1", "p2"):
+            vector = geometry.get(key)
+            if not isinstance(vector, list) or len(vector) != 3:
+                raise ValueError(t("ppbw.transfer"))
+            ids.extend(vector)
+        ids.append(geometry.get("radius"))
+        if (any(not isinstance(ident, str) or ident not in fields for ident in ids)
+                or len(set(ids)) != 7
+                or any(fields[ident].get("editable", True) is False for ident in ids)):
+            raise ValueError(t("ppbw.transfer"))
+        values = [fields[ident]["value"] for ident in ids]
+        if values[-1] <= 0:
+            raise ValueError(t("ppbw.transfer"))
+        return ids, values
+
+    def ppb_to_collider(self, capsule_id, bone, index):
+        """Copy explicit source geometry to one user-selected existing NIF capsule."""
+        _, values = self._ppb_geometry(capsule_id)
+        return self.collider_set(bone, index, {"p1": values[:3], "p2": values[3:6], "radius": values[6]})
+
+    def ppb_from_collider(self, capsule_id, bone, index):
+        """Copy selected NIF geometry to existing source spans, preserving every other byte."""
+        ids, _ = self._ppb_geometry(capsule_id)
+        state = self.collider_edit_state()
+        matches = [cap for cap in state["capsules"] if cap["bone"] == bone and cap["index"] == index]
+        if len(matches) != 1:
+            raise ValueError(t("ppbw.transfer"))
+        cap = matches[0]
+        if cap["radius"] <= 0:
+            raise ValueError(t("ppbw.transfer"))
+        values = [self._ppb_value(value) for value in cap["p1"] + cap["p2"] + [cap["radius"]]]
+        owner = self._ppb_owner()
+        before = copy.deepcopy(owner)
+        try:
+            for ident, value in zip(ids, values):
+                owner.set(ident, value)
+        except Exception:
+            self._ppb_workspace = before
+            raise
+        return self.ppb_state()
+
     def workspace_replay(self, actions):
         """Bounded allowlist; numerical calls only, never arbitrary attribute access."""
         allowed = {
             "workspace_mode": (1, 1), "workspace_tab": (1, 1),
             "physics_replace": (1, 1), "physics_set": (2, 2),
+            "ppb_replace": (1, 1), "ppb_set": (2, 2),
+            "ppb_to_collider": (3, 3), "ppb_from_collider": (3, 3),
             "collider_select": (1, 2), "collider_set": (3, 3),
             "collider_translate": (3, 3), "collider_add": (4, 4),
             "collider_remove": (1, 2), "collider_reset": (0, 0),
@@ -87,16 +230,20 @@ class WorkspaceMixin:
         # Preserve all editable owners if a later action is invalid.
         before = (copy.deepcopy(self.rig), copy.deepcopy(getattr(self, "_physics_workspace", None)),
                   self.workspace_state(), copy.deepcopy(getattr(self, "_workspace_tabs", {})), self._placements.mode,
-                  self.view.colliders, self.view.bumper)
+                  self.view.colliders, self.view.bumper, copy.deepcopy(getattr(self, "_ppb_workspace", None)))
         try:
             for action in actions:
                 getattr(self, action["method"])(*action["args"])
         except Exception:
-            self.rig, physics, state, tabs, placement_mode, colliders, bumper = before
+            self.rig, physics, state, tabs, placement_mode, colliders, bumper, ppb = before
             if physics is None:
                 self.__dict__.pop("_physics_workspace", None)
             else:
                 self._physics_workspace = physics
+            if ppb is None:
+                self.__dict__.pop("_ppb_workspace", None)
+            else:
+                self._ppb_workspace = ppb
             self._workspace_mode, self._workspace_tabs = state["mode"], tabs
             self.slots_mode(placement_mode)
             self.view.colliders = colliders

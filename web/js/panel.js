@@ -11,7 +11,7 @@ class WorkspaceUI {
     this.modes = [
       { id: "morphs", label: T.wsMorphs, note: T.wsMorphsNote, tabs: ["sliders", "display"],
         icon: ["M3 4h10M3 8h10M3 12h10", "M6 2v4M10 6v4M5 10v4"] },
-      { id: "colliders", label: T.wsColliders, note: T.wsCollidersNote, tabs: ["edit", "display"],
+      { id: "colliders", label: T.wsColliders, note: T.wsCollidersNote, tabs: ["edit", "ppb", "display"],
         icon: ["M5 3a3 3 0 0 1 5 0l3 6a3 3 0 0 1-5 3L3 6a3 3 0 0 1 2-3Z", "M4 5l7 6"] },
       { id: "physics", label: T.wsPhysics, note: T.wsPhysicsNote, tabs: ["configuration", "ranges"],
         icon: ["M8 1v3M8 12v3M1 8h3M12 8h3", "M11.5 4.5a5 5 0 1 1-7 7M5 6l3 2 3-5"] },
@@ -19,7 +19,7 @@ class WorkspaceUI {
         icon: ["M2 2h5v5H2zM9 2h5v5H9zM2 9h5v5H2zM9 9h5v5H9z"] },
     ];
     this.tabLabels = { sliders: T.wsSliders, display: T.wsDisplay, edit: T.wsEdit,
-      configuration: T.wsConfiguration, ranges: T.wsRanges, author: T.wsAuthor };
+      configuration: T.wsConfiguration, ranges: T.wsRanges, author: T.wsAuthor, ppb: T.edPpb };
     this.modeButtons = new Map();
     this.tabButtons = new Map();
     if (!this.modeNav || !this.tabNav) return;

@@ -73,7 +73,7 @@ class BenchMirror {
   // the core); with collidersFollowParts off, every bone counts.
   visible_collider_bones() {
     const bones = this.collider_bones();
-    if (!this.settings.collidersFollowParts) return bones;
+    if (!this.settings.collidersFollowParts || !this.is_open() || !this.summary.vertices) return bones;
     const held = new Set();
     for (const name of this.visible_shapes()) for (const b of this.shape(name).heldBones) held.add(b);
     return bones.filter((b) => held.has(b));
@@ -129,6 +129,10 @@ class BenchMirror {
     const clouds = shapes.map((shape) => this.deformed(shape.name));
     if(this.has_skeleton()&&(this.view.colliders||!clouds.length)) for(const mesh of this.collider_meshes()) clouds.push(mesh.pos);
     if(this.placements.mode === "slots") for(const mesh of this.slots_meshes()) clouds.push(new Float32Array(mesh.vertices.flat()));
+    if(!clouds.length&&this.placements.mode!=="slots"&&this.has_skeleton()) {
+      const points=Object.values(this.slots_anchors()).map((matrix)=>matrix.slice(0,3).map((row)=>row[3]));
+      if(points.length) clouds.push(new Float32Array(points.flat()));
+    }
     if (!clouds.length) throw new Error(T.errAllHidden);
     const lo = [Infinity, Infinity, Infinity], hi = [-Infinity, -Infinity, -Infinity];
     for (const p of clouds) {

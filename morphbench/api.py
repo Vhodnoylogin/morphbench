@@ -33,6 +33,7 @@ mod of their own.
 """
 from __future__ import annotations
 
+import copy
 import os
 from pathlib import Path
 
@@ -210,9 +211,12 @@ class MorphBench(WorkspaceMixin):
         collision capsules open together with the body. An empty string instead of a path means
         do not look.
         """
-        self.model = BodyModel.from_nif(nif, self.cfg)
+        # Read everything before publishing any of it. A malformed TRI or an unreadable
+        # skeleton must leave the previous model, edits, sliders and view usable.
+        model = BodyModel.from_nif(nif, self.cfg)
         path = Path(nif)
-        if tri is None:
+        standalone = not model.vertex_count
+        if tri is None and not standalone:
             stem = path.stem
             for suffix in ("_0", "_1"):
                 if stem.endswith(suffix):
@@ -220,14 +224,29 @@ class MorphBench(WorkspaceMixin):
                     break
             guess = path.with_name(stem + ".tri")
             tri = guess if file_exists(guess) else None
-        self.morph_set = MorphSet.from_file(tri, self.cfg) if tri else None
-        self.analyzer = self._analyzer() if self.morph_set else None
+        morph_set = MorphSet.from_file(tri, self.cfg) if tri else None
         if skeleton is None:
-            skeleton = self._skeleton_beside(path)
-        self.rig = ColliderSet.from_nif(skeleton, self.cfg) if skeleton else None
-        self._sliders.clear()
-        self.view.focus_all()
-        return self.summary()
+            # A node/collision-only NIF is itself the selected skeleton. Guessing its
+            # sibling skeleton.nif opens the wrong variant (or no rig for female rigs).
+            skeleton = path if standalone else self._skeleton_beside(path)
+        rig = ColliderSet.from_nif(skeleton, self.cfg) if skeleton else None
+        if (standalone and rig is not None and skeleton == path
+                and not (rig.bodies or rig.bumper or rig.unsupported or len(rig.matrices) > 1)):
+            rig = None                       # a valid root-only NIF, without a skeleton
+        candidate = copy.copy(self)
+        candidate.model, candidate.rig, candidate.morph_set = model, rig, morph_set
+        candidate.analyzer = candidate._analyzer() if morph_set else None
+        candidate._sliders = {}
+        candidate.view = copy.deepcopy(self.view)
+        candidate.view.focus_all()
+        if standalone:
+            candidate.view = ViewState(self.cfg)
+            candidate._placements = Placements(self.cfg)
+            candidate._workspace_tabs = {}
+            candidate.workspace_mode("colliders" if rig is not None else "morphs")
+        summary = candidate.summary()
+        self.__dict__.update(candidate.__dict__)
+        return summary
 
     def _skeleton_beside(self, nif: Path) -> Path | None:
         """The skeleton file in the mesh's folder, matched with no regard to case; None when
@@ -292,7 +311,8 @@ class MorphBench(WorkspaceMixin):
             "triKind": self.morph_set.kind if self.morph_set else None,
             "shapes": len(self.model.shapes),
             "vertices": self.model.vertex_count,
-            "bones": len(self.model.bone_names()),
+            "bones": (len(self.model.bone_names()) if self.model.vertex_count
+                      else len(self.rig.matrices) if self.rig else 0),
             "morphs": len(self.morph_set.names()) if self.morph_set else 0,
             "skeleton": str(self.rig.path) if self.rig else None,
             "colliders": self.rig.capsule_count() if self.rig else 0,
@@ -731,7 +751,8 @@ class MorphBench(WorkspaceMixin):
         are. With no mesh open, or with `collidersFollowParts` off, every bone is returned.
         """
         bones = self.collider_bones(needle)
-        if self.model is None or not bool(self.cfg["collidersFollowParts"]):
+        if (self.model is None or not self.model.vertex_count
+                or not bool(self.cfg["collidersFollowParts"])):
             return bones
         held: set[str] = set()
         for name in self.visible_shapes():
@@ -955,7 +976,12 @@ class MorphBench(WorkspaceMixin):
         if self._placements.mode == "slots":
             chunks.extend(np.asarray(mesh["vertices"], dtype=np.float32) for mesh in self.slots_meshes())
         if self.rig is not None and (self.view.colliders or not chunks):
-            chunks.extend(piece["verts"] for piece in self.collider_meshes())
+            chunks.extend(piece["verts"] for piece in self.collider_meshes()
+                          if len(piece["verts"]))
+        if (not chunks and self._placements.mode != "slots"
+                and self.rig is not None and self.rig.matrices):
+            chunks.append(np.asarray([matrix[:3, 3] for matrix in self.rig.matrices.values()],
+                                     dtype=np.float32))
         if not chunks:
             raise RuntimeError(t("core.allHidden"))
         verts = np.vstack(chunks)

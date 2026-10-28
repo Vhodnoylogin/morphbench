@@ -3,7 +3,7 @@
 class EditorPanel {
   constructor(app,root) {
     this.app=app;this.bench=app.bench;this.root=root;this.fieldSignature="";
-    this.makeColliders();this.makePhysics();
+    this.makeColliders();this.makePPB();this.makePhysics();
     const svgTemplate=document.createElement("template");svgTemplate.innerHTML="<svg></svg>";
     this.overlay=svgTemplate.content.firstElementChild;
     this.svgNamespace=this.overlay.namespaceURI;
@@ -59,7 +59,7 @@ class EditorPanel {
       const recipe=placementParseJSON(await file.text());
       if(recipe.format!=="morphbench-workspace"||recipe.version!==1) throw Error(T.edInvalid);
       if(!Array.isArray(recipe.actions))throw Error(T.edInvalid);
-      if(recipe.actions.some((action)=>String(action.method).startsWith("collider_"))&&JSON.stringify(recipe.source)!==JSON.stringify(DATA.source)) throw Error(T.edStale);
+      if(recipe.actions.some((action)=>String(action.method).startsWith("collider_")||["ppb_to_collider","ppb_from_collider"].includes(action.method))&&JSON.stringify(recipe.source)!==JSON.stringify(DATA.source)) throw Error(T.edStale);
       this.app.invoke("workspace_replay",recipe.actions);
     }catch(error){this.fail(error);}
   }
@@ -70,6 +70,74 @@ class EditorPanel {
       if(!response.ok){const problem=await response.json();throw Error(problem.error);}
       this.download("morphbench-skeleton.nif",await response.arrayBuffer(),"application/octet-stream");
     }catch(error){this.fail(error);}
+  }
+  makePPB() {
+    const section=this.section("colliders","ppb",T.edPpb);
+    section.appendChild(el("p",{class:"warn",text:T.edPpbScope}));
+    this.ppbUpload=el("input",{type:"file",accept:".txt","aria-label":T.edPpbLoad,on:{change:()=>this.importPPB()}});
+    section.appendChild(el("label",{class:"slot-field"},[T.edPpbLoad,this.ppbUpload]));
+    this.ppbGroup=el("select",{"aria-label":T.edPpbGroup,on:{change:()=>this.refreshPPB()}});
+    section.appendChild(el("label",{class:"slot-field"},[T.edPpbGroup,this.ppbGroup]));
+    this.ppbTarget=el("select",{"aria-label":T.edPpbTarget,on:{change:()=>{
+      const cap=this.bench.collider_edit_state().capsules[Number(this.ppbTarget.value)];
+      if(this.ppbTarget.value!==""&&cap)this.app.invoke("collider_select",cap.bone,cap.index);
+    }}});
+    section.appendChild(el("label",{class:"slot-field"},[T.edPpbTarget,this.ppbTarget]));
+    this.ppbFields=el("div",{class:"physics-fields"});section.appendChild(this.ppbFields);
+    const transfer=(method)=>{const cap=this.selected();if(cap)this.app.invoke(method,this.ppbGroup.value,cap.bone,cap.index);};
+    this.ppbTo=this.button(T.edPpbTo,()=>transfer("ppb_to_collider"));
+    this.ppbFrom=this.button(T.edPpbFrom,()=>transfer("ppb_from_collider"));
+    section.appendChild(el("div",{class:"row editor-actions"},[this.ppbTo,this.ppbFrom]));
+    this.ppbNote=el("p",{class:"muted",style:"white-space:pre-line"});section.appendChild(this.ppbNote);
+    this.ppbSource=el("textarea",{rows:"8","aria-label":T.edPpbSource,spellcheck:"false",style:"width:100%",on:{input:()=>{this.ppbRawDirty=true;}}});
+    section.appendChild(el("details",null,[el("summary",{text:T.edPpbSource}),this.ppbSource,this.button(T.edApplySource,()=>this.parsePPB(this.ppbSource.value))]));
+    section.appendChild(this.button(T.edPpbExport,()=>{if(this.bench.ppb_state().document)this.download("PPB_tuning.morphbench.txt",this.bench.ppb_export(),"text/plain;charset=utf-8");}));
+  }
+  async importPPB() {
+    try {
+      const file=this.ppbUpload.files[0];if(!file)return;
+      if(file.size>this.bench.settings.physicsMaxChars*4)throw Error(T.edInvalid);
+      const text=new TextDecoder("utf-8",{fatal:true,ignoreBOM:true}).decode(await file.arrayBuffer());
+      await this.parsePPB(text);
+    }catch(error){this.fail(error);}
+  }
+  async parsePPB(text) {
+    try {
+      if(!this.bench.server)throw Error(T.edServer);
+      const response=await fetch("/api/physics/import",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({kind:"ppb",text})});
+      const parsed=await response.json();if(!response.ok)throw Error(parsed.error);
+      this.ppbRawDirty=false;this.ppbFieldSignature="";this.app.invoke("ppb_replace",parsed.document);
+    }catch(error){this.fail(error);}
+  }
+  refreshPPB() {
+    const state=this.bench.ppb_state(),capsules=state.capsules||[],signature=JSON.stringify(capsules.map((cap)=>[cap.id,cap.slot,cap.index]));
+    if(this.ppbGroup.dataset.signature!==signature) {
+      this.ppbGroup.textContent="";this.ppbGroup.appendChild(el("option",{value:"",text:T.edPpbGroup}));
+      for(const cap of capsules)this.ppbGroup.appendChild(el("option",{value:cap.id,text:cap.slot+(cap.index?" · C"+cap.index:" · 0")}));
+      this.ppbGroup.dataset.signature=signature;
+    }
+    const collider=this.bench.collider_edit_state(),targetSignature=JSON.stringify(collider.capsules.map((cap)=>[cap.bone,cap.index,cap.editable]));
+    if(this.ppbTarget.dataset.signature!==targetSignature) {
+      this.ppbTarget.textContent="";this.ppbTarget.appendChild(el("option",{value:"",text:T.edPpbTarget}));
+      collider.capsules.forEach((cap,index)=>this.ppbTarget.appendChild(el("option",{value:String(index),text:cap.bone+" · "+cap.index})));
+      this.ppbTarget.dataset.signature=targetSignature;
+    }
+    const selected=this.selected(),targetIndex=selected?collider.capsules.findIndex((cap)=>cap.bone===selected.bone&&cap.index===selected.index):-1;
+    this.ppbTarget.value=targetIndex<0?"":String(targetIndex);
+    const cap=capsules.find((item)=>item.id===this.ppbGroup.value),fields=(state.fields||[]).filter((field)=>cap&&field.group===cap.id),fieldSignature=JSON.stringify(fields.map((field)=>[field.id,field.label]));
+    if(this.ppbFieldSignature!==fieldSignature) {
+      this.ppbFieldSignature=fieldSignature;this.ppbFields.textContent="";this.ppbInputs=new Map();
+      for(const field of fields) {
+        const input=el("input",{type:"number",step:"any","aria-label":field.label+" · PPB · "+field.id,on:{change:()=>this.app.invoke("ppb_set",field.id,input.value.trim()===""?NaN:Number(input.value))}});
+        input.disabled=field.editable===false;this.ppbInputs.set(field.id,input);
+        this.ppbFields.appendChild(el("label",{class:"physics-field"},[el("span",{text:field.label,title:field.id}),input]));
+      }
+    }
+    for(const field of fields){const input=this.ppbInputs.get(field.id);if(input!==document.activeElement)input.value=String(field.value);}
+    this.ppbTo.disabled=!cap||!cap.transfer_supported||!selected||!selected.editable;
+    this.ppbFrom.disabled=!cap||!cap.transfer_supported||!selected;
+    this.ppbNote.textContent=state.document?Array.from(new Set((state.warnings||[]).filter((warning)=>!warning.group||(cap&&warning.group===cap.id)).map((warning)=>warning.message||warning.code))).join("\n"):T.edPpbEmpty;
+    if(!this.ppbRawDirty)this.ppbSource.value=state.document?this.bench.ppb_export():"";
   }
   makePhysics() {
     const section=this.section("physics","configuration",T.edPhysics);
@@ -102,7 +170,7 @@ class EditorPanel {
         const recipe=placementParseJSON(text);
         if(recipe.format!=="morphbench-workspace"||recipe.version!==1)throw Error(T.edInvalid);
         // A configuration workspace can travel without a mesh; capsule recipes still bind their original source.
-        const capsuleActions=recipe.actions.some((action)=>String(action.method).startsWith("collider_"));
+        const capsuleActions=recipe.actions.some((action)=>String(action.method).startsWith("collider_")||["ppb_to_collider","ppb_from_collider"].includes(action.method));
         if(capsuleActions&&JSON.stringify(recipe.source)!==JSON.stringify(DATA.source))throw Error(T.edStale);
         this.app.invoke("workspace_replay",recipe.actions);return;
       }
@@ -164,6 +232,7 @@ class EditorPanel {
     for(const [key,fields] of Object.entries(this.capsuleFields))fields.forEach((field,i)=>{field.disabled=!cap||!cap.editable;if(field!==document.activeElement)field.value=cap?String(key==="radius"?cap.radius:cap[key][i]):"";});
     this.apply.disabled=this.duplicate.disabled=this.remove.disabled=!cap||!cap.editable;
     this.colliderNote.textContent=state.capsules.length?"":T.edNoCapsules;
+    this.refreshPPB();
     this.refreshPhysics();
   }
   project(point) {

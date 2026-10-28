@@ -114,7 +114,7 @@ class PhysicsWorkspace:
             raise ValueError(t("physicsw.document"))
         candidate = copy.deepcopy(document)
         fields = candidate.get("fields")
-        if (candidate.get("kind") not in ("fsmp", "cbpc") or not isinstance(fields, list)
+        if (candidate.get("kind") not in ("fsmp", "cbpc", "ppb") or not isinstance(fields, list)
                 or not isinstance(candidate.get("records", []), list)
                 or not isinstance(candidate.get("warnings", []), list)
                 or not isinstance(candidate.get("groups", []), list)):

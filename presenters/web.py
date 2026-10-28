@@ -305,6 +305,7 @@ class WebPage:
             "workspace": bench.workspace_state(),
             "colliderEditor": bench.collider_editor_payload(),
             "physics": bench.physics_state(),
+            "ppb": bench.ppb_state(),
             "physicsTexts": {"physicsw." + key: value for key, value in section("physicsw.").items()},
             "source": self.source_identity(bench),
         })
@@ -327,7 +328,8 @@ class WebPage:
         The data sits in a <script type="application/json"> block; the sequence `</` inside
         the strings is escaped, so that the name of a part cannot close the block.
         """
-        data = json.dumps(self.payload(), ensure_ascii=False, separators=(",", ":"))
+        data = json.dumps(self.payload(), ensure_ascii=False, separators=(",", ":"),
+                          allow_nan=False)
         data = data.replace("</", "<\\/")
         name = (Path(self.bench.summary()["nif"]).name if self.bench.is_open()
                 else t("page.noMesh"))
@@ -339,6 +341,7 @@ class WebPage:
             # when the script did not go.
             "__MB_HINT__": _escape(t("page.hint")),
             "__MB_NOGL__": _escape(t("page.noWebGL")),
+            "__MB_DATA_ERROR__": _escape(t("page.startupDataError")),
             "__MB_DATA__": data,
         }, linked=linked)
 

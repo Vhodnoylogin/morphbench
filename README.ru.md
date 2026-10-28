@@ -18,6 +18,12 @@ English version of this file — [README.md](README.md).
 и Git LFS проверены 03.10.2026. После проверки старые локальная и удалённая ветки
 `Skyrim-Mods/morphbench` удалены; исторические рабочие копии сохранены.
 
+Разработка следующей версии редактора коллайдеров и физики продолжается в ветке
+[`feature/collider-physics-ppb`](https://github.com/Vhodnoylogin/morphbench/tree/feature/collider-physics-ppb).
+В ней доступны визуальная правка капсул, [интеграция настроек PPB](docs/ppb.ru.md)
+с сохранением исходного текста и исправление пустой страницы при открытии скелета.
+Эти изменения не входят в публичный архив 0.7.1-r2.
+
 ## Почему это, а не BodySlide
 
 **BodySlide строит тело; morphbench его проверяет.** BodySlide — это место, где рисуют ползунки

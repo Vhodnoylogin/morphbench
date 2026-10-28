@@ -337,6 +337,8 @@ class WebServer:
             return {"workspace": self.bench.workspace_state(),
                     "colliders": self.bench.collider_editor_payload(),
                     "physics": self.bench.physics_state(),
+                    "ppb": self.bench.ppb_state(),
+                    "ppbText": self.bench.ppb_export() if self.bench.ppb_state()["document"] else None,
                     "envelopes": self.bench.physics_envelopes(),
                     "text": self.bench.physics_export() if self.bench.physics_state()["document"] else None}
 
@@ -354,6 +356,8 @@ class WebServer:
             clone.rig, clone.view, clone._placements = copy.deepcopy(self.bench.rig), copy.deepcopy(self.bench.view), copy.deepcopy(self.bench._placements)
             if hasattr(clone, "_physics_workspace"):
                 clone._physics_workspace = copy.deepcopy(clone._physics_workspace)
+            if hasattr(clone, "_ppb_workspace"):
+                clone._ppb_workspace = copy.deepcopy(clone._ppb_workspace)
             clone._workspace_tabs = copy.deepcopy(getattr(self.bench, "_workspace_tabs", {}))
             clone.collider_reset()
             clone.workspace_replay(recipe.get("actions"))
@@ -372,15 +376,16 @@ class WebServer:
         with_morphs = not query.flag("all") if "all" in query.values else self.with_morphs
         error, status = None, 200
         with self.lock:
-            bench = self.bench
+            # Query options and a rig association belong to the same selection. Keep the
+            # current workspace when a later part of that selection cannot be opened.
+            bench = copy.copy(self.bench)
+            bench.view = copy.deepcopy(self.bench.view)
+            bench._placements = copy.deepcopy(self.bench._placements)
+            bench._workspace_tabs = copy.deepcopy(getattr(self.bench, "_workspace_tabs", {}))
             root = self._root_of(query)
             shown_root = root
             catalog: list[dict] = []
             try:
-                if query.get("mode") is not None:
-                    bench.workspace_mode(query.get("mode"))
-                if query.get("tab") is not None:
-                    bench.workspace_tab(query.get("tab"))
                 if root is not None:
                     catalog = bench.catalog(root, with_morphs)
                 key = query.key
@@ -391,8 +396,13 @@ class WebServer:
                     if not bench.env.allows(skeleton):
                         raise PermissionError(t("workspace.invalid", field="skeleton path"))
                     bench.open_skeleton(skeleton)
+                if query.get("mode") is not None:
+                    bench.workspace_mode(query.get("mode"))
+                if query.get("tab") is not None:
+                    bench.workspace_tab(query.get("tab"))
             except Exception as e:  # noqa: BLE001 - any refusal of the facade is shown as text
                 error, status = _message(e), _status_of(e)
+                bench = self.bench
                 catalog = []
                 if self.root is not None:
                     try:
@@ -402,7 +412,10 @@ class WebServer:
                 shown_root = None if self.root is None else str(self.root)
             page = WebPage(bench, server=True, catalog=catalog, environment=bench.environment(),
                            root=shown_root, with_morphs=with_morphs, error=error)
-            return page.html(linked=True), status
+            html = page.html(linked=True)
+            if error is None:
+                self.bench.__dict__.update(bench.__dict__)
+            return html, status
 
     def __repr__(self) -> str:
         return "WebServer(%s, root=%s)" % (self.url, self.root or "not set")
@@ -520,7 +533,7 @@ class _Handler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def _send_json(self, data, status: int = 200) -> None:
-        body = json.dumps(data, ensure_ascii=False).encode("utf-8")
+        body = json.dumps(data, ensure_ascii=False, allow_nan=False).encode("utf-8")
         self._send(body, "application/json; charset=utf-8", status)
 
     def _send_html(self, html: str, status: int = 200) -> None:

@@ -280,12 +280,16 @@ class CollisionBody:
 
     def __init__(self, bone: str, capsules: list[Capsule], physics: dict,
                  kind: str = "bhkRigidBody", shape_kind: str = "bhkCapsuleShape",
-                 editable: bool = True):
+                 editable: bool = True, shape_children: list[str] | None = None):
         self.bone = bone
         self.capsules = capsules
         self.physics = physics
         self.kind = kind
         self.shape_kind = shape_kind
+        # Direct child kinds, not the flattened capsule list: a one-child list is
+        # distinct from a direct capsule, and nested/wrapped children have different
+        # runtime addresses. None means the original list layout is not known.
+        self.shape_children = tuple(shape_children) if shape_children is not None else None
         self.editable = bool(editable)
         # How the body was read out of the file: this snapshot is what tells whether it has
         # changed, and writing replaces the shape of changed bodies only.
@@ -434,6 +438,8 @@ class ColliderSet:
                 shape = getattr(body, "shape", None)
                 caps = cls._capsules_of(name, shape)
                 shape_kind = type(shape).__name__
+                shape_children = ([type(child).__name__ for child in shape.children]
+                                  if shape_kind == "bhkListShape" else None)
                 editable = cls._shape_editable(shape)
                 if not caps:
                     if shape is not None:
@@ -443,7 +449,7 @@ class ColliderSet:
                     continue
                 kind = type(body).__name__
                 entry = CollisionBody(name, caps, cls._physics_of(body, names), kind,
-                                      shape_kind, editable)
+                                      shape_kind, editable, shape_children)
                 if "Phantom" in kind:
                     bumper = entry
                 else:
@@ -675,12 +681,26 @@ class ColliderSet:
 
     def local_capsules(self, bones=None) -> list[dict]:
         """The capsules in the coordinates of their own body - the way they lie in the file
-        and the way other programs' settings expect them. One dictionary per body: the bone,
-        the kind and the capsules."""
+        and the way other programs' settings expect them. The additive shape metadata
+        describes the output topology of save_as, including a retained one-child list.
+        Unknown original list children remain None; consumers must not infer addresses
+        from the flattened capsule indices alone."""
         out = []
         for bone in (bones if bones is not None else self.bone_names()):
             body = self.body(bone)
+            shape_kind = body.shape_kind
+            children = body.shape_children
+            if body.changed:
+                shape_kind = ("bhkListShape" if len(body.capsules) > 1 or
+                              body.shape_kind == "bhkListShape" else "bhkCapsuleShape")
+                children = (["bhkCapsuleShape"] * len(body.capsules)
+                            if shape_kind == "bhkListShape" else None)
             out.append({"bone": bone, "kind": body.kind, "physics": body.physics,
+                        "shapeKind": shape_kind,
+                        "shapeChildren": list(children) if children is not None else None,
+                        "capsuleGeometry": [{"bone": bone, "index": c.index,
+                            "p1": c.p1.tolist(), "p2": c.p2.tolist(), "radius": c.radius}
+                            for c in body.capsules],
                         "capsules": [c.as_dict() for c in body.capsules]})
         return out
 
@@ -927,7 +947,9 @@ class ColliderSet:
         Always into a new one: the skeleton that was read belongs to somebody else's mod and
         must not be touched; edits travel as a separate mod on top of it. The skeleton is
         opened again, and the shape of every changed body is replaced with a new one: one
-        capsule by a capsule, several by a `bhkListShape` bundle with a capsule for each. The
+        capsule by a capsule, several by a `bhkListShape` bundle with a capsule for each.
+        An original list remains a list even with one child: its runtime child address
+        must not change merely because the capsule's radius was edited. The
         body, its constraints and its controllers stay the same blocks, and the previous shape
         leaves the file. Unchanged bodies are not touched at all.
         """
@@ -963,7 +985,7 @@ class ColliderSet:
             node = nif.nodes[bone]
             target = node.collision_object.body
             caps = body.capsules
-            if len(caps) == 1:
+            if len(caps) == 1 and body.shape_kind != "bhkListShape":
                 target.add_shape(self._capsule_props(bhkCapsuleShapeProps, caps[0]))
             else:
                 lst = target.add_shape(bhkListShapeProps())

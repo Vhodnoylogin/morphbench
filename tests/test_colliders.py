@@ -464,14 +464,16 @@ class TestPPB(unittest.TestCase):
     def test_lines_name_the_slot_and_the_child(self):
         """PPB handles are put together as cap<Slot>[C<number>]<field> out of the capsules
         in the coordinates of the bone."""
-        cs = rig(body("NPC L Calf [LClf]",
+        calf = body("NPC R Calf [RClf]",
                       cap(p1=(1, 2, 3), p2=(4, 5, 6), radius=7.0),
-                      cap(index=1, p1=(0, 0, 0), p2=(0, 0, 1), radius=0.5)),
-                 matrices={"NPC L Calf [LClf]": shift(dz=500.0)})
+                      cap(index=1, p1=(0, 0, 0), p2=(0, 0, 1), radius=0.5))
+        calf.shape_kind = "bhkListShape"
+        calf.shape_children = ("bhkCapsuleShape", "bhkCapsuleShape")
+        cs = rig(calf, matrices={"NPC R Calf [RClf]": shift(dz=500.0)})
         lines = ppb.lines(cs.local_capsules())
         self.assertIn("capCalfEnable 1", lines)
-        self.assertIn("capCalfAX 1.0000", lines)
-        self.assertIn("capCalfR 7.0000", lines)
+        self.assertIn("capCalfAX 1", lines)
+        self.assertIn("capCalfR 7", lines)
         self.assertIn("capCalfC1Enable 1", lines)
 
     def test_unknown_bone_is_skipped(self):

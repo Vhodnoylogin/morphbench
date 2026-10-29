@@ -394,6 +394,14 @@ second while the game runs, so the lines can be tried live without restarting an
 names its knobs by body slot and has none for a tail or for fingers, so those bones are
 skipped rather than given an invented name.
 
+PPB's capsule bank addresses exact right-side/center nodes globally. For generated snippets,
+select a supported source such as `--find "NPC R Thigh [RThg]"`; bilateral/left-only rows and
+duplicate slots are refused rather than overwritten. Hand lists use `C1` for child 0, while a
+direct Hand capsule uses the unsuffixed block. Only a known direct/flat-capsule layout within
+the reviewed PPB child limits is exported; arbitrary wrapped or nested original shapes are
+refused. Full-precision float values are used. With `--out --ppb`, PPB validation finishes
+before writing the new skeleton. See [PPB source scope](ppb.md#generated-fitting-snippets).
+
 `--json` returns `{fitted: [...], ragdoll: {...}}` with `saved` and `ppb` beside them when
 those keys were given. A fitted row is `{bone, points, fitted, was, wasCount, now, count,
 capsules}`; a bone that gave no skin points comes back as `{bone, points, fitted: false}`. The

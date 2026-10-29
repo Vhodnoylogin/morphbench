@@ -462,10 +462,10 @@ def cmd_fit(args) -> int:
     rows = bench.collider_fit(args.find, args.percentile, bundle=args.bundle or 1,
                               split=args.split)
     result = {"fitted": rows, "ragdoll": bench.ragdoll()}
-    if args.save:
-        result["saved"] = bench.collider_save(args.save)
     if args.ppb:
         result["ppb"] = ppb.lines(bench.collider_local(args.find))
+    if args.save:
+        result["saved"] = bench.collider_save(args.save)
     if args.json:
         _out(args, result)
         return 0

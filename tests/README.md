@@ -63,6 +63,11 @@ the text of the exception: what is under test is the bench's reading, not PyNifl
 
 ## Skeleton and PPB checks
 
+`test_ppb_export.py` verifies generated right/center PPB slot identities, Hand direct/list
+numbering, global-key conflicts, supported child limits, precise float export, unknown layout
+refusals and no partial CLI output on rejection. Its native PyNifly fixtures verify that an
+edited original one-child NIF list remains a list after save/reopen, without reading mod data.
+
 `test_file_visibility.py` verifies native local/inherited flags through generated NIFs and
 malformed/ambiguous graph doubles. `test_visibility_policy.py` verifies independent file and
 viewer policies, conservative unknown handling, visible-surface fit/coverage, CLI/native

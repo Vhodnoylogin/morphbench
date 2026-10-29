@@ -85,6 +85,29 @@ and so on. The unsuffixed `capHand` block addresses a single capsule. Other slot
 unsuffixed block for the main capsule/list child 0 and `C1` for list child 1. A supported knob
 does not prove that the selected skeleton contains that child.
 
+## Generated fitting snippets
+
+`mb.py fit ... --ppb` generates new capsule assignments; it does not use the lossless
+existing-document editor above. PPB has one global bank addressing exact right-side and
+center nodes, not independent left/right banks. Select an exact supported source, for example
+`--find "NPC R Thigh [RThg]"`. Bilateral/left-only input and repeated global slots are refused
+with an actionable message; the exporter does not choose a winning side or guess `capMirrorL`.
+Bones with no PPB slot, such as tails, remain omitted. Similar names with a different bracket
+suffix are refused because PPB's runtime node identity is exact.
+
+Generated keys require a direct capsule or a known flat list of direct capsule children and
+the reviewed child limits above. A one-child Hand list uses `capHandC1`, whereas a direct Hand
+capsule uses `capHand`. Editing/exporting an original one-child NIF list preserves that list
+topology. Unknown, nested, wrapped or non-capsule original layouts are refused by this text
+export; an explicit NIF edit can produce a supported new direct/list layout.
+
+The facade's `collider_local` retains its rounded report `capsules` and adds full-precision
+`capsuleGeometry`, effective output `shapeKind` and original/known generated `shapeChildren`.
+Text export uses those precise values and round-trips PPB float fields; invalid, overflowing,
+underflowing or nonpositive-radius values are refused. With `--ppb --out`, this validation
+finishes before a new skeleton is written. Generated snippets remain source values: runtime
+mirroring, auto-fit, actor/sculpt gates and other overrides below still require review.
+
 ## What requires PPB runtime evidence
 
 The preview and copies describe source values. They do not resolve effective in-game capsules.

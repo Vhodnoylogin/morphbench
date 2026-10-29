@@ -311,6 +311,35 @@ console.log(JSON.stringify({visible:bench.collider_edit_state(),recipe:bench.wor
         self.assertEqual(source.read_bytes(), original_bytes)
         self.assertEqual(self.bench.collider_edit_state(), expected)
 
+    def test_browser_recipe_at_action_boundary_downloads_native_skeleton(self):
+        pynifly = common.load_pynifly(self.cfg)
+        source = common.write_skeleton(pynifly, self.root / "budget-source.nif", {
+            "A": (0, ((0, 0, 0), (0, 0, 0.1), 0.03)),
+            "B": (1, ((0, 0, 0), (0, 0, 0.2), 0.04))})
+        self.bench.open_skeleton(source)
+        self.cfg._values["workspaceActionLimit"] = 9
+        source_bytes = source.read_bytes()
+        initial = copy.deepcopy(self.bench.collider_edit_state())
+        browser = run_browser(self, self.tmp.name, WebPage(self.bench).payload(), """
+const bench=new BenchMirror(DATA);
+for(let index=0;index<4;index++)bench.collider_set(index%2?'A':'B',0,{radius:index+4});
+console.log(JSON.stringify({recipe:bench.workspace_recipe(),state:bench.collider_edit_state()}));
+""")
+        self.assertEqual(len(browser["recipe"]["actions"]), 9)
+        code, content_type, exported = self.request("/api/workspace/skeleton", browser["recipe"])
+        self.assertEqual(code, 200, exported)
+        self.assertIn("application/octet-stream", content_type)
+        output = self.root / "budget-export.nif"
+        output.write_bytes(exported)
+        written = ColliderSet.from_nif(output, self.cfg).edit_state()["capsules"]
+        for actual, expected in zip(written, browser["state"]["capsules"]):
+            self.assertEqual(actual["bone"], expected["bone"])
+            self.assertAlmostEqual(actual["radius"], expected["radius"], places=4)
+            np.testing.assert_allclose(actual["p1"], expected["p1"], atol=1e-4)
+            np.testing.assert_allclose(actual["p2"], expected["p2"], atol=1e-4)
+        self.assertEqual(self.bench.collider_edit_state(), initial)
+        self.assertEqual(source.read_bytes(), source_bytes)
+
     def test_regenerated_payload_keeps_loaded_identity_and_refuses_changed_disk_source(self):
         pynifly = common.load_pynifly(self.cfg)
         source = common.write_skeleton(pynifly, self.root / "source.nif", {
@@ -459,6 +488,78 @@ console.log(JSON.stringify({state:bench.collider_edit_state(),recipe,recovered:r
             self.assert_state_equal(self.bench.collider_edit_state(), expected)
         with self.subTest(phase="browser reopens saved browser recipe"):
             self.assert_state_equal(result["recovered"], expected)
+
+    def test_maximum_accepted_edit_session_remains_replayable_in_both_clients(self):
+        result = self.run_js(WebPage(self.bench).payload(), """
+const bench=new BenchMirror(DATA),limit=bench.settings.workspaceActionLimit;
+const snapshot=()=>JSON.stringify([bench.collider_edit_state(),bench.workspace_state(),bench.workspace_recipe()]);
+let accepted=0,rejected=false;
+for(let index=0;index<limit;index++){
+ const before=snapshot();
+ try{bench.collider_set(index%2?'A':'B',0,{radius:index+4});accepted++;}
+ catch(error){rejected=before===snapshot();break;}
+}
+// Re-editing the last capsule can coalesce at the boundary without losing data.
+bench.collider_set((accepted-1)%2?'A':'B',0,{radius:123.5});
+const recipe=bench.workspace_recipe(),fresh=new BenchMirror(DATA);
+fresh.workspace_replay(recipe.actions);
+console.log(JSON.stringify({accepted,rejected,recipe,state:bench.collider_edit_state(),restored:fresh.collider_edit_state()}));
+""")
+        self.assertGreater(result["accepted"], 0)
+        self.assertTrue(result["rejected"])
+        self.assertEqual(len(result["recipe"]["actions"]), self.cfg["workspaceActionLimit"])
+        self.assert_state_equal(result["restored"], result["state"])
+        self.bench.workspace_replay(result["recipe"]["actions"])
+        self.assert_state_equal(result["state"], self.bench.collider_edit_state())
+
+    def test_document_edits_and_ppb_binding_share_recipe_budget_atomically(self):
+        from test_ppb_document import block
+        self.cfg._values["workspaceActionLimit"] = 10
+        ppb = parse_document("ppb", block())
+        physics = parse_document("fsmp", XML)
+        result = self.run_js(WebPage(self.bench).payload(), """
+const bench=new BenchMirror(DATA);bench.physics_replace(input.physics);bench.ppb_replace(input.ppb);
+const group=input.ppb.capsules[0],r=group.fields.R,ax=group.fields.AX;
+bench.ppb_link(group.id,'A',0);bench.collider_set('A',0,{radius:9});
+const snapshot=()=>JSON.stringify([bench.ppb_state(),bench.physics_state(),bench.collider_edit_state(),bench.workspace_recipe()]);
+const before=snapshot(),rejected=[];
+for(const edit of [()=>bench.ppb_set(ax,8),()=>bench.physics_set(input.physics.fields[0].id,9),()=>bench.collider_set('A',0,{p1:[10,11,12]})]){
+ let failed=false;try{edit();}catch(error){failed=true;}rejected.push(failed&&before===snapshot());
+}
+const recipe=bench.workspace_recipe(),fresh=new BenchMirror(DATA);fresh.workspace_replay(recipe.actions);
+console.log(JSON.stringify({rejected,recipe,text:bench.ppb_export(),restoredText:fresh.ppb_export(),state:bench.collider_edit_state(),restored:fresh.collider_edit_state()}));
+""", ppb=ppb, physics=physics)
+        self.assertEqual(result["rejected"], [True, True, True])
+        self.assertEqual(len(result["recipe"]["actions"]), 10)
+        self.assertEqual(result["restoredText"], result["text"])
+        self.assert_state_equal(result["restored"], result["state"])
+        self.bench.workspace_replay(result["recipe"]["actions"])
+        self.assertEqual(self.bench.ppb_export(), result["text"])
+        self.assert_state_equal(self.bench.collider_edit_state(), result["state"])
+
+    def test_replay_checks_final_budget_and_restores_invalid_batch(self):
+        from test_ppb_document import block
+        self.cfg._values["workspaceActionLimit"] = 9
+        ppb = parse_document("ppb", block())
+        result = self.run_js(WebPage(self.bench).payload(), """
+const bench=new BenchMirror(DATA);bench.ppb_replace(input.ppb);
+for(let index=0;index<3;index++)bench.collider_set(index%2?'A':'B',0,{radius:index+4});
+const recipe=bench.workspace_recipe(),fresh=new BenchMirror(DATA);fresh.ppb_replace(input.ppb);
+fresh.ppb_set(input.ppb.capsules[0].fields.AX,8);
+// The receiver's old source edit coexists briefly with the restored geometry;
+// the recipe then replaces that source. Only the final state needs to fit.
+fresh.workspace_replay(recipe.actions);
+const before=JSON.stringify([fresh.collider_edit_state(),fresh.ppb_state(),fresh.workspace_recipe()]);
+let rejected=false;
+try{fresh.workspace_replay([{method:'collider_add',args:['A',[0,0,0],[1,1,1],2]}]);}catch(error){rejected=true;}
+console.log(JSON.stringify({recipe,restored:fresh.collider_edit_state(),rejected,
+ atomic:before===JSON.stringify([fresh.collider_edit_state(),fresh.ppb_state(),fresh.workspace_recipe()])}));
+""", ppb=ppb)
+        self.assertEqual(len(result["recipe"]["actions"]), 9)
+        self.assertTrue(result["rejected"])
+        self.assertTrue(result["atomic"])
+        self.bench.workspace_replay(result["recipe"]["actions"])
+        self.assert_state_equal(self.bench.collider_edit_state(), result["restored"])
 
     def test_browser_invalid_batch_is_atomic_and_cannot_dispatch_other_methods(self):
         payload = WebPage(self.bench).payload()

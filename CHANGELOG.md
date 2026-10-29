@@ -25,6 +25,12 @@ go in a major release, and nowhere else.
 - Added static NIF visibility diagnostics and an independent inspection policy for locally
   or ancestrally hidden shapes. This does not evaluate game controllers or camera culling.
 - Fixed Windows launcher argument quoting for directory paths ending in a backslash.
+- Preserve a one-child `bhkListShape` when exporting an edited capsule, keeping its
+  runtime child address stable.
+- Generate PPB snippets only for supported source nodes and shape layouts, with correct
+  Hand child numbering; refuse ambiguous mappings before writing any requested NIF output.
+- Keep browser edit recipes within the complete replay budget, including setup and
+  linked-document actions, so accepted edits remain reloadable and exportable.
 - Trimmed unused Blender UI modules and native dependency build files from the bundle;
   retained runtime modules, licences, user documentation and launcher rebuild sources.
 

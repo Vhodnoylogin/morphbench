@@ -61,12 +61,23 @@ class EditorState {
     }
     this.binding=editorClone((DATA.ppb||{}).binding||null);
   }
-  record(method,args) {
+  checkRecipeSize({actionCount=this.actions.length,physics=this.physics.state(),ppb=this.ppb.state(),binding=this.binding}={}) {
+    // The saved recipe also carries owner setup, selection and display state. Reserve
+    // those actions before accepting an edit, otherwise the page can create a session
+    // that its own replay API (and the NIF download endpoint) must reject.
+    if(this.replaying)return;
+    const count=3+(this.state.available?actionCount+2:0)
+      +(physics.document?1+Object.keys(physics.edits||{}).length:0)
+      +(ppb.document?1+Object.keys(ppb.edits||{}).length:0)+(binding?1:0);
+    if(count>this.bench.settings.workspaceActionLimit)editorError("actions");
+  }
+  record(method,args,owners={}) {
     const last=this.actions[this.actions.length-1];
-    if(method==="collider_set"&&last&&last.method===method&&last.args[0]===args[0]&&last.args[1]===args[1]) {
+    const merge=method==="collider_set"&&last&&last.method===method&&last.args[0]===args[0]&&last.args[1]===args[1];
+    this.checkRecipeSize({...owners,actionCount:this.actions.length+(merge?0:1)});
+    if(merge) {
       Object.assign(last.args[2],editorClone(args[2]));return;
     }
-    if(this.actions.length>=this.bench.settings.workspaceActionLimit) editorError("actions");
     this.actions.push({method,args:editorClone(args)});
   }
   capsule(bone,index,editable=true) {
@@ -87,6 +98,7 @@ class EditorState {
     this.bench._colliderMeshes=untouched.concat(this.state.capsules.filter((cap)=>cap.editable).map((cap)=>editorCapsuleMesh(cap,this.state.bodyMatrices[cap.bone],this.bench.settings.colliderSegments)));
   }
   recipe() {
+    this.checkRecipeSize();
     const physics=this.physics.state(),actions=[];
     if(this.state.available) {
       actions.push({method:"collider_reset",args:[]});
@@ -126,7 +138,7 @@ Object.assign(BenchMirror.prototype,{
     for(const key of ["p1","p2"]) if(Object.hasOwn(changes,key)) next[key]=editorVector(changes[key]);
     if(Object.hasOwn(changes,"radius")) {if(typeof changes.radius!=="number"||!Number.isFinite(changes.radius)||!Number.isFinite(Math.fround(changes.radius))||changes.radius<0) editorError("radius");next.radius=changes.radius;}
     const ppb=this._ppb_collider_source(bone,index,next,changes);
-    owner.record("collider_set",[bone,index,changes]);Object.assign(cap,next);if(ppb)owner.ppb=ppb;owner.state.selected={bone,index};owner.rebuild();return editorClone(cap);
+    owner.record("collider_set",[bone,index,changes],ppb?{ppb:ppb.state()}:{});Object.assign(cap,next);if(ppb)owner.ppb=ppb;owner.state.selected={bone,index};owner.rebuild();return editorClone(cap);
   },
   collider_translate(bone,index,delta) {
     const owner=editorOwner(this),cap=owner.capsule(bone,index),vec=editorVector(delta);
@@ -139,18 +151,26 @@ Object.assign(BenchMirror.prototype,{
     if(!body) editorError("bone");p1=editorVector(p1);p2=editorVector(p2);
     if(typeof radius!=="number"||!Number.isFinite(radius)||!Number.isFinite(Math.fround(radius))||radius<0) editorError("radius");
     const index=Math.max(-1,...owner.state.capsules.filter((c)=>c.bone===bone).map((c)=>c.index))+1;
-    owner.record("collider_add",[bone,p1,p2,radius]);
+    owner.record("collider_add",[bone,p1,p2,radius],{binding:null});
     const cap={bone,index,p1,p2,radius,kind:body.kind,shapeKind:body.shapeKind,editable:true,changed:true};owner.state.capsules.push(cap);owner.state.selected={bone,index};owner.binding=null;owner.rebuild();return editorClone(cap);
   },
   collider_remove(bone,index=0) {
     const owner=editorOwner(this);owner.capsule(bone,index);
     const caps=owner.state.capsules.filter((c)=>c.bone===bone);if(caps.length<=1) editorError("last capsule");
-    owner.record("collider_remove",[bone,index]);owner.state.capsules=owner.state.capsules.filter((c)=>!(c.bone===bone&&c.index===index));
+    owner.record("collider_remove",[bone,index],{binding:null});owner.state.capsules=owner.state.capsules.filter((c)=>!(c.bone===bone&&c.index===index));
     owner.state.capsules.filter((c)=>c.bone===bone).forEach((c,i)=>c.index=i);owner.state.selected={bone,index:0};owner.binding=null;owner.rebuild();return this.collider_edit_state();
   },
   collider_reset() {const owner=editorOwner(this);if(!owner.state.available)editorError("skeleton");owner.state=editorClone(owner.original);owner.actions=[];owner.binding=null;owner.rebuild();return this.collider_edit_state();},
-  physics_replace(document) {if(!document||!["fsmp","cbpc"].includes(document.kind))editorError("document");return editorOwner(this).physics.replace(document);},
-  physics_set(id,value) {return editorOwner(this).physics.set(id,value);},
+  physics_replace(document) {
+    if(!document||!["fsmp","cbpc"].includes(document.kind))editorError("document");
+    const owner=editorOwner(this),candidate=new PhysicsWorkspaceMirror(null,DATA.physicsTexts||{},{max_chars:this.settings.physicsMaxChars,max_fields:this.settings.physicsMaxFields});
+    const state=candidate.replace(document);owner.checkRecipeSize({physics:state});owner.physics=candidate;return state;
+  },
+  physics_set(id,value) {
+    const owner=editorOwner(this),state=owner.physics.state(),candidate=new PhysicsWorkspaceMirror(null,DATA.physicsTexts||{},{max_chars:this.settings.physicsMaxChars,max_fields:this.settings.physicsMaxFields});
+    if(state.document){candidate.replace(state.document);for(const [ident,edit] of Object.entries(state.edits||{}))candidate.set(ident,edit);}
+    const result=candidate.set(id,value);owner.checkRecipeSize({physics:result});owner.physics=candidate;return result;
+  },
   physics_state() {return editorOwner(this).physics.state();},
   physics_export() {return editorOwner(this).physics.export_text();},
   physics_envelopes() {return editorOwner(this).physics.envelopes(this.slots_anchors());},
@@ -172,7 +192,7 @@ Object.assign(BenchMirror.prototype,{
         if(new Set(ids.filter((id)=>typeof id==="string")).size!==8||ids.some((id)=>typeof id!=="string"||!bindings.includes(id)))editorError("PPB binding");
       }
     }
-    const owner=editorOwner(this);owner.ppb=candidate;owner.binding=null;return this.ppb_state();
+    const owner=editorOwner(this);owner.checkRecipeSize({ppb:normalized,binding:null});owner.ppb=candidate;owner.binding=null;return this.ppb_state();
   },
   _ppb_value(value) {if(typeof value!=="number"||!Number.isFinite(value)||Math.abs(value)>3.4028234663852886e38||(value!==0&&Math.fround(value)===0))editorOwner(this).ppb._fail("ppbw.float");return value;},
   ppb_set(id,value) {
@@ -181,12 +201,13 @@ Object.assign(BenchMirror.prototype,{
   },
   _ppb_commit_source(candidate,changedIds) {
     const owner=editorOwner(this);
+    owner.checkRecipeSize({ppb:candidate.state()});
     if(owner.binding){
       const {ids}=this._ppb_geometry(owner.binding.capsule);
       if(changedIds.some((id)=>ids.includes(id))){
         const {values}=this._ppb_geometry(owner.binding.capsule,candidate.state()),{bone,index}=owner.binding,cap=owner.capsule(bone,index);
         const changes={p1:editorVector(values.slice(0,3)),p2:editorVector(values.slice(3,6)),radius:values[6]};
-        owner.record("collider_set",[bone,index,changes]);Object.assign(cap,changes);owner.state.selected={bone,index};owner.rebuild();
+        owner.record("collider_set",[bone,index,changes],{ppb:candidate.state()});Object.assign(cap,changes);owner.state.selected={bone,index};owner.rebuild();
       }
     }
     owner.ppb=candidate;
@@ -214,7 +235,7 @@ Object.assign(BenchMirror.prototype,{
   },
   ppb_link(capsuleId,bone,index) {
     const {values}=this._ppb_geometry(capsuleId),owner=editorOwner(this),cap=owner.capsule(bone,index),changes={p1:editorVector(values.slice(0,3)),p2:editorVector(values.slice(3,6)),radius:values[6]};
-    owner.record("collider_set",[bone,index,changes]);Object.assign(cap,changes);owner.state.selected={bone,index};owner.binding={capsule:capsuleId,bone,index};owner.rebuild();return this.ppb_state();
+    const binding={capsule:capsuleId,bone,index};owner.record("collider_set",[bone,index,changes],{binding});Object.assign(cap,changes);owner.state.selected={bone,index};owner.binding=binding;owner.rebuild();return this.ppb_state();
   },
   ppb_unlink() {editorOwner(this).binding=null;return this.ppb_state();},
   _ppb_target(bone,index) {const binding=editorOwner(this).binding;return !!binding&&binding.bone===bone&&binding.index===index;},
@@ -245,8 +266,15 @@ Object.assign(BenchMirror.prototype,{
       const range=allowed[action.method];if(action.args.length<range[0]||action.args.length>range[1]) editorError("arguments");
     }
     const owner=editorOwner(this),before={state:editorClone(owner.state),actions:editorClone(owner.actions),mode:owner.mode,tabs:editorClone(owner.tabs),physics:owner.physics.state(),ppb:owner.ppb.state(),binding:editorClone(owner.binding),placementMode:this.placements.mode,colliders:this.view.colliders,bumper:this.view.bumper,respectFileVisibility:this.view.respectFileVisibility,showFileHidden:this.view.showFileHidden};
-    try {for(const action of actions) this[action.method](...action.args);}
+    const replaying=owner.replaying;owner.replaying=true;
+    try {
+      // A saved recipe can replace old source documents after restoring geometry.
+      // Check its final budget, not temporary overlap with the receiver's old edits.
+      for(const action of actions) this[action.method](...action.args);
+      owner.replaying=replaying;owner.checkRecipeSize();
+    }
     catch(error) {
+      owner.replaying=replaying;
       Object.assign(owner,{state:before.state,actions:before.actions,mode:before.mode,tabs:before.tabs,binding:before.binding});
       const limits={max_chars:this.settings.physicsMaxChars,max_fields:this.settings.physicsMaxFields};
       owner.physics=new PhysicsWorkspaceMirror(null,DATA.physicsTexts||{},limits);if(before.physics.document) {owner.physics.replace(before.physics.document);for(const [id,value] of Object.entries(before.physics.edits||{})) owner.physics.set(id,value);}

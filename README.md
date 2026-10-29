@@ -180,7 +180,8 @@ own, in both languages: what the layer is, what it may depend on, and what must 
 Open the folder and the boundary is right there.
 
 The release archive additionally carries `python\`, `vendor\` (numpy, pillow, PyNifly) and
-`THIRD-PARTY.md`. It carries no tests, no launcher sources and no `release.py`.
+`THIRD-PARTY.md`. The launcher source, build script and resources stay beside its binary.
+Tests and `release.py` remain in the repository.
 
 The line between the core and the presenters is hard, and there is a way to check it: if an action
 cannot be performed from the command line, the line was drawn wrong. Everything the viewer can do
@@ -222,15 +223,19 @@ Developed with assistance from [Codex (OpenAI)](https://github.com/codex).
 
 ## Editing workspace
 
-The viewer separates **Morphs**, **Colliders**, **Physics** and experimental **Slots**, with
-mode tabs above the view, models on the left and an inspector on the right. Edit supported
-collision capsules or existing FSMP XML/CBPC TXT, save a replayable workspace and export new
-files. FSMP overlays show nominal configured limits; CBPC remains a raw parameter inspector.
-The same actions run through `mb.py workspace` and the local HTTP API without a GUI.
+The 0.8.0 viewer enables **Morphs** and **Colliders**, with mode tabs above the view, models
+on the left and an inspector on the right. Edit supported collision capsules, save a
+replayable workspace and export new files. **Physics** and **Slots** remain disabled in the
+browser. Experimental FSMP XML/CBPC TXT editing remains accessible through `mb.py workspace`
+and the local HTTP API; FSMP overlays represent nominal configured limits, not simulation.
 See [the workspace workflow](docs/workspace.md) for controls, automation and offline limits.
 
 ## Offline Slots mode
 
 Local preview variants add independent author → definition → variant inheritance. Session recipes preserve variants and edit targets; `mb.py slots --editor` recovers unfinished projects and exports unbound placement presets. Authored JSON and `.bslots` remain authored-only. See [the Slots workflow](docs/slots.md).
 
-The viewer now offers **Slots authoring** beside mesh inspection. Create or load named skeleton-node placements, edit local position/rotation/access spheres, compare author defaults with a temporary effective override, and download Body Slots schema-v1 JSON or a `.bslots` provider package. Save and reopen a session recipe to continue applied edits and preview overrides, including unfinished projects. The same placement actions replay through `mb.py slots`; the mesh/skeleton inputs are never overwritten. This mode does not edit game saves, item instances, equipment or inventories. See [docs/slots.md](docs/slots.md) for the offline workflow and limits.
+Experimental Slots authoring remains available through `mb.py slots` and the local HTTP API;
+the browser tab is disabled in 0.8.0. The backend supports named skeleton-node placements,
+local transforms/access spheres, author defaults and temporary effective overrides, session
+recipes, Body Slots schema-v1 JSON and `.bslots` exports. It does not edit game saves,
+equipment or inventories. See [docs/slots.md](docs/slots.md) for the offline workflow and limits.

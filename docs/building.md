@@ -295,8 +295,16 @@ nested-archive policy, but does not establish antivirus or moderator clearance.
 The GPL requires that the list of third-party work travel with the binary, and `release.py` writes
 it into every archive from `dependencies.json`: for each entry, what it is, what the workbench
 needs it for, whether it is inside the package and where, under which licence, and where its
-sources live. For PyNifly that last one is not a formality — `NiflyDLL.dll` is a compiled binary,
-and its source address is the only thing that makes handing it on lawful.
+sources live. `NiflyDLL.dll` is compiled; a generic source address alone does not identify
+the precise inputs used to build a particular binary.
+
+The audited 0.8.0 bundle's 27 PyNifly files match the author's
+[V28.1.0 release](https://github.com/BadDogSkyrim/PyNifly/releases/tag/V28.1.0).
+Its 26 non-DLL files also match
+[commit 934fbbf](https://github.com/BadDogSkyrim/PyNifly/tree/934fbbfbb41b63ed636d44afa957ec98d7fb0803).
+The upstream project references a separate sibling Nifly library without identifying its
+exact build revision. The audit establishes release-byte provenance, not a reproduced DLL
+build or complete native dependency source provenance.
 
 Only the frame of that document is translated. The entries are copied from `dependencies.json`
 word for word, and that file is in English.

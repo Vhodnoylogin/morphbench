@@ -29,7 +29,7 @@ checks this condition. The displayed control radius is6.993 and marker radius
 20.979 in the tool's skeleton/game coordinate system; right radius is6.985.
 These rounded file values are not a measurement of live Havok geometry.
 
-## Reference views and procedure
+## Original VR reference views and procedure
 
 `artifact/reference/` contains front, side and back images of each witness, drawn
 by Morphbench from the exact saved skeleton and the body used in the mod.
@@ -79,7 +79,7 @@ is a finding to investigate, not proof that Morphbench wrote a wrong file.
 Hand collision/filter rules and other engine shapes can dominate the response.
 The intended marker is not an acceptable production fit.
 
-## Assessment and evidence limits
+## Original VR assessment and evidence limits
 
 Use stage IDs F01 fixture identity, V01 visible body, H01 left marker comparison,
 H02 unchanged right-side comparison, H03 motion/stability and T01 evidence quality.
@@ -96,6 +96,23 @@ contact history and solver acceptance need separate qualified telemetry.
 Return the completed packet and human assessment to the exact Morphbench origin.
 
 ## Rebuild
+
+### Static SE comparison with Morphbench 0.8.0
+
+`generate-se.py` regenerates this retained human fixture through an unpacked final bundle:
+
+```text
+<tool-home>/python/python.exe generate-se.py --tool-home <tool-home> --builds-root <external-builds> --out <external-builds>/NEW-fixture
+```
+
+Run from this fixture directory. The source defaults to the retained `artifact/`; use
+`--source-fixture` for another verified copy. It exports/reopens new control and marker
+skeletons, checks full-precision capsules/matrices and creates six reference views plus
+provenance. No game, installation or test submission is performed. Outputs and the final
+tool bundle remain outside Git. This SE procedure does not exercise PPB runtime behavior;
+live Havok observations require a separately compatible and qualified SE provider.
+
+### Rebuild the retained original fixture
 
 Run `python fixtures/human-collider-witness/build.py --help` from the repository.
 Provide explicit body0/body1, original skeleton, matching ragdoll HKX, Skyrim.esm,

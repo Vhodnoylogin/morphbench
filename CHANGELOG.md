@@ -11,7 +11,7 @@ go in a major release, and nowhere else.
 
 Эта страница на русском: [CHANGELOG.ru.md](CHANGELOG.ru.md).
 
-## [0.8.0-rc.1] — 2026-10-29
+## [0.8.0] — 2026-10-29
 
 - Reorganized the browser into Morphs and Colliders modes with a shared model list and
   inspector. Physics and Body Slots tabs are disabled for this release; their script APIs
@@ -25,6 +25,8 @@ go in a major release, and nowhere else.
 - Added static NIF visibility diagnostics and an independent inspection policy for locally
   or ancestrally hidden shapes. This does not evaluate game controllers or camera culling.
 - Fixed Windows launcher argument quoting for directory paths ending in a backslash.
+- Trimmed unused Blender UI modules and native dependency build files from the bundle;
+  retained runtime modules, licences, user documentation and launcher rebuild sources.
 
 ## [0.7.1]
 

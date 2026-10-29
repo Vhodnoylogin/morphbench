@@ -108,6 +108,8 @@ CONTENT = [
 ]
 #: What we leave out even when it matched a pattern above.
 SKIP = ("__pycache__", ".pyc", "morphbench.json", "morphbench.log")
+# The builder reads these catalogues from source, but release.py itself does not ship.
+BUILD_CATALOGUE = "release.json"
 
 
 def load_manifest(path: Path) -> list[dict]:
@@ -127,7 +129,9 @@ def own_files(home: Path) -> list[Path]:
     for pattern in CONTENT:
         for found in sorted(glob.glob(str(home / pattern))):
             p = Path(found)
-            if p.is_file() and not any(s in str(p) for s in SKIP):
+            if (p.is_file() and not any(s in str(p) for s in SKIP)
+                    and not (p.parent.parent == home / "locale"
+                             and p.name == BUILD_CATALOGUE)):
                 out.append(p)
     return out
 
@@ -139,7 +143,7 @@ def find_folder(dep: dict, home: Path, named: str | None) -> Path | None:
     proof = [str(p) for p in dep.get("proof", [])]
 
     def fits(folder: Path) -> bool:
-        return folder.is_dir() and all((folder / p).exists() for p in proof)
+        return folder.is_dir() and all((folder / p).is_file() for p in proof)
 
     if named:
         folder = Path(named)
@@ -176,7 +180,9 @@ def vendor_folder(dep: dict, home: Path, stage: Path, named: str | None) -> str:
             if src.is_dir():
                 shutil.copytree(src, target / name, dirs_exist_ok=True, ignore=junk)
             else:
-                shutil.copy2(src, target / name)
+                dst = target / name
+                dst.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(src, dst)
         return "%s <- %s (%s)" % (target.relative_to(stage), folder, ", ".join(keep))
     shutil.copytree(folder, target, dirs_exist_ok=True, ignore=junk)
     return "%s <- %s" % (target.relative_to(stage), folder)
@@ -186,7 +192,9 @@ def trim_packages(into: Path) -> None:
     """Keep runtime modules and licences, without dependency test suites or type stubs.
 
     This changes only the staged distribution, never the builder's installed packages.
-    numpy.testing remains: it is an importable API, unlike directories named tests.
+    numpy.testing, typing and f2py remain: they are importable APIs, unlike test suites.
+    Native headers, static/import libraries and pkg-config files are only build inputs;
+    runtime extensions and the licence copies in .dist-info are retained.
     The wheel RECORD is narrowed to the retained files; hashes of those files stay intact.
     """
     into = into.resolve()
@@ -203,6 +211,15 @@ def trim_packages(into: Path) -> None:
     for pattern in ("*.pyi", "*.pyc"):
         for stub in into.rglob(pattern):
             stub.unlink()
+    numpy = into / "numpy"
+    for relative in ("_core/include", "_core/lib/pkgconfig"):
+        folder = numpy / relative
+        if folder.is_dir():
+            if not folder.resolve().is_relative_to(into):
+                raise ValueError(folder)
+            shutil.rmtree(folder)
+    for library in numpy.rglob("*.lib"):
+        library.unlink()
     # pip generates these build/configuration launchers with the builder's Python path.
     # Morphbench uses NumPy as a library and never launches either utility.
     for name in ("f2py.exe", "numpy-config.exe"):

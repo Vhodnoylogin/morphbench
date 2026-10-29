@@ -68,7 +68,8 @@
       "proof": [
         "pyn/pynifly.py",
         "NiflyDLL.dll",
-        "tri/trifile.py"
+        "tri/trifile.py",
+        "tri/tripfile.py"
       ],
       "search": [
         "%APPDATA%/Blender Foundation/Blender/*/scripts/addons/io_scene_nifly",
@@ -80,9 +81,10 @@
       "license": "GPL-3.0",
       "remark": [
         "Blender itself is NOT needed: the workbench never touches bpy, only the add-on folder.",
-        "Only the parts named in keep travel: the add-on carries 42 MB, of which the",
-        "workbench imports `pyn` (with NiflyDLL.dll beside it) and `tri`. The Blender",
-        "assets, hkxcmd.exe and the material list are 39 MB that nothing here ever opens.",
+        "Only the parts named in keep travel: the workbench imports `pyn`",
+        "(with NiflyDLL.dll beside it) and loads only",
+        "tri/trifile.py and tri/tripfile.py directly. The Blender nif/ and tri UI modules,",
+        "assets, hkxcmd.exe and the material list are never used and do not ship.",
         "keep is an allow-list on purpose: a future release of the add-on can add another",
         "folder, and a deny-list would let it in without anyone noticing.",
         "That folder usually sits among the Blender add-ons - which is where the build looks.",
@@ -93,8 +95,8 @@
       ],
       "keep": [
         "pyn",
-        "tri",
-        "nif",
+        "tri/trifile.py",
+        "tri/tripfile.py",
         "NiflyDLL.dll"
       ]
     }

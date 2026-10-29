@@ -7,6 +7,12 @@ an edited **new file**. The source editor preserves comments, command order, dup
 unknown text, UTF-8 BOM and original line endings. An edit replaces only the selected decimal
 number's source span. Exporting without edits reproduces the imported UTF-8 text exactly.
 
+PPB's runtime plugin is for **Skyrim VR**. Editing its text is possible outside either game,
+but SE/AE does not execute PPB's runtime re-scaling or auto-fit. A static exported Havok
+skeleton can be assessed independently on a compatible runtime; it does not provide those
+PPB features. Visible TRI morphs and Havok capsule geometry are separate: changing a mesh
+does not by itself fit the capsules. CBPC and FSMP also have their own collision definitions.
+
 In **Colliders**, select a PPB source group and an existing NIF capsule independently. The two
 copy actions move the selected seven geometric values between them: endpoint A, endpoint B and
 radius. This is an explicit manual copy in body-local game units. Check the chosen body, side,

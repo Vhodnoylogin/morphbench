@@ -176,11 +176,16 @@ python release.py --list
 | `mb.py` | the command line |
 | `morphbench.exe` | the launch window — build it *before* the release, it is not built for you |
 | `LICENSE`, `README.md`, `README.ru.md`, `dependencies.json` | the licence, the shop window in both languages, the statement about dependencies |
-| `CLAUDE.md`, `CLAUDE.ru.md` | the manifest: whoever unpacks the archive may hand the folder to an assistant, and this is the file that says what must not be "simplified" |
+| `CHANGELOG.md`, `CHANGELOG.ru.md` | the release history in both languages |
+| `CLAUDE.md` | the manifest: whoever unpacks the archive may hand the folder to an assistant, and this is the file that says what must not be "simplified" |
 | `morphbench/*.py`, `presenters/*.py` | the core and the presentation layers |
-| `locale/*/*.json` | every language, every section file |
+| `locale/*/*.json` | every runtime section in every language; the builder-only `release.json` is omitted |
 | `web/*.html`, `web/*.css`, `web/js/*.js` | the viewer page |
 | `docs/*.md` | this documentation, both languages |
+| `launcher/*.cs`, `launcher/*.cmd`, `launcher/*.py`, `launcher/*.manifest`, `launcher/*.ico` | the complete source, build script and resources for the compiled launcher |
+
+The launcher sources stay beside the binary so a mirrored archive still contains the inputs
+needed to rebuild it. The Python runtime code is already source; none of it is compiled away.
 
 Anything not named there cannot reach the archive, however much of it is lying next to us in the
 working copy. This is the whole reason the rule is written this way round: this repository is one
@@ -193,13 +198,16 @@ which `--list` shows immediately.
 leaves behind, `morphbench.json` and `morphbench.log`. The settings and the log belong to a
 machine, not to a release.
 
+The `release.json` catalogue in each language is also omitted: only `release.py` uses it, and
+the builder stays in the repository. The source catalogue remains available to the builder.
+
 Two consequences to keep in mind when adding files:
 
 * **The patterns are one level deep.** `web/js/*.js` catches a new script in `web/js/`
   automatically — and the load order for it is declared in `PageAssets.SCRIPTS`, not here — but a
   new folder, `web/img/` say, needs a new line in `CONTENT` or it silently will not ship. The same
   holds for a new subpackage under `morphbench/`.
-* **A new language or a new section ships by itself.** `locale/*/*.json` covers both, which is the
+* **A new language or a new runtime section ships by itself.** `locale/*/*.json` covers both, which is the
   point of a language being a folder of section files rather than one big file; see
   [localisation.md](localisation.md).
 
@@ -236,7 +244,8 @@ repeating here. `why` says what the workbench needs the thing for, and **an entr
 not be added** — a dependency nobody can justify is a dependency nobody will dare remove. `proof`
 lists files that must exist inside the folder, so that a folder with the right name belonging to
 something else is not picked up by mistake: for PyNifly those are `pyn/pynifly.py`, `NiflyDLL.dll`
-and `tri/trifile.py`. Name the wrong folder with `--pynifly` and the build stops and tells you
+and the two parsers `tri/trifile.py` and `tri/tripfile.py`. Each proof entry must be a file.
+Name the wrong folder with `--pynifly` and the build stops and tells you
 which files were missing, instead of packing a stranger's code.
 
 The `search` list is where the builder's machine is looked at: Blender's add-on and extension
@@ -244,13 +253,21 @@ folders under `%APPDATA%` and `%LOCALAPPDATA%`, then `./vendor/io_scene_nifly` i
 `%VARIABLE%` is taken from the environment and `*` behaves as in a file name. Candidates are tried
 in reverse name order, so the newest Blender version wins.
 
+PyNifly's `keep` list carries the `pyn/` runtime tree, `NiflyDLL.dll`, and just the two parser
+files `tri/trifile.py` and `tri/tripfile.py`. Nested file entries retain their relative paths;
+the bundler creates their parent folders. Morphbench loads those parser files directly because
+the `tri` package initialiser imports Blender. The Blender-facing `nif/` folder and TRI UI
+modules are not used and do not ship. Third-party source files are copied without edits.
+
 ### The packages and the embedded Python
 
 `numpy` and `pillow` are installed by the same `pip` you already have, but into the release folder
 rather than into the system: `pip install --target <stage>/vendor`. Dependency `test`/`tests`
 directories, `__pycache__`, `.pyc` caches, `.pyi` type stubs and NumPy's `_pyinstaller` build
 hooks and generated `f2py.exe`/`numpy-config.exe` build utilities are removed from the
-staged copy. Runtime APIs such as `numpy.testing` stay.
+staged copy. NumPy's `_core/include/` headers, `.lib` static/import libraries and
+`_core/lib/pkgconfig/` build configuration are also removed. Runtime `.pyd` extensions and
+DLLs stay, as do importable APIs such as `numpy.testing`, `numpy.typing` and `numpy.f2py`.
 `.dist-info` stays, including the exact versions and package licence files; `RECORD` lists
 only retained files. The builder's installed dependencies are not changed.
 

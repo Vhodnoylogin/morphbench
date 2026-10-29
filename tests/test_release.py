@@ -1,5 +1,7 @@
 """Release preflight and the truth of package manifests, without downloads or pip."""
+import base64
 import contextlib
+import hashlib
 import io
 import json
 import tempfile
@@ -27,8 +29,10 @@ class TestRelease(unittest.TestCase):
         self.deps = release.load_manifest(common.ROOT / "dependencies.json")
         (self.home / "dependencies.json").write_text(json.dumps({"dependencies": self.deps}))
         (self.home / "morphbench.exe").write_bytes(b"test launcher")
-        for name in ("pyn", "tri", "nif"):
+        for name in ("pyn", "tri"):
             (self.home / name).mkdir()
+        for name in ("pyn/pynifly.py", "tri/trifile.py", "tri/tripfile.py"):
+            (self.home / name).write_text("test parser")
         (self.home / "NiflyDLL.dll").write_bytes(b"test dependency")
         self.addCleanup(mock.patch.stopall)
         mock.patch.object(release, "HERE", self.home).start()
@@ -89,8 +93,19 @@ class TestRelease(unittest.TestCase):
         icon.write_bytes(b"icon")
         self.assertIn(icon, release.own_files(self.home))
 
+    def test_builder_catalogues_stay_in_source_only(self):
+        language = self.home / "locale" / "en"
+        language.mkdir(parents=True)
+        builder = language / "release.json"
+        builder.write_text('{"release.key": "builder text"}')
+        runtime = language / "page.json"
+        runtime.write_text('{"page.key": "runtime text"}')
+        self.assertEqual(release._texts(), {"release.key": "builder text"})
+        self.assertNotIn(builder, release.own_files(self.home))
+        self.assertIn(runtime, release.own_files(self.home))
+
     def test_incomplete_dependency_preserves_previous_stage(self):
-        (self.home / "nif").rmdir()
+        (self.home / "tri" / "tripfile.py").unlink()
         stage = self.out / "morphbench-0.7.0"
         stage.mkdir(parents=True)
         marker = stage / "keep.txt"
@@ -112,6 +127,9 @@ class TestRuntimeContents(unittest.TestCase):
         files = {
             "numpy/__init__.py": "runtime",
             "numpy/testing/__init__.py": "runtime testing API",
+            "numpy/_typing/__init__.py": "runtime internal typing module",
+            "numpy/f2py/__init__.py": "runtime f2py module",
+            "numpy/f2py/src/fortranobject.h": "f2py source",
             "numpy/tests/example.py": "test",
             "numpy/f2py/test/example.py": "nested test",
             "numpy/typing/tests/data/example.pyi": "test stub",
@@ -119,10 +137,24 @@ class TestRuntimeContents(unittest.TestCase):
             "numpy/__init__.pyi": "type stub",
             "numpy/__pycache__/example.pyc": "cache",
             "numpy/_pyinstaller/hook-numpy.py": "build hook",
+            "numpy/_core/include/numpy/arrayobject.h": "native build header",
+            "numpy/_core/include/numpy/__multiarray_api.c": "native build table",
+            "numpy/_core/lib/npymath.lib": "static build library",
+            "numpy/_core/lib/pkgconfig/numpy.pc": "native build configuration",
+            "numpy/_core/_multiarray_umath.cp312-win_amd64.lib": "import library",
+            "numpy/_core/_multiarray_umath.cp312-win_amd64.pyd": "runtime extension",
+            "numpy/_core/_multiarray_tests.cp312-win_amd64.pyd": "testing API extension",
+            "numpy/random/lib/npyrandom.lib": "static random build library",
             "numpy.libs/runtime.dll": "native runtime",
             "bin/f2py.exe": "Fortran build launcher",
             "bin/numpy-config.exe": "build configuration launcher",
             "numpy-1.dist-info/licenses/LICENSE.txt": "licence",
+            "numpy-1.dist-info/licenses/numpy/_core/include/numpy/LICENSE.txt": "header licence",
+        }
+        recorded = {
+            name: ["sha256=" + base64.urlsafe_b64encode(hashlib.sha256(body.encode()).digest())
+                   .decode().rstrip("="), str(len(body.encode()))]
+            for name, body in files.items()
         }
 
         def install(_argv):
@@ -131,18 +163,64 @@ class TestRuntimeContents(unittest.TestCase):
                 target.parent.mkdir(parents=True, exist_ok=True)
                 target.write_text(body)
             (into / "numpy-1.dist-info/RECORD").write_text(
-                "".join(name + ",,\n" for name in files) + "numpy-1.dist-info/RECORD,,\n")
+                "".join(",".join([name, *recorded[name]]) + "\n" for name in files)
+                + "numpy-1.dist-info/RECORD,,\n")
             return 0
 
         with mock.patch.object(release.subprocess, "call", side_effect=install):
             release.vendor_packages([{"name": "numpy", "into": "vendor"}], self.stage)
         retained = {p.relative_to(into).as_posix() for p in into.rglob("*") if p.is_file()}
-        expected = {"numpy/__init__.py", "numpy/testing/__init__.py",
-                    "numpy/typing/__init__.py", "numpy.libs/runtime.dll",
-                    "numpy-1.dist-info/licenses/LICENSE.txt", "numpy-1.dist-info/RECORD"}
+        expected = {
+            "numpy/__init__.py", "numpy/testing/__init__.py",
+            "numpy/_typing/__init__.py", "numpy/typing/__init__.py",
+            "numpy/f2py/__init__.py", "numpy/f2py/src/fortranobject.h",
+            "numpy/_core/_multiarray_umath.cp312-win_amd64.pyd",
+            "numpy/_core/_multiarray_tests.cp312-win_amd64.pyd",
+            "numpy.libs/runtime.dll", "numpy-1.dist-info/licenses/LICENSE.txt",
+            "numpy-1.dist-info/licenses/numpy/_core/include/numpy/LICENSE.txt",
+            "numpy-1.dist-info/RECORD",
+        }
         self.assertEqual(retained, expected)
         with (into / "numpy-1.dist-info/RECORD").open(newline="") as stream:
-            self.assertEqual({row[0] for row in release.csv.reader(stream)}, expected)
+            rows = list(release.csv.reader(stream))
+        self.assertEqual({row[0] for row in rows}, expected)
+        for row in rows:
+            self.assertEqual(row[1:], ["", ""] if row[0].endswith("/RECORD")
+                             else recorded[row[0]])
+
+    def test_pynifly_bundle_copies_only_runtime_tree_and_nested_parser_files(self):
+        source = self.stage / "addon"
+        files = {
+            "pyn/pynifly.py": "runtime wrapper",
+            "pyn/nested/helper.py": "runtime helper",
+            "pyn/__pycache__/helper.pyc": "cache",
+            "tri/trifile.py": "FRTRI parser",
+            "tri/tripfile.py": "TRIP parser",
+            "tri/__init__.py": "Blender initialisation",
+            "tri/import_tri.py": "Blender UI",
+            "nif/import_nif.py": "Blender NIF UI",
+            "NiflyDLL.dll": "native runtime",
+        }
+        for name, body in files.items():
+            target = source / name
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text(body)
+        dep = next(d for d in release.load_manifest(common.ROOT / "dependencies.json")
+                   if d["name"] == "PyNifly")
+        release.vendor_folder(dep, self.stage, self.stage, str(source))
+        target = self.stage / dep["into"]
+        retained = {p.relative_to(target).as_posix() for p in target.rglob("*") if p.is_file()}
+        self.assertEqual(retained, {"pyn/pynifly.py", "pyn/nested/helper.py",
+                                    "tri/trifile.py", "tri/tripfile.py", "NiflyDLL.dll"})
+        self.assertEqual((target / "tri/trifile.py").read_text(), "FRTRI parser")
+        self.assertEqual((target / "tri/tripfile.py").read_text(), "TRIP parser")
+
+    def test_dependency_proof_refuses_a_directory_in_place_of_a_parser(self):
+        source = self.stage / "addon"
+        (source / "tri" / "tripfile.py").mkdir(parents=True)
+        dep = {"name": "PyNifly", "proof": ["tri/tripfile.py"]}
+        with self.assertRaises(SystemExit):
+            release.find_folder(dep, self.stage, str(source))
 
     def test_embedded_stdlib_is_unpacked_and_import_path_is_updated(self):
         library = io.BytesIO()

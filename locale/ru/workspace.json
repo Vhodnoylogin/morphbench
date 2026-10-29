@@ -11,6 +11,8 @@
   "page.wsPhysics": "Физика",
   "page.wsSlots": "Слоты",
   "page.wsExperimental": "Эксперимент",
+  "page.wsWithheld": "Неактивно",
+  "page.wsUnavailable": "Этот режим недоступен в текущем выпуске.",
   "page.wsMorphsNote": "Проверка морфов и сравнение геометрии",
   "page.wsCollidersNote": "Проверка, правка и подгонка капсул коллизий",
   "page.wsPhysicsNote": "Просмотр цепочек костей и настроек физики",

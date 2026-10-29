@@ -18,8 +18,16 @@ WORKSPACE_TABS = {
     "slots": ("author", "display"),
 }
 
+# Release navigation is deliberately narrower than the scripted workspace API.
+# Keep experimental owners and old recipes usable without offering their pages.
+WORKSPACE_ENABLED_MODES = ("morphs", "colliders")
+
 
 class WorkspaceMixin:
+    def workspace_modes(self):
+        """Modes offered by this release's browser navigation, in display order."""
+        return list(WORKSPACE_ENABLED_MODES)
+
     def workspace_mode(self, mode="morphs"):
         mode = "morphs" if mode == "mesh" else mode
         if mode not in WORKSPACE_TABS:

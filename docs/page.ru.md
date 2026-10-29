@@ -24,6 +24,10 @@ python mb.py web body.nif --tri body.tri --out page.html
 python mb.py serve --root "D:\SteamLibrary\steamapps\common\SkyrimVR\Data"
 ```
 
+В этом выпуске доступны **Морфы** и **Коллайдеры**. Физика и Слоты отключены.
+Инспектор коллайдеров позволяет перемещать капсулы визуально и экспортировать новый файл;
+жесты, редактирование PPB и рецепты описаны в [workspace.ru.md](workspace.ru.md).
+
 Все ключи обеих команд — в [cli.ru.md](cli.ru.md); как открыть первый меш, в том числе запуском
 из Mod Organizer 2, — в [quickstart.ru.md](quickstart.ru.md).
 

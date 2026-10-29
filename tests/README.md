@@ -28,6 +28,8 @@ not one real build folder anywhere.
 | Suite | Needs PyNifly | What it checks |
 |---|---|---|
 | `test_release.py` | no | truthful bundle manifests, version/runtime preflight, preservation of a previous stage on missing dependencies, launcher sources, dependency test/stub cleanup with licences preserved, unpacked stdlib and import paths |
+| `test_launcher_args.py` | no; Windows/.NET compiler | compiles the production launcher helper and round-trips Windows arguments, including trailing backslashes, drive roots, quotes, spaces and following switches |
+| `test_workspace_modes.py` | no; Node for browser mirror | release navigation, disabled experimental links/recipes, keyboard skipping and independent mode overlays; scripted experimental APIs remain available |
 | `test_tri.py` | yes | a real TRIP written by `TripFile` reads back through `MorphSet.from_file` to the precision of the int16 quantum; an FRTRI written by `TriFile` |
 | `test_nif.py` | yes | a tiny NIF made by PyNifly reads back through `BodyModel.from_nif`; `open()` finds the `.tri` lying beside it |
 | `test_morphs.py` | no | an empty morph, one declared but absent, `apply` with a fraction and with vertex numbers past the end of the mesh |

@@ -24,6 +24,10 @@ python mb.py web body.nif --tri body.tri --out page.html
 python mb.py serve --root "D:\SteamLibrary\steamapps\common\SkyrimVR\Data"
 ```
 
+The release workspace offers **Morphs** and **Colliders**. Physics and Slots are disabled.
+The collider inspector supports visual capsule movement and new-file export; see
+[workspace.md](workspace.md) for gestures, PPB editing and saved recipes.
+
 Every option of both commands is in [cli.md](cli.md); getting the first mesh open, including
 the launch from inside Mod Organizer 2, is in [quickstart.md](quickstart.md).
 

@@ -268,7 +268,9 @@ class TestNativeSkeletonOpen(unittest.TestCase):
                                                     "mode": "slots"})
             status, kind, html = get(base + "/?" + explicit_mode)
             self.assertEqual(status, 200)
-            self.assertEqual(self.bench.workspace_state()["mode"], "slots")
+            # Old experimental links keep the loaded rig but cannot enable a withheld tab.
+            self.assertEqual(self.bench.workspace_state()["mode"], "morphs")
+            self.assertTrue(self.bench.has_skeleton())
 
     def test_browser_mirror_displays_all_standalone_capsules_and_matches_frame(self):
         self.bench.open(self.variant)

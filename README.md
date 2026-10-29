@@ -23,6 +23,9 @@ Development of the next collider/physics workspace continues on
 It includes visual capsule editing, bidirectional source-preserving [PPB tuning editing](docs/ppb.md)
 and the skeleton-only blank-page fix. These changes are not included in the public 0.7.1-r2 archive.
 It also distinguishes [native file visibility](docs/visibility.md) from the viewer's shape selection.
+The **0.8.0-rc.1** candidate enables only **Morphs** and **Colliders**; Physics and Body Slots
+are disabled in browser navigation. Their code and script APIs remain for development.
+See the [editing workspace](docs/workspace.md) and [changelog](CHANGELOG.md).
 
 ## Why this and not BodySlide
 

@@ -11,7 +11,22 @@ go in a major release, and nowhere else.
 
 Эта страница на русском: [CHANGELOG.ru.md](CHANGELOG.ru.md).
 
-## [0.7.1] — unreleased
+## [0.8.0-rc.1] — 2026-10-29
+
+- Reorganized the browser into Morphs and Colliders modes with a shared model list and
+  inspector. Physics and Body Slots tabs are disabled for this release; their script APIs
+  and saved data remain available for development.
+- Added visual capsule selection and translation, numeric endpoint/radius editing,
+  duplication/removal, reset, source-pinned recipes and export to a new skeleton NIF.
+- Added source-preserving PPB tuning import/edit/export and explicit live links between
+  a selected tuning record and an editable capsule. Runtime PPB overrides and auto-fit
+  still require validation in the game.
+- Fixed standalone skeleton loading and framing when the NIF has no renderable mesh.
+- Added static NIF visibility diagnostics and an independent inspection policy for locally
+  or ancestrally hidden shapes. This does not evaluate game controllers or camera culling.
+- Fixed Windows launcher argument quoting for directory paths ending in a backslash.
+
+## [0.7.1]
 
 - Offline audit on 2026-10-03: refuses existing NIF outputs, including hardlink aliases;
   keeps cylinder end rings inside fitted capsules; retains partial FRTRI morphs; bounds

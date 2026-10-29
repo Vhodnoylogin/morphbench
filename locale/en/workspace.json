@@ -11,6 +11,8 @@
   "page.wsPhysics": "Physics",
   "page.wsSlots": "Slots",
   "page.wsExperimental": "Experimental",
+  "page.wsWithheld": "Unavailable",
+  "page.wsUnavailable": "This mode is not available in this release.",
   "page.wsMorphsNote": "Inspect morphs and compare the mesh",
   "page.wsCollidersNote": "Inspect, edit and fit collision capsules",
   "page.wsPhysicsNote": "Review bone chains and physics configuration",

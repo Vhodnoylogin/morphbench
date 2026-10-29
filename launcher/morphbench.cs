@@ -372,7 +372,25 @@ static class Module
 
     public static string Quote(string s)
     {
-        return "\"" + s.Replace("\"", "\\\"") + "\"";
+        // ProcessStartInfo passes one Windows command line, not an argv array. Backslashes
+        // immediately before a quote are escapes, including the quote closing the argument:
+        // a directory ending in '\\' must keep its slash without swallowing the next switch.
+        var quoted = new StringBuilder("\"");
+        int slashes = 0;
+        foreach (char ch in s)
+        {
+            if (ch == '\\')
+            {
+                slashes++;
+                continue;
+            }
+            quoted.Append('\\', ch == '"' ? slashes * 2 + 1 : slashes);
+            quoted.Append(ch);
+            slashes = 0;
+        }
+        quoted.Append('\\', slashes * 2);
+        quoted.Append('"');
+        return quoted.ToString();
     }
 }
 

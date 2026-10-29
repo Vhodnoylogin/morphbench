@@ -8,6 +8,8 @@ class App {
   constructor(data) {
     this.data = data;
     this.bench = new BenchMirror(data);
+    // Old links and saved experimental pages must not activate withheld tabs.
+    if (!this.bench.workspace_modes().includes(this.bench.workspace_state().mode)) this.bench.workspace_mode("morphs");
     this.lastCall = "";
     this.scale = 1.0;
     this.canvas = document.getElementById("canvas");
@@ -30,13 +32,16 @@ class App {
     this.editorPanel.refresh();
     this.workspace.refresh();
     this.draw();
+    this.updateWorkspaceUrl();
   }
   // The one door to every action: the name of a facade method and its arguments.
   invoke(method, ...args) {
     this.panel.error.textContent = "";
     let result;
     try {
+      if (method === "workspace_mode" && !this.bench.workspace_modes().includes(args[0] === "mesh" ? "morphs" : args[0])) throw new Error(T.wsUnavailable);
       result = this.bench[method](...args);
+      if (method === "workspace_replay" && !this.bench.workspace_modes().includes(this.bench.workspace_state().mode)) this.bench.workspace_mode("morphs");
     } catch (e) {
       this.panel.error.textContent = String(e.message || e);
       return;
@@ -51,12 +56,15 @@ class App {
     this.panel.refresh();
     if(this.editorPanel) this.editorPanel.refresh();
     if(this.workspace) this.workspace.refresh();
-    if((method==="workspace_mode"||method==="workspace_tab")&&this.bench.server) {
-      const url=new URL(window.location.href),state=this.bench.workspace_state();
-      url.searchParams.set("mode",state.mode);url.searchParams.set("tab",state.tab);window.history.replaceState(null,"",url);
-    }
+    if (["workspace_mode", "workspace_tab", "workspace_replay"].includes(method)) this.updateWorkspaceUrl();
     this.draw();
     return result;
+  }
+  updateWorkspaceUrl() {
+    if (!this.bench.server) return;
+    const url = new URL(window.location.href), state = this.bench.workspace_state();
+    url.searchParams.set("mode", state.mode); url.searchParams.set("tab", state.tab);
+    window.history.replaceState(null, "", url);
   }
   refreshSlots() { this.renderer.uploadSlots(this.bench.slots_meshes()); }
   refreshColliders() {

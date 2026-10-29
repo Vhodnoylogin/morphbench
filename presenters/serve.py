@@ -399,7 +399,10 @@ class WebServer:
                     bench.open_skeleton(skeleton)
                 if query.get("mode") is not None:
                     bench.workspace_mode(query.get("mode"))
-                if query.get("tab") is not None:
+                enabled_mode = bench.workspace_state()["mode"] in bench.workspace_modes()
+                if not enabled_mode:
+                    bench.workspace_mode("morphs")
+                if query.get("tab") is not None and enabled_mode:
                     bench.workspace_tab(query.get("tab"))
             except Exception as e:  # noqa: BLE001 - any refusal of the facade is shown as text
                 error, status = _message(e), _status_of(e)

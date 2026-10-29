@@ -31,6 +31,7 @@ class WorkspaceUI {
     document.getElementById("workspace-context").textContent = T.wsModels;
     document.getElementById("viewport-title").textContent = T.wsViewport;
     for (const mode of this.modes) {
+      const enabled = this.bench.workspace_modes().includes(mode.id);
       const icon = el("span", { class: "mode-icon", "aria-hidden": "true" });
       // A fixed SVG template lets the HTML parser select its namespace without an URL in
       // the offline page. Path data below is static markup, never model or user content.
@@ -42,10 +43,11 @@ class WorkspaceUI {
         shape.setAttribute("d", path); svg.appendChild(shape);
       }
       icon.appendChild(svg);
-      const button = el("button", { class: "mode-button", type: "button", title: mode.note,
+      const button = el("button", { class: "mode-button", type: "button", title: enabled ? mode.note : T.wsUnavailable,
+        ...(!enabled ? { disabled: "disabled" } : {}), "aria-disabled": String(!enabled),
         "data-workspace-mode": mode.id, on: { click: () => app.invoke("workspace_mode", mode.id) } },
       [icon, el("span", { text: mode.label }),
-        mode.id === "slots" ? el("span", { class: "mode-badge", text: T.wsExperimental }) : null]);
+        !enabled ? el("span", { class: "mode-badge", text: T.wsWithheld }) : null]);
       this.modeButtons.set(mode.id, button);
       this.modeNav.appendChild(button);
     }
@@ -54,7 +56,8 @@ class WorkspaceUI {
     this.refresh();
   }
   onNavigate(event, buttons, method) {
-    const keys = Array.from(buttons.keys()), nodes = Array.from(buttons.values());
+    const entries = Array.from(buttons).filter(([, button]) => !button.disabled);
+    const keys = entries.map(([key]) => key), nodes = entries.map(([, button]) => button);
     const index = nodes.indexOf(document.activeElement);
     if (index < 0 || !["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
     event.preventDefault();

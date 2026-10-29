@@ -303,6 +303,7 @@ class WebPage:
             "texts": section("page."),
             "slots": bench.slots_state(),
             "workspace": bench.workspace_state(),
+            "workspaceModes": bench.workspace_modes(),
             "colliderEditor": bench.collider_editor_payload(),
             "physics": bench.physics_state(),
             "ppb": bench.ppb_state(),

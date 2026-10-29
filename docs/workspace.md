@@ -2,10 +2,16 @@
 
 Russian: [workspace.ru.md](workspace.ru.md).
 
-The viewer has four modes across the top: **Morphs**, **Colliders**, **Physics** and
-**Slots**. A second row holds the current mode's tabs. Models and parts stay on the left,
-the 3D view in the centre, and the current inspector on the right. Ragdoll capsules are
-shown in Colliders mode. Slots retains the existing experimental [placement editor](slots.md).
+This release enables **Morphs** and **Colliders**. **Physics** and **Slots** remain visible
+but disabled; keyboard navigation skips them, and old links to those modes open Morphs.
+A second row holds the current mode's tabs. Models and parts stay on the left, the 3D view
+in the centre, and the current inspector on the right. Ragdoll capsules are shown in Colliders
+mode. Experimental physics and [placement](slots.md) code, documents and scripted APIs are
+retained for further development; they are not offered as release UI features.
+
+`bench.workspace_modes()` returns the enabled browser modes. `workspace_mode()` and numeric
+CLI/HTTP operations retain their existing scripted contract, including experimental modes.
+Opening their saved recipes in the browser keeps the data and returns navigation to Morphs.
 
 Start a local viewer with an explicit mesh and skeleton:
 

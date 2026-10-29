@@ -33,7 +33,9 @@ class BenchMirror {
     this._fileVisibility = data.fileVisibility || {source:this.summary?this.summary.nif:null,scope:"nif-file",runtimeEvaluated:false,complete:false,shapes:[]};
     this._sliders = new Map(Object.entries(data.sliders));
     this.placements = new PlacementMirror(data.settings, data.slots);
+    this._workspaceModes = (data.workspaceModes || ["morphs", "colliders"]).slice();
   }
+  workspace_modes() { return this._workspaceModes.slice(); }
 
   slots_mode(mode="slots") { return this.placements.setMode(mode); }
   slots_replace(metadata,rows) { return this.placements.replace(metadata,rows); }

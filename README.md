@@ -49,10 +49,19 @@ edited or fitted collision capsules, and edited physics configurations into new 
 
 ## What it needs
 
-**From the release archive — nothing.** Everything is inside: the workbench itself, the launch
-window `morphbench.exe`, an embedded Python, `numpy`, `pillow` and the **PyNifly** add-on folder.
-Unpack and run. Blender is not needed and is not in the archive: morphbench never touches `bpy`,
-it only needs PyNifly's folder, which normally happens to live among Blender's add-ons.
+**From a release — no separate Python or Blender installation.** Split releases have two packages:
+**Runtime** contains `morphbench.exe`, embedded Python, `numpy`, `pillow` and **PyNifly**;
+**Application** contains the workbench's Python, browser assets, translations and documentation.
+For the first installation, extract the contents of both packages into the **same folder**,
+so `morphbench.exe`, `mb.py`, `python/` and both release manifests are beside one another.
+The archive wrapper folders have different names; merge their contents, not those folders.
+Then run `morphbench.exe`. Later Application updates reuse the exact Runtime they require.
+See [installation, updates and recovery](docs/updating.md), including migration from older
+single-archive releases.
+
+Blender is not bundled or needed: morphbench never touches `bpy`; it uses PyNifly's folder,
+which normally happens to live among Blender's add-ons. The legacy full archive remains a
+supported build format.
 
 **From the sources**, in a working copy, you supply those yourself:
 
@@ -72,7 +81,7 @@ a second reading that could drift away from the first never appears.
 
 ## Starting it
 
-Everything runs from the repository root. A first look at a mesh:
+Everything runs from the installation or repository root. A first look at a mesh:
 
 ```
 python mb.py summary body.nif
@@ -112,7 +121,8 @@ buttons to start it, stop it and open the page. It computes nothing — every bu
 call `serve` makes. Started from MO2, it starts the server as its own child, and that server sees
 the merged `Data`.
 
-1. Build the window once: `launcher\build.cmd`. The result lands beside `mb.py`.
+1. A release already includes the window. From sources, build it once with
+   `launcher\build.cmd`; the result lands beside `mb.py`.
 2. In MO2, add an executable: the binary is `morphbench.exe`; `--start` as an argument raises the
    server and opens the page in one click. "Start in" is not needed.
 3. Run that entry from MO2. The window reports whether it is under MO2, and the page will not step
@@ -163,6 +173,7 @@ require runtime evidence.
 | Path | What is there |
 |---|---|
 | `mb.py` | the command line — one client of the facade like everything else |
+| `mb_distribution.py`, `update.py` | release manifest verification, install locking and the local Application updater |
 | `morphbench\` | the core: geometry, morphs, measurement. It does not draw, does not open windows and does not know the word "pixel" |
 | `presenters\` | the layers that show what the core computed: console tables, PNG, the page, and the settings format of PPB |
 | `web\` | the viewer page as real files — `page.html`, `style.css`, `js\*.js`; `presenters\assets.py` either serves them one by one or folds them into one self-contained file, and the load order is declared once in `PageAssets.SCRIPTS` |
@@ -179,9 +190,13 @@ require runtime evidence.
 own, in both languages: what the layer is, what it may depend on, and what must never import it.
 Open the folder and the boundary is right there.
 
-The release archive additionally carries `python\`, `vendor\` (numpy, pillow, PyNifly) and
-`THIRD-PARTY.md`. The launcher source, build script and resources stay beside its binary.
-Tests and `release.py` remain in the repository.
+A split installation keeps this flat layout. Runtime supplies `morphbench.exe`, `python\`,
+`vendor\` (numpy, pillow, PyNifly), the launcher rebuild sources and third-party notices.
+Application supplies the workbench and its documentation. `runtime-manifest.json` identifies
+the Runtime and its exact file hashes; `application-manifest.json` identifies the Application,
+its owned files and the required Runtime identity/hash. Application updates preserve settings,
+launcher state, installed add-ons and other user files. Tests and `release.py` remain in the
+repository. Source checkouts without release manifests remain usable.
 
 The line between the core and the presenters is hard, and there is a way to check it: if an action
 cannot be performed from the command line, the line was drawn wrong. Everything the viewer can do
@@ -213,6 +228,7 @@ from `dependencies.json`.
 | [docs/workspace.md](docs/workspace.md) | the four modes, capsule/configuration editing, session replay and limits |
 | [docs/localisation.md](docs/localisation.md) | how the texts are laid out and how to add a language |
 | [docs/building.md](docs/building.md) | building `morphbench.exe` and the release archive: what is bundled and under what licence |
+| [docs/updating.md](docs/updating.md) | install Runtime and Application, update locally, recover an interruption and migrate an older release |
 
 Each of these exists twice, in English and in Russian: `NAME.md` and `NAME.ru.md`.
 

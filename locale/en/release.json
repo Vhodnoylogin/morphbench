@@ -33,5 +33,12 @@
   "release.tpSource": "Sources: %(source)s",
   "release.tpTitle": "Third-party work inside morphbench %(version)s",
   "release.tpWhy": "What it is for: %(why)s",
-  "release.usage": "Building the release: one self-contained archive of the workbench.\n\n    python release.py                      build into build\\ and pack\n    python release.py --version 0.7.0      release number for the archive name and manifest.json\n    python release.py --no-python          no embedded Python (one must already be installed)\n    python release.py --pynifly <folder>   take the add-on from here instead of looking for it\n    python release.py --stage-only         stage the release folder and do not pack it\n    python release.py --list               what would go into the archive, doing nothing"
+  "release.usage": "Building the release: one self-contained archive of the workbench.\n\n    python release.py                      build into build\\ and pack\n    python release.py --version 0.7.0      release number for the archive name and manifest.json\n    python release.py --no-python          no embedded Python (one must already be installed)\n    python release.py --pynifly <folder>   take the add-on from here instead of looking for it\n    python release.py --stage-only         stage the release folder and do not pack it\n    python release.py --list               what would go into the archive, doing nothing",
+  "release.optPackage": "Package kind: legacy full, immutable runtime, or application-only update.",
+  "release.optRuntimeFrom": "Audited complete release or existing Runtime folder; copy exact bytes.",
+  "release.optRuntimeManifest": "Required runtime-manifest.json for the Application.",
+  "release.optRuntimeVersion": "Independent Runtime version, changed only for native/runtime updates.",
+  "release.splitFlags": "Split-only options cannot be mixed with legacy bundling options.",
+  "release.needRuntime": "--package application requires --runtime <runtime-manifest.json>.",
+  "release.needRuntimeSeed": "--package runtime requires --runtime-from <audited release folder>."
 }

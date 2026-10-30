@@ -11,6 +11,18 @@ go in a major release, and nowhere else.
 
 Эта страница на русском: [CHANGELOG.ru.md](CHANGELOG.ru.md).
 
+## [Unreleased]
+
+- Added separate Runtime and Application packages while keeping the flat installation layout
+  and the legacy full-release build. Runtime reuses existing launcher/dependency bytes and
+  records exact file hashes; Application pins that Runtime and inventories its own files.
+- Added a local Application updater with verification-only checks, install locking, backups
+  and interrupted-update recovery. It preserves Runtime, settings, launcher state, add-ons
+  and unknown user files, refuses modified owned files and removes only owned obsolete files.
+- Documented first installation, Application updates and fresh-folder migration from a legacy
+  full archive in English and Russian. Runtime changes require separate review; stable hashes
+  do not establish antivirus or Nexus clearance.
+
 ## [0.8.0] — 2026-10-29
 
 - Reorganized the browser into Morphs and Colliders modes with a shared model list and

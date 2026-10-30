@@ -2,24 +2,26 @@
 
 BodySlide builds the body; morphbench checks it — it reads what was built and says whether the
 morphs, the bounding spheres and the collision capsules hold up, outside the
-game, in seconds. This page is for whoever produces the two things a user actually receives: the
-launch window `morphbench.exe`, and the release archive that carries the workbench with everything
-it needs inside it.
+game, in seconds. This page is for whoever builds the launch window `morphbench.exe` and
+packages the workbench. Split releases reuse a reviewed Runtime and ship Application changes
+separately. The legacy full archive recipe remains available.
 
 If you only want to use the tool from a working copy, you do not need this page — see
 [quickstart.md](quickstart.md). What the tool is and how it is put together is in
 [../README.md](../README.md).
 
-## The two artefacts
+## Build artefacts
 
 | Artefact | Built from | By | Lands in |
 |---|---|---|---|
 | `morphbench.exe` | `launcher/morphbench.cs` + `launcher/morphbench.manifest` + `launcher/morphbench.ico` | `launcher/build.cmd` | next to `mb.py`, in the root of the module |
 | `launcher/morphbench.ico` | twenty-odd numbers in `launcher/make-icon.py` | `python launcher/make-icon.py` | `launcher/morphbench.ico` (versioned, see below) |
 | `morphbench-<version>.zip` | the module itself plus the bundled dependencies | `python release.py` | `build/` |
+| `morphbench-runtime-<runtime-version>-win64.zip` | Runtime files from a complete existing release folder, copied unchanged | `python release.py --package runtime` | the `--out` folder |
+| `morphbench-application-<version>.zip` | Application sources and assets pinned to a Runtime manifest | `python release.py --package application` | the `--out` folder |
 
-Both `morphbench.exe` and the archive are build products and git does not take them: they are named
-in `.gitignore`. The icon is the exception, and the reason is given under [The icon](#the-icon).
+`morphbench.exe` and the ZIP archives are build products and git does not take them: they are
+named in `.gitignore`. The icon is the exception, explained under [The icon](#the-icon).
 
 ## What the build machine needs
 
@@ -27,8 +29,9 @@ in `.gitignore`. The icon is the exception, and the reason is given under [The i
 |---|---|---|
 | `morphbench.exe` | nothing to install | the .NET Framework 4 compiler ships with Windows |
 | redrawing the icon | Python with `pillow` | only if the `.ico` is missing; normally it comes out of the repository |
-| the release archive | Python 3.12+, `pip`, a network connection | `pip` fetches `numpy` and `pillow`, the network fetches the embeddable Python |
-| the release archive | the **PyNifly** add-on folder on disk | found automatically among the Blender add-ons, or named with `--pynifly` |
+| a full release archive | Python 3.12+, `pip`, a network connection | `pip` fetches `numpy` and `pillow`, the network fetches the embeddable Python |
+| a full release archive | the **PyNifly** add-on folder on disk | found automatically among the Blender add-ons, or named with `--pynifly` |
+| split packages | Python 3.12+ and a complete existing release folder | Runtime packaging reuses its files; Application packaging reads a Runtime manifest. Neither step downloads dependencies |
 | the checks | Python 3.12+ with `numpy`; `pillow` and PyNifly optional | suites that need what is missing skip themselves |
 
 Blender itself is never needed, for anything. The workbench never touches `bpy`; it needs the
@@ -121,7 +124,59 @@ will hand the pointer to the compiler and the build fails on an unreadable icon.
 The header comment in `build.cmd` still says the icon is not versioned. That comment is stale;
 `.gitattributes` and `.gitignore` are the current rule.
 
-## The release archive
+## Split Runtime and Application packages
+
+The installation remains flat: `morphbench.exe`, `mb.py`, `python/`, `vendor/`, `launcher/`
+and the Application directories share one root. This preserves the existing launcher and MO2
+paths. Runtime packaging copies the existing launcher bytes; it does not compile a new exe.
+
+First choose a complete existing release folder containing the launcher, embedded Python,
+vendor dependencies, launcher rebuild sources and licence notices. Package that Runtime:
+
+```
+python release.py --package runtime --runtime-from "<complete-release-folder>" --runtime-version 1 --out "<builds>"
+```
+
+This creates `morphbench-runtime-1-win64.zip`. Its staged `runtime-manifest.json` has Runtime
+identity `runtime-1-win64`, a SHA-256 inventory of the Runtime files and a `contentHash` for
+that inventory. Use the staged manifest path reported by the build in the next command:
+
+```
+python release.py --package application --runtime "<runtime-stage>/runtime-manifest.json" --version 0.8.0 --out "<builds>"
+```
+
+This creates `morphbench-application-0.8.0.zip` and a staged `application-manifest.json`.
+The Application manifest records its version, owned file inventory and the exact required
+Runtime identity and content hash. Runtime version `1` is independent of Application version
+`0.8.0`; a matching-looking name or Python version cannot replace the pinned hash.
+
+| Package | Contents |
+|---|---|
+| Runtime | `morphbench.exe`, `python/`, `vendor/`, launcher rebuild sources and third-party licence notices |
+| Application | `mb.py`, `mb_distribution.py`, `update.py`, `morphbench/`, `presenters/`, `web/`, `locale/`, `docs/` and release documentation/licences |
+
+Application packages exclude native `.exe`, `.dll`, `.pyd` and `.so` files, Runtime directories
+`python/`, `vendor/`, `launcher/`, per-machine configuration, installed add-ons, tests,
+caches and nested archives. They carry Python and JavaScript source, which is still executable
+code. The package inventory defines ownership; the updater does not infer ownership from a
+directory name.
+
+For a first install, users extract the contents of **both** archives into one new directory,
+merging the contents of their differently named wrapper folders. Later Application updates
+use `update.py` after stopping the server. The install lock prevents the running Application
+and an updater from using the installation concurrently. Manifests and Runtime hashes are
+checked before native imports; source checkouts without release manifests remain usable.
+See [updating.md](updating.md) for the exact install, check, update, recovery and migration steps.
+
+Review and publish Runtime independently. Any Runtime dependency change, security upgrade or
+launcher rebuild requires a new Runtime review and corresponding manifest; Application-only
+updates cannot replace those files. Reusing the same bytes avoids unnecessary native changes,
+but stable hashes do not guarantee antivirus or Nexus clearance. Installation and updates
+provide no automatic downloader for end users.
+
+## Legacy full release archive
+
+The default is still `--package full`. Existing full-release commands keep their behaviour:
 
 ```
 python release.py --version 0.7.0
@@ -162,7 +217,7 @@ guessing the machine's language is the catalogue's job and whoever builds a rele
 `release.py` itself never travels inside the archive it builds. It belongs to the repository, not
 to the release.
 
-### CONTENT: what goes in is listed, never what stays out
+### CONTENT: what goes into the full archive
 
 The contents of the archive are stated in one place — the `CONTENT` list at the top of
 `release.py` — and they are stated **by enumeration**:
@@ -173,7 +228,7 @@ python release.py --list
 
 | Pattern | What it carries |
 |---|---|
-| `mb.py` | the command line |
+| `mb.py`, `mb_distribution.py`, `update.py` | the command line, release verification and local updater |
 | `morphbench.exe` | the launch window — build it *before* the release, it is not built for you |
 | `LICENSE`, `README.md`, `README.ru.md`, `dependencies.json` | the licence, the shop window in both languages, the statement about dependencies |
 | `CHANGELOG.md`, `CHANGELOG.ru.md` | the release history in both languages |
@@ -238,8 +293,8 @@ them: `release.py` builds the archive by it and writes `THIRD-PARTY.md` by it.
 **The licence decides what goes in, not convenience.** PyNifly is GPL-3 and so are we, so it can
 and should travel inside; numpy, pillow and Python are all under licences that permit
 redistribution. A dependency that cannot legally go inside would be marked `bundle: false`, and
-then its entry is obliged to say where the user gets it. Nothing is marked that way today, which
-is why the release is self-contained: there is nothing for the user to download.
+then its entry is obliged to say where the user gets it. Nothing is marked that way today:
+the Runtime/Application pair and the legacy full archive include the required dependencies.
 
 The fields of an entry are documented in the `note` block at the top of the file. Two are worth
 repeating here. `why` says what the workbench needs the thing for, and **an entry without it must
@@ -295,8 +350,9 @@ nested-archive policy, but does not establish antivirus or moderator clearance.
 ### THIRD-PARTY.md
 
 The GPL requires that the list of third-party work travel with the binary, and `release.py` writes
-it into every archive from `dependencies.json`: for each entry, what it is, what the workbench
-needs it for, whether it is inside the package and where, under which licence, and where its
+it into a full release from `dependencies.json` and retains it in Runtime packaging: for each
+entry, what it is, what the workbench needs it for, whether it is inside the package and where,
+under which licence, and where its
 sources live. `NiflyDLL.dll` is compiled; a generic source address alone does not identify
 the precise inputs used to build a particular binary.
 
@@ -369,6 +425,7 @@ These are real and they are in the code as described.
 |---|---|
 | [../README.md](../README.md) | what the tool is and how it is put together |
 | [quickstart.md](quickstart.md) | the first hour: open a mesh, read the answer, launch from MO2 |
+| [updating.md](updating.md) | install the split packages, update Application, recover an interruption and migrate a legacy release |
 | [cli.md](cli.md) | every command of `mb.py` and what `--json` returns |
 | [page.md](page.md) | the viewer in the browser |
 | [physics.md](physics.md) | what the bench measures: reach spheres and collision capsules |

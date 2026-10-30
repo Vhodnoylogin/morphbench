@@ -31,9 +31,12 @@ import re
 import shutil
 import subprocess
 import sys
+import tempfile
 import urllib.request
 import zipfile
 from pathlib import Path
+
+import mb_distribution as distribution
 
 HERE = Path(__file__).resolve().parent
 _VAR = re.compile(r"%([^%]+)%")
@@ -79,6 +82,8 @@ def t(key: str, **values) -> str:
 #: named here will not reach the archive, however much of it lies next to us in the working copy.
 CONTENT = [
     "mb.py",
+    "mb_distribution.py",
+    "update.py",
     "morphbench.exe",
     "LICENSE",
     "README.md",
@@ -307,6 +312,138 @@ def third_party(deps: list[dict], stage: Path, version: str) -> None:
     (stage / "THIRD-PARTY.md").write_text("\n".join(lines), encoding="utf-8")
 
 
+def application_files(home: Path) -> list[Path]:
+    """The application namespace is shared with the installer, never a deny-list."""
+    return [path for path in own_files(home)
+            if distribution.app_path(path.relative_to(home).as_posix())]
+
+
+def _inventory(stage: Path) -> dict:
+    return {path.relative_to(stage).as_posix(): distribution.file_digest(path)
+            for path in sorted(stage.rglob("*")) if path.is_file()}
+
+
+def _publish_split(stage: Path, out: Path, name: str, manifest: dict, stage_only: bool) -> None:
+    marker = (distribution.RUNTIME_MANIFEST if manifest["kind"] == "runtime"
+              else distribution.APP_MANIFEST)
+    distribution.validate_manifest(manifest, manifest["kind"])
+    (stage / marker).write_bytes(distribution.canonical(manifest))
+    target = out / name
+    if (target.is_symlink() or target.resolve().parent != out
+            or HERE.resolve().is_relative_to(target)):
+        raise distribution.PackageError("unsafePath", path=str(target))
+    if target.exists():
+        distribution.checked_root(target)
+    # A runtime label must never silently acquire different bytes in the same output.
+    if target.exists() and manifest["kind"] == "runtime":
+        existing = distribution.read_json(target / marker)
+        if existing != manifest:
+            raise distribution.PackageError("immutableRuntime", path=str(target))
+        distribution.verify_files(target, manifest)
+    elif target.exists():
+        shutil.rmtree(target)
+    if not target.exists():
+        os.replace(stage, target)
+    if not stage_only:
+        # Use the inventory even when reusing an existing Runtime stage. A local log,
+        # cache or user file added beside it must never leak into the archive.
+        archive = str(out / (name + ".zip"))
+        with zipfile.ZipFile(archive, "w", zipfile.ZIP_DEFLATED) as package:
+            for path in sorted([*manifest["files"], marker]):
+                package.write(distribution.safe_path(target, path), name + "/" + path)
+        if manifest["kind"] == "application":
+            distribution.read_application(Path(archive))  # Inspect the actual finished ZIP too.
+        print(t("release.archive", path=archive, size=Path(archive).stat().st_size / 1048576.0))
+    print(t("release.staged", path=target))
+
+
+def split_release(args, parser) -> int:
+    """No compiler, pip, network or native import in either split packaging operation.
+
+    Runtime is seeded from an audited complete distribution, or copied from an
+    already pinned Runtime. Future application builds need only its manifest.
+    """
+    if args.no_vendor or args.no_python or args.pynifly:
+        parser.error(t("release.splitFlags"))
+    out = (Path(args.out) if args.out else HERE / "build").resolve()
+    if args.package == "application":
+        if not args.runtime:
+            parser.error(t("release.needRuntime"))
+        runtime = distribution.validate_manifest(distribution.read_json(Path(args.runtime)), "runtime")
+        files = application_files(HERE)
+        if args.list:
+            for path in files:
+                print(path.relative_to(HERE).as_posix())
+            return 0
+        contents = {path.relative_to(HERE).as_posix(): path.read_bytes() for path in files}
+        for name, data in contents.items():
+            distribution.check_application_file(name, data)
+        if len(contents) > distribution.MAX_FILES or sum(map(len, contents.values())) > distribution.MAX_TOTAL:
+            raise distribution.PackageError("archive")
+        manifest = {"schemaVersion": 1, "kind": "application", "name": "morphbench",
+                    "version": args.version, "license": "GPL-3.0",
+                    "requiresRuntime": {key: runtime[key] for key in ("id", "contentHash")},
+                    "files": {name: distribution.digest(data) for name, data in contents.items()}}
+        distribution.validate_manifest(manifest, "application")
+        name = "morphbench-application-" + args.version
+    else:
+        if not args.runtime_from:
+            parser.error(t("release.needRuntimeSeed"))
+        seed = distribution.checked_root(Path(args.runtime_from))
+        marker = seed / distribution.RUNTIME_MANIFEST
+        if marker.exists():
+            manifest = distribution.validate_manifest(distribution.read_json(marker), "runtime")
+            if manifest["id"] != "runtime-" + args.runtime_version + "-win64":
+                raise distribution.PackageError("immutableRuntime", path=str(seed))
+            distribution.verify_files(seed, manifest)
+            contents = {name: distribution.safe_path(seed, name).read_bytes() for name in manifest["files"]}
+        else:
+            # Consume only named runtime partitions of the complete audited release.
+            names = ["morphbench.exe"]
+            for folder in ("python", "vendor", "launcher"):
+                tree = distribution.safe_path(seed, folder)
+                if not tree.is_dir():
+                    raise distribution.PackageError("runtimeMissing", path=folder)
+                for path in sorted(tree.rglob("*")):
+                    if distribution._linked(path):
+                        raise distribution.PackageError("unsafePath", path=str(path))
+                    if path.is_file():
+                        relative = path.relative_to(seed).as_posix()
+                        if (any(part in ("tests", "test", "__pycache__") for part in path.relative_to(tree).parts)
+                                or path.suffix == ".pyi"
+                                or (folder != "python" and path.suffix == ".pyc")):
+                            raise distribution.PackageError("runtimeJunk", path=relative)
+                        names.append(relative)
+            contents = {name: distribution.safe_path(seed, name).read_bytes() for name in names}
+            for source, target in (("LICENSE", "RUNTIME-LICENSE"),
+                                   ("THIRD-PARTY.md", "RUNTIME-THIRD-PARTY.md"),
+                                   ("dependencies.json", "runtime-dependencies.json")):
+                contents[target] = distribution.safe_path(seed, source).read_bytes()
+            # Existing full archives state the actual interpreter, avoiding a guessed ABI.
+            seed_manifest = distribution.read_json(distribution.safe_path(seed, "manifest.json"))
+            manifest = {"schemaVersion": 1, "kind": "runtime", "name": "morphbench",
+                        "id": "runtime-" + args.runtime_version + "-win64", "platform": "win-amd64",
+                        "python": seed_manifest.get("python"), "license": "GPL-3.0",
+                        "files": {name: distribution.digest(data) for name, data in contents.items()}}
+            manifest["contentHash"] = distribution.digest(distribution.canonical(manifest))
+            distribution.validate_manifest(manifest, "runtime")
+        name = "morphbench-" + manifest["id"]
+        if args.list:
+            for path in sorted(contents):
+                print(path)
+            return 0
+    out.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix=".morphbench-package-", dir=out) as temporary:
+        stage = Path(temporary) / name
+        stage.mkdir()
+        for path, data in contents.items():
+            target = stage / path
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes(data)
+        _publish_split(stage, out, name, manifest, args.stage_only)
+    return 0
+
+
 def main(argv=None) -> int:
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     ap = argparse.ArgumentParser(prog="release.py", description=t("release.usage"),
@@ -319,6 +456,11 @@ def main(argv=None) -> int:
     ap.add_argument("--no-vendor", action="store_true", help=t("release.optNoVendor"))
     ap.add_argument("--stage-only", action="store_true", help=t("release.optStageOnly"))
     ap.add_argument("--list", action="store_true", help=t("release.optList"))
+    ap.add_argument("--package", choices=("full", "runtime", "application"), default="full",
+                    help=t("release.optPackage"))
+    ap.add_argument("--runtime-from", help=t("release.optRuntimeFrom"))
+    ap.add_argument("--runtime", help=t("release.optRuntimeManifest"))
+    ap.add_argument("--runtime-version", default="1", help=t("release.optRuntimeVersion"))
     args = ap.parse_args(argv)
 
     # Versions are labels, never paths. Validate before any staging folder is removed.
@@ -326,6 +468,16 @@ def main(argv=None) -> int:
         ap.error(t("release.badVersion", version=args.version))
     if not re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+", args.python_version):
         ap.error(t("release.badVersion", version=args.python_version))
+    if not re.fullmatch(r"[0-9][A-Za-z0-9._-]*", args.runtime_version):
+        ap.error(t("release.badVersion", version=args.runtime_version))
+    if args.package != "full":
+        try:
+            return split_release(args, ap)
+        except (distribution.PackageError, OSError) as error:
+            ap.error(distribution.message(error, HERE) if isinstance(error, distribution.PackageError)
+                     else str(error))
+    if args.runtime or args.runtime_from or args.runtime_version != "1":
+        ap.error(t("release.splitFlags"))
 
     home = HERE
     deps = load_manifest(home / "dependencies.json")

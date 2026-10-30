@@ -27,6 +27,21 @@ sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+# The release contract is checked before importing numpy/PyNifly or touching config.
+# Source checkouts without release manifests retain their ordinary CLI behavior.
+sys.dont_write_bytecode = True
+sys.pycache_prefix = str(Path(__file__).resolve().parent / ".morphbench-no-bytecode")
+from mb_distribution import PackageError, message, startup  # noqa: E402
+try:
+    _installation_lease = startup(Path(__file__).resolve().parent)
+except (PackageError, OSError) as error:
+    print(message(error, Path(__file__).resolve().parent) if isinstance(error, PackageError)
+          else str(error), file=sys.stderr)
+    raise SystemExit(2)
+if _installation_lease is not None:
+    import atexit
+    atexit.register(_installation_lease.__exit__, None, None, None)
+
 import errno                                  # noqa: E402
 
 from morphbench import MorphBench            # noqa: E402

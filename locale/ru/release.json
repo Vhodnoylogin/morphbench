@@ -33,5 +33,12 @@
   "release.tpSource": "Исходники: %(source)s",
   "release.tpTitle": "Чужое внутри morphbench %(version)s",
   "release.tpWhy": "Зачем: %(why)s",
-  "release.usage": "Сборка выпуска: самодостаточный архив верстака.\n\n    python release.py                      собрать в build\\ и запаковать\n    python release.py --version 0.7.0      номер выпуска в имя архива и в manifest.json\n    python release.py --no-python          без встроенного Python (нужен установленный)\n    python release.py --pynifly <папка>    взять аддон отсюда, а не искать\n    python release.py --stage-only         разложить папку выпуска и не паковать\n    python release.py --list               что войдёт в архив, ничего не делая"
+  "release.usage": "Сборка выпуска: самодостаточный архив верстака.\n\n    python release.py                      собрать в build\\ и запаковать\n    python release.py --version 0.7.0      номер выпуска в имя архива и в manifest.json\n    python release.py --no-python          без встроенного Python (нужен установленный)\n    python release.py --pynifly <папка>    взять аддон отсюда, а не искать\n    python release.py --stage-only         разложить папку выпуска и не паковать\n    python release.py --list               что войдёт в архив, ничего не делая",
+  "release.optPackage": "Тип пакета: прежний полный, неизменяемый Runtime или обновление приложения.",
+  "release.optRuntimeFrom": "Папка проверенного полного релиза или Runtime; байты копируются без изменений.",
+  "release.optRuntimeManifest": "Нужный приложению runtime-manifest.json.",
+  "release.optRuntimeVersion": "Независимая версия Runtime, меняется при обновлении нативной среды.",
+  "release.splitFlags": "Нельзя совмещать параметры разделённых пакетов с параметрами прежней сборки.",
+  "release.needRuntime": "Для --package application требуется --runtime <runtime-manifest.json>.",
+  "release.needRuntimeSeed": "Для --package runtime требуется --runtime-from <папка проверенного релиза>."
 }

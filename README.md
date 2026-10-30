@@ -230,8 +230,9 @@ For anyone who wants to use it, the terms are the friendly ones. Use it for anyt
 your own mods. Change it, for yourself or for everyone. Hand it on — with the source, under the
 same licence, with the copyright notices kept. What goes inside the release archive is decided by
 licence and not by convenience: PyNifly is GPL-3 like us, `numpy` is BSD-3, `pillow` is MIT-CMU,
-Python is PSF. `THIRD-PARTY.md`, which the GPL obliges us to ship beside a binary, is generated
-from `dependencies.json`.
+Python is PSF. Full archives generate `THIRD-PARTY.md` from `dependencies.json`.
+The split Runtime carries these notices as `RUNTIME-THIRD-PARTY.md`, alongside the
+dependency statement `runtime-dependencies.json` and the bundled licence files.
 
 ## Documents
 

@@ -35,6 +35,7 @@ come from the settings. Source and protocol details are in `presenters/serve.py`
 | `/api/payload?index=0` | Open the numbered catalogue entry and return its viewer payload |
 | `/api/payload?name=<relative-path>` | Open an entry by catalogue name; URL-encode the path |
 | `/api/payload` | Return the currently open mesh's payload |
+| `/api/preview-payload?name=<relative-path>` | Development: independent viewer payload; leaves the main server scene unchanged |
 | `/api/root` | Current root and mesh count |
 | `/api/root?root=<folder>` | Set the browse root; under MO2 it must remain within the game's Data |
 | `/api/workspace` | Current mode, capsule editor, physics document, nominal limits and exported configuration text |
@@ -44,8 +45,25 @@ Catalogue and payload requests can also supply `root=<folder>`. To open a mesh w
 pass `all=1` to both the catalogue and the payload request, for example
 `/api/payload?name=femalebody_1.nif&all=1`.
 A payload request without
-an open mesh returns an error. Opening a payload changes the server's selected mesh;
+an open mesh returns an error. Opening `/api/payload` changes the server's selected mesh;
 setting a root and shutting down are actions even though their routes use GET.
+
+## Independent preview payloads (development)
+
+`GET /api/preview-payload` loads a catalogue entry in a fresh facade under the same native-read
+lock. It requires `name=<catalogue-name>` or `index=<catalogue-number>` and accepts `root=<folder>`
+and `all=1`, with the same catalogue/root restrictions as `/api/payload`. Use the exact name
+returned by `/api/catalog`, including its case and forward slashes. Unique partial names
+and alternate spellings are rejected by this route; this is not an arbitrary filesystem-path loader. Missing selectors
+or browse roots return 400; missing entries/folders return 404, and foreign MO2 roots return 403.
+
+For example, `/api/preview-payload?name=meshes/human/body_0.nif&all=1` returns the usual viewer
+payload, including geometry/morph data, fresh view/workspace state and empty slider values.
+Its `server` field is `null`: it is data for an independent preview, not another root viewer.
+Success or failure leaves the server's selected model, morphs, camera, workspace, browse root,
+catalogue cache and settings file unchanged. A per-request `root` applies only to that preview.
+No model handle or mutable scene is stored by this HTTP route; later browser edits belong to
+the host-owned preview and are not submitted back to the main server scene.
 
 ## Workspace requests
 
@@ -154,7 +172,7 @@ for implementation contracts; these instructions are not bundled with the releas
 
 ## Local add-on packages (development)
 
-API v1 on `feature/addons` includes these additive development routes:
+API v1 includes these local add-on routes:
 
 | Request | Body | Result |
 |---|---|---|
@@ -184,5 +202,4 @@ performs no automatic replay and is not durable project storage.
 Foreign-origin and iframe requests to the root page and server APIs are rejected, including
 GET actions. Local CLI clients can omit `Origin`. Package CSP `connect-src 'none'` blocks all
 fetch/XHR, including packaged JSON: use local classic JS data, HTML-embedded JSON or user-picked
-files through File API. XML package assets are not allowed. The existing 0.8.0 archive does not
-contain this add-on infrastructure.
+files through File API. XML package assets are not allowed.

@@ -55,10 +55,12 @@ class PageAssets:
         "js/editor.js",
         "js/addon_session.js",
         "js/render.js",
+        "js/addon_previews.js",
         "js/slots_panel.js",
         "js/panel.js",
         "js/editor_panel.js",
         "js/app.js",
+        "js/addon_preview_host.js",
         "js/addons.js",
         "js/boot.js",
     )

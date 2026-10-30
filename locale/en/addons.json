@@ -34,5 +34,10 @@
   "page.addonNoMesh": "Open a model first.",
   "page.addonApi": "This add-on API version is incompatible.",
   "page.addonDisabled": "The add-on has been disabled.",
-  "page.addonMethod": "Unknown add-on API method."
+  "page.addonMethod": "Unknown add-on API method.",
+  "page.addonUnknownPreview": "Unknown or closed preview.",
+  "page.addonPreviewLimit": "Close a preview before opening another.",
+  "page.addonPreviewTimeout": "Model loading exceeded the preview request time limit.",
+  "page.addonPreviewConfig": "Invalid preview limits in Morphbench settings.",
+  "page.addonPreviewMesh": "This preview requires a mesh with triangle geometry."
 }

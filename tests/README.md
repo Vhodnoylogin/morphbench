@@ -92,8 +92,9 @@ and Python/actual-JS parity.
 
 ## Add-on checks
 
-These suites cover API v1 and its additive update/session-data extensions on the development
-branch; the existing 0.8.0 archive does not include them.
+These suites cover the shipped API v1 package/update/session-data contract and the new
+independent-preview extension on its feature branch. Published Application 0.8.0 includes
+the former; independent previews remain separate development.
 
 `test_addons.py` checks immutable ZIP installation, strict manifests and paths, bounded
 archives, enabled-state persistence, unsafe installed files, rollback and real subprocess
@@ -121,3 +122,24 @@ failures, preservation of the previous value on rejected writes and data reset w
 changes. A replacement generation cannot authorize an old frame's mutation or deferred model
 navigation. Node is optional; these checks do not establish a browser's session-restore policy,
 durable project storage or visual UI quality. No game or installed mod data is used.
+
+
+`test_preview_payload.py` exercises the non-mutating HTTP loader with real generated NIF/TRIP,
+exact catalogue names, main facade/root/cache/settings preservation, failure isolation,
+origin/MO2 guards and native-lock serialization. Legacy payload selection keeps its behavior.
+`test_preview_surface.py` runs the actual renderer/facade/surface JS with browser resource
+doubles: independent geometry/cameras, real input handlers, no-op notifications, partial
+construction and full disposal. Native skeleton-only, empty and triangle-free sources reject
+before GPU allocation; a triangle mesh without TRI remains supported.
+`test_addon_previews.py` exercises actual manager/RPC/facade JS with platform/surface doubles:
+target-only morphs, atomic invalid batches, orientation linking and revision/source events,
+independent framing, bounded pending capacity, late loads/timeouts, frame/generation changes,
+resource cleanup, main-state restoration and compatibility with legacy single-view methods.
+`test_preview_editor_scope.py` protects per-instance rig/documents/recipe source, including
+PPB copies, failed replay rollback and a negative control against the former global DATA leak.
+
+For embedded-interpreter qualification, use Python from a complete merged Runtime + Application
+installation. Its isolated `_pth` intentionally does not add the current working directory;
+Runtime-only Python cannot import Application modules in subprocess checks. Run full interpreter
+passes sequentially: the recovery fixtures flush backups of more than a thousand real files,
+and parallel runs can exhaust their process time budget under filesystem contention.

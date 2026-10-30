@@ -7,8 +7,9 @@ is facade calls - `catalog`, `open_entry`, `environment` and the packing done by
 `WebPage`. There is not one computation here, just as in the other layers.
 
 The standard library and nothing above it: `ThreadingHTTPServer` on the port from the
-settings. There is one facade and it is not thread-safe, so every request takes the lock for
-the whole time it works with it. The page the server hands out talks to that server alone -
+settings. Requests selecting the main scene share one facade; independent preview payloads
+use a fresh facade. Both take the same lock for the whole operation because the native reader
+is shared. The page the server hands out talks to that server alone -
 by going to another request, `/?name=...`; it makes no request that leaves the machine,
 and neither does the file on disk.
 
@@ -26,6 +27,7 @@ Routes:
     GET /api/environment                     bench.environment()
     GET /api/catalog?root=&all=0|1&rescan=0|1    bench.catalog(...)
     GET /api/payload?index=|name=&root=      open_entry, then WebPage(bench).payload()
+    GET /api/preview-payload?index=|name=&root=  the same payload from an independent facade
     GET /api/root?root=<folder>              make the folder the server's root; without root - which one it is now
     GET /api/shutdown                        stop the server: the answer goes out, the loop ends
 
@@ -50,6 +52,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, unquote, urlsplit
 
+from morphbench import MorphBench
 from morphbench.environment import process_alive, wait_process
 from morphbench.i18n import t
 from morphbench.journal import Journal, from_config
@@ -300,6 +303,30 @@ class WebServer:
             if not self.bench.is_open():
                 raise RequestError(400, t("serve.meshNotOpen"))
             return WebPage(self.bench).payload()
+
+    def api_preview_payload(self, query: Query) -> dict:
+        """Load a catalogue entry without selecting or editing the server's main scene.
+
+        Reuse the loaded Config, not Config(): a read request must not create or rewrite a
+        settings file. A fresh facade also keeps its catalogue cache, view, slider values
+        and workspace separate. It owns no journal, socket or other server resource to close.
+        Catalogue/root checks remain the facade's, and native reads keep the existing lock.
+        """
+        with self.lock:
+            key = query.key
+            if key is None:
+                raise RequestError(400, t("serve.meshNotOpen"))
+            root = self._root_required(query)
+            preview = MorphBench(self.cfg)
+            # Catalog.get also supports convenient unique partial names for the main
+            # viewer. A preview handle must bind the exact catalogue identity requested,
+            # never silently select a similarly named model from that convenience path.
+            with_morphs = not query.flag("all")
+            if isinstance(key, str) and not any(
+                    row["name"] == key for row in preview.catalog(root, with_morphs)):
+                raise RequestError(404, t("catalog.noEntryName", name=key, near=""))
+            preview.open_entry(key, root, with_morphs)
+            return WebPage(preview).payload()
 
     def api_root(self, query: Query) -> dict:
         """The server's root: name a new one, or ask which it is now."""
@@ -589,6 +616,8 @@ class _Handler(BaseHTTPRequestHandler):
                 self._send_json(owner.api_catalog(query))
             elif url.path == "/api/payload":
                 self._send_json(owner.api_payload(query))
+            elif url.path == "/api/preview-payload":
+                self._send_json(owner.api_preview_payload(query))
             elif url.path == "/api/root":
                 self._send_json(owner.api_root(query))
             elif url.path == "/api/workspace":

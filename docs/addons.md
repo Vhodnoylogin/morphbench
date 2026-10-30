@@ -2,11 +2,15 @@
 
 Russian: [addons.ru.md](addons.ru.md).
 
-This document describes API **v1**, including its additive update and session-state extensions,
-shipped in **Application 0.8.0**. Install Application with the required **Morphbench Launcher v1**
+This document describes API **v1**. The package-update and session-state extensions shipped in
+**Application 0.8.0**. Independent previews are a further additive extension: the published
+Application 0.8.0 baseline does not provide them. Check the connected host's capabilities before
+using them; `apiVersion:1` alone does not establish their availability.
+Install Application with the required **Morphbench Launcher v1**
 (internal package **Runtime v1**, `runtime-1-win64`) as described
 in [updating.md](updating.md). An add-on is a local HTML/JavaScript/CSS package
-that adds an inspector tab to the server-backed viewer. The central model view stays visible.
+that adds an inspector tab to the server-backed viewer. Its controls appear beside the host's
+model view; independent previews can occupy that stage without replacing the main model's state.
 Self-contained HTML exported by `mb.py web` does not activate add-ons.
 
 V1 supports browser add-ons only. It has no Python imports, native plug-ins, backend hooks,
@@ -19,7 +23,8 @@ Use the viewer's add-on manager to upload a ZIP, inspect its metadata, and expli
 Installation always leaves the package **disabled**. Enabled compatible packages have their own
 inspector tabs. Selecting an add-on tab loads its entry page; disabling the active package in
 that viewer unloads the frame and removes its tab. Closing an add-on tab's inspector does not
-undo changes that it already made to the preview.
+undo changes already applied to the main preview. Independent previews described below are
+disposed with their owning frame.
 
 Package files and enabled state are per-machine data in the configured `addonDirectory`.
 They are never bundled or versioned; the default source-checkout folder is Git-ignored.
@@ -189,10 +194,11 @@ The host independently verifies the sending frame and the enabled package.
   event: "scene.changed", data: { method: "..." } }
 ```
 
-`scene.changed` announces a host preview operation. Its `method` string identifies the operation
+`scene.changed` announces an operation on the main host preview. Its `method` string identifies the operation
 for diagnostics; it is not a replay recipe. Notifications have no request ID. Reads do not mutate
-the scene. Debounce reads and keep them separate from mutations to avoid feedback loops. A model
-change replaces the page and frame, so reconnect and read state after loading.
+the scene. Debounce reads and keep them separate from mutations to avoid feedback loops.
+`models.open` replaces the page and frame, so reconnect and read state after loading.
+Independent previews use the scoped events described below and do not navigate the page.
 
 ## API v1
 
@@ -294,6 +300,140 @@ Host error codes include `invalidParams`, `unknownMethod`, `serverRequired`, `no
 Registry/disabled-package failures can supply additional
 codes. SDK transport failures include `timeout`, `notConnected`, `disconnected` and
 `invalidResponse`. Display error messages with `textContent`, not HTML interpolation.
+
+## Independent previews
+
+This additive API lets an add-on place several host-rendered models side by side. Each opaque
+`preview` handle owns **one independent model and its camera**. It is not an interface for
+several cameras sharing one model. The host owns the canvases, rendering and mouse gestures;
+the sandboxed add-on receives no DOM, renderer or live geometry-buffer access. The main viewer's
+model, morphs and view remain unchanged when an independent preview is loaded or edited.
+
+Use `host.info.capabilities` to detect the individual methods. Supporting hosts also return
+`previewLimits:{maxPreviews,loadTimeoutMs}` from `host.info`; defaults are **4** previews and
+**8000 ms**. Pending loads reserve preview capacity too. `previews.list` reports successfully
+published previews, not pending loads. Limits are per active add-on frame.
+
+| Method | Parameters | Result |
+|---|---|---|
+| `previews.create` | `{name:catalogRelativeName}` | `{preview:string,name:string}` |
+| `previews.list` | `{}` | `{previews:[{preview:string,name:string},...]}` |
+| `previews.close` | `{preview}` | `{closed:true}` |
+| `previews.scene.get` | `{preview}` | The `scene.get` schema for this preview |
+| `previews.geometry` | `{preview,shape:existingShapeName}` | The `scene.geometry` schema for this preview |
+| `previews.morphs.get` | `{preview}` | The `morphs.get` schema for this preview |
+| `previews.morphs.set` | `{preview,values:{name:finiteNumber,...}}` | The `morphs.get` schema after merging this preview's complete batch |
+| `previews.morphs.reset` | `{preview}` | The `morphs.get` schema with `values:{}` for this preview |
+| `previews.view.get` | `{preview}` | The `view.get` schema for this preview |
+| `previews.view.set` | `{preview,preset?,yaw?,pitch?,zoom?,pan?,visibleShapes?}` | The `view.get` schema after validated changes |
+| `previews.link` | `{previews:[preview,...],properties:["orientation"]}` | The same link object |
+| `previews.unlink` | `{}` | `{previews:[],properties:[]}` |
+
+`previews.create` accepts the exact `name` from `models.list`, not an arbitrary filesystem path.
+This first preview surface requires a model with renderable mesh triangles. A body NIF without
+TRI is supported; a mesh-less skeleton or node-only NIF is refused with `noMesh` before GPU
+allocation. Use the main Colliders workspace for skeleton-only inspection.
+The method loads a fresh model without navigating or resetting the add-on. The host uses
+`GET /api/preview-payload?name=<catalogRelativeName>&all=1` to obtain an independent payload through
+the existing facade and source/root checks. This endpoint leaves the server's main facade
+unchanged; it is distinct from the state-changing `/api/payload` route. The add-on calls
+`previews.create` through the SDK, since its CSP still prohibits direct `fetch` requests.
+HTTP automation can also select by `index` instead of `name`, with optional `root` and
+`all=1` under the normal source checks. The SDK accepts only `name` and uses the host's
+current server root; it cannot select another root. The HTTP route does not itself create
+an SDK handle or a persistent server session.
+
+Loading and re-authorizing the requesting frame must finish within the host's load budget,
+shorter than the SDK's 10-second request deadline. Failure, cancellation or timeout publishes
+no surface. A late result cannot revive a preview after the frame has gone away. Closing a
+preview frees its resources; its handle must no longer be used. Handles are not persistent
+IDs: save catalogue names and your own input data if you need to recreate previews later.
+
+Preview failures include `unknownPreview` for an invalid or expired handle, `previewLimit`
+when capacity is exhausted and `previewTimeout` when the host's load budget expires.
+`maxPreviews` and `loadTimeoutMs` must be positive safe integers, with `loadTimeoutMs < 10000`;
+invalid limit configuration rejects preview calls with `invalidParams`. Ordinary
+`invalidParams`, `unknownShape`, `noMesh`, `disabled` and `staleGeneration` checks still apply.
+
+All morph names and shape names are checked against the **explicit target preview**. The
+existing finite-number validation, complete-batch rejection and view normalization still
+apply. A morph batch for one preview cannot alter another preview or the main model. Separate
+requests to two previews are separate operations, not a cross-model transaction. Two models
+having the same morph name does not establish a correspondence between them. An add-on such
+as CLAW owns its mapping and calculations and must supply each target's intended names and
+values; never send mapped values to an unscoped `morphs.set` expecting them to reach another model.
+Legacy `models.open`, `morphs.*`, `scene.*` and `view.*` keep their original behavior and strict
+parameter schemas; they do not accept a `preview` parameter.
+
+There is one orientation link group per active frame. `previews.link` requires at least two
+distinct existing handles and exactly `properties:["orientation"]`. The first member supplies
+the initial `yaw` and `pitch`. Afterwards, rotating either member, by mouse or a scoped view
+request, updates every member's orientation. Zoom, pan, focus and framing remain independent.
+Use `previews.unlink` to remove the group. The host performs synchronization; an add-on does
+not need to echo camera changes back through another SDK request.
+
+`previews.changed` announces creation, closure and morph operations. Camera changes have their
+own event. The new notifications have these data objects:
+
+```javascript
+// A scoped preview operation; reads do not emit changes.
+{ preview: "opaque-handle", method: "..." } // previews.changed
+// A changed view, with the same unrounded state returned by previews.view.get.
+{ preview: "opaque-handle", state: viewState, revision: 1,
+  source: "initiating-preview-handle", method: "..." } // previews.view.changed
+```
+
+`revision` increases monotonically for camera changes in each preview. `source` is the original initiating
+preview handle, including notifications for linked peers; it is not an add-on ID or a DOM
+window. Redundant changes are suppressed. Subscribe with `MorphbenchAddon.on` and use the
+snapshot to refresh your controls, rather than writing it back and creating a feedback loop.
+Shape-visibility and viewport-size changes do not promise camera notifications.
+
+A generic two-model setup, using two names explicitly selected from `models.list`:
+
+```javascript
+async function openPair(leftName, rightName) {
+  const host = await MorphbenchAddon.connect();
+  const required = ["previews.create", "previews.close", "previews.link",
+    "previews.morphs.get", "previews.morphs.set", "previews.view.get"];
+  if (!required.every(name => host.capabilities.includes(name))) {
+    throw new Error("This host does not support independent previews.");
+  }
+  const created = [];
+  try {
+    created.push(await MorphbenchAddon.request("previews.create", {name:leftName}));
+    created.push(await MorphbenchAddon.request("previews.create", {name:rightName}));
+    await MorphbenchAddon.request("previews.link", {
+      previews:created.map(item => item.preview), properties:["orientation"]
+    });
+    return {left:created[0].preview, right:created[1].preview};
+  } catch (error) {
+    await Promise.allSettled(created.map(({preview}) =>
+      MorphbenchAddon.request("previews.close", {preview})));
+    throw error;
+  }
+}
+
+async function applyPair(pair, leftValues, rightValues) {
+  await MorphbenchAddon.request("previews.morphs.set", {
+    preview:pair.left, values:leftValues
+  });
+  await MorphbenchAddon.request("previews.morphs.set", {
+    preview:pair.right, values:rightValues
+  });
+}
+```
+
+The frame owns its preview handles, pending loads, link group and rendering resources. Frame
+recreation, selecting another add-on or closing the inspector disposes them. An update or
+external disable invalidates them when the normal registry/generation checks detect it;
+instant shutdown of another open viewer is not promised. Session-data storage remains the
+separate contract below and does not preserve preview handles or automatically restore edits.
+
+These operations do not write source files, configuration or installed add-on packages, and
+require no new native Runtime or Launcher binaries. They show file-based offline previews,
+not game physics, contacts or runtime skinning. The existing int16-quantized browser morph
+payload remains in use; matching views are not proof of bit-for-bit native calculation.
 
 ## Add-on session data
 

@@ -19,6 +19,13 @@ class AddonHost {
       if(wanted&&this.entries.some((row)=>row.id===wanted&&row.enabled&&row.compatible))this.select(wanted);
     }).catch((error)=>{this.manager.title=String(error.message||error);});
   }
+  previewManager() {
+    if(!this.previewHost)this.previewHost=new AddonPreviewHost(this);
+    return this.previewHost;
+  }
+  notify(event,data) {
+    if(this.frame)this.frame.contentWindow.postMessage({type:"morphbench-addon:event",apiVersion:1,event,data},"*");
+  }
   async json(path, options={}) {
     const response=await fetch(path,options),data=await response.json();
     if(!response.ok)throw Object.assign(Error(data.error||T.addonFailure),{code:data.code||"operationFailed"});
@@ -59,7 +66,7 @@ class AddonHost {
     if(identifier)url.searchParams.set("addon",identifier);else url.searchParams.delete("addon");
     window.history.replaceState(null,"",url);this.paintNav();
   }
-  destroyFrame() {if(this.frame)this.frame.remove();this.frame=null;}
+  destroyFrame() {if(this.previewHost)this.previewHost.reset();if(this.frame)this.frame.remove();this.frame=null;}
   close() {
     this.destroyFrame();this.active=null;this.generation=null;this.opened=false;this.panel.hidden=true;
     document.getElementById("panel").hidden=false;
@@ -100,7 +107,7 @@ class AddonHost {
   changed(method) {
     if(this.opened&&["workspace_mode","workspace_tab"].includes(method)){this.close();return;}
     if(!this.frame||method==="resize")return;
-    this.frame.contentWindow.postMessage({type:"morphbench-addon:event",apiVersion:1,event:"scene.changed",data:{method}},"*");
+    this.notify("scene.changed",{method});
   }
   failure(code,message=T.addonParams) {return Object.assign(Error(message),{code});}
   params(value,keys,required=[]) {
@@ -137,7 +144,7 @@ class AddonHost {
     if(!source||event.source!==source||!request||request.type!=="morphbench-addon:request")return;
     if(typeof request.id!=="string"||request.id.length>128)return;
     const reply={type:"morphbench-addon:response",apiVersion:1,id:request.id};
-    let after;
+    const receivedAt=Date.now();let after,closeAfterReply=false;
     try{
       if(request.apiVersion!==1)throw this.failure("incompatibleApi",T.addonApi);
       const installed=await this.json("/api/addons");
@@ -155,7 +162,7 @@ class AddonHost {
         case "host.info":
           this.params(params,[]);
           reply.result={apiVersion:1,addon:{id:entry.id,name:entry.name,version:entry.version},language:document.documentElement.lang,
-            capabilities:["host.info","models.list","models.open","morphs.get","morphs.set","morphs.reset","scene.get","scene.geometry","view.get","view.set","state.get","state.set","state.reset"],scope:"browser-session",
+            capabilities:["host.info","models.list","models.open","morphs.get","morphs.set","morphs.reset","scene.get","scene.geometry","view.get","view.set","state.get","state.set","state.reset",...ADDON_PREVIEW_METHODS],previewLimits:this.previewManager().limits(),scope:"browser-session",
             stateScope:"tab-session",stateLimits:bench.addon_state_limits()};break;
         case "state.get":case "state.set":case "state.reset":
           reply.result=this.sessionState(request.method,entry.id,params);break;
@@ -184,11 +191,18 @@ class AddonHost {
           this.params(params,["preset","yaw","pitch","zoom","pan","visibleShapes"]);
           // Validate and change atomically in the facade, not in this transport.
           reply.result=invoke("addon_set_view",params);break;
-        default:throw this.failure("unknownMethod",T.addonMethod);
+        default:
+          if(!ADDON_PREVIEW_METHODS.includes(request.method))throw this.failure("unknownMethod",T.addonMethod);
+          reply.result=await this.previewManager().request(request.method,params,
+            {frame:this.frame,source,identifier:this.active,generation:this.generation},receivedAt);
+          break;
       }
-    }catch(error){reply.error={code:error.code||"operationFailed",message:String(error.message||error)};}
+    }catch(error){reply.error={code:error.code||"operationFailed",message:String(error.message||error)};
+      closeAfterReply=["disabled","staleGeneration"].includes(error.code);
+    }
     if(this.frame?.contentWindow!==source)return;
     source.postMessage(reply,"*");
+    if(closeAfterReply){this.close();return;}
     if(after){
       const identifier=this.active,generation=this.generation;
       setTimeout(async()=>{

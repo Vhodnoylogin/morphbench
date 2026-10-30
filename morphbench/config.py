@@ -31,6 +31,8 @@ DEFAULTS = {
     "addonDirectory": "",
     "addonStateMaxBytes": 65536,
     "addonStateMaxDepth": 32,
+    "addonMaxPreviews": 4,
+    "addonPreviewLoadTimeoutMs": 8000,
     "addonLimits": {"maxArchiveBytes": 16777216, "maxFiles": 256,
                     "maxFileBytes": 4194304, "maxTotalBytes": 16777216,
                     "maxCompressionRatio": 200, "maxManifestBytes": 65536},

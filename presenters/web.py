@@ -177,6 +177,8 @@ class WebPage:
         return {
             "addonStateMaxBytes": cfg["addonStateMaxBytes"],
             "addonStateMaxDepth": cfg["addonStateMaxDepth"],
+            "addonMaxPreviews": cfg["addonMaxPreviews"],
+            "addonPreviewLoadTimeoutMs": cfg["addonPreviewLoadTimeoutMs"],
             "background": [float(x) for x in cfg["background"]],
             "lightFollowCamera": bool(cfg["lightFollowCamera"]),
             "lightCameraDirection": [float(x) for x in cfg["lightCameraDirection"]],

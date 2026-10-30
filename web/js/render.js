@@ -61,34 +61,60 @@ class Renderer {
     const gl = canvas.getContext("webgl2", { antialias: true, preserveDrawingBuffer: true });
     if (!gl) throw new Error(T.errNoWebGL);
     this.gl = gl;
-    this.program = this._program(VERTEX_SHADER, FRAGMENT_SHADER);
-    this.attr = { pos: gl.getAttribLocation(this.program, "aPos"), nrm: gl.getAttribLocation(this.program, "aNrm"),
-                  col: gl.getAttribLocation(this.program, "aCol") };
-    this.uni = {};
-    for (const name of ["uRight", "uUp", "uForward", "uCentre", "uScale", "uZc", "uZr", "uHalf",
-                        "uLight", "uAmbient", "uDiffuse", "uFill", "uFlat", "uAlpha"])
-      this.uni[name] = gl.getUniformLocation(this.program, name);
+    this.program = null;
     this.meshes = new Map();
     this.slotChunks = [];
-    this.bg = settings.background.map((x) => x / 255.0);
-    this.flat = settings.shading === "flat";
-    // The capsule layer: colour and opacity from the same settings keys the rasteriser reads.
-    this.colliderTint = settings.colliderColour.map((x) => x / 255.0);
-    this.colliderAlpha = settings.colliderOpacity;
+    this.disposed = false;
+    try {
+      this.program = this._program(VERTEX_SHADER, FRAGMENT_SHADER);
+      this.attr = { pos: gl.getAttribLocation(this.program, "aPos"), nrm: gl.getAttribLocation(this.program, "aNrm"),
+                    col: gl.getAttribLocation(this.program, "aCol") };
+      this.uni = {};
+      for (const name of ["uRight", "uUp", "uForward", "uCentre", "uScale", "uZc", "uZr", "uHalf",
+                          "uLight", "uAmbient", "uDiffuse", "uFill", "uFlat", "uAlpha"])
+        this.uni[name] = gl.getUniformLocation(this.program, name);
+      this.bg = settings.background.map((x) => x / 255.0);
+      this.flat = settings.shading === "flat";
+      // The capsule layer: colour and opacity from the same settings keys the rasteriser reads.
+      this.colliderTint = settings.colliderColour.map((x) => x / 255.0);
+      this.colliderAlpha = settings.colliderOpacity;
+    } catch (error) {
+      this.dispose();
+      throw error;
+    }
   }
   _shader(type, src) {
     const gl = this.gl, sh = gl.createShader(type);
-    gl.shaderSource(sh, src); gl.compileShader(sh);
-    if (!gl.getShaderParameter(sh, gl.COMPILE_STATUS)) throw new Error(say(T.errShader, { log: gl.getShaderInfoLog(sh) }));
-    return sh;
+    if (!sh) throw new Error(T.errNoWebGL);
+    try {
+      gl.shaderSource(sh, src); gl.compileShader(sh);
+      if (!gl.getShaderParameter(sh, gl.COMPILE_STATUS)) throw new Error(say(T.errShader, { log: gl.getShaderInfoLog(sh) }));
+      return sh;
+    } catch (error) {
+      gl.deleteShader(sh);
+      throw error;
+    }
   }
   _program(vs, fs) {
-    const gl = this.gl, p = gl.createProgram();
-    gl.attachShader(p, this._shader(gl.VERTEX_SHADER, vs));
-    gl.attachShader(p, this._shader(gl.FRAGMENT_SHADER, fs));
-    gl.linkProgram(p);
-    if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(say(T.errProgram, { log: gl.getProgramInfoLog(p) }));
-    return p;
+    const gl = this.gl, p = gl.createProgram(), shaders = [];
+    let linked = false;
+    if (!p) throw new Error(T.errNoWebGL);
+    try {
+      for (const [type, source] of [[gl.VERTEX_SHADER, vs], [gl.FRAGMENT_SHADER, fs]]) {
+        const shader = this._shader(type, source);
+        shaders.push(shader); gl.attachShader(p, shader);
+      }
+      gl.linkProgram(p);
+      if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(say(T.errProgram, { log: gl.getProgramInfoLog(p) }));
+      linked = true;
+      return p;
+    } finally {
+      for (const shader of shaders) {
+        if (linked) gl.detachShader(p, shader);
+        gl.deleteShader(shader);
+      }
+      if (!linked) gl.deleteProgram(p);
+    }
   }
   _attribute(buffer, data, location, usage) {
     const gl = this.gl;
@@ -102,23 +128,47 @@ class Renderer {
     const gl = this.gl;
     if (!shape.triCount) return;
     this.removeMesh(shape.name);
-    const vao = gl.createVertexArray();
-    gl.bindVertexArray(vao);
-    const pos = gl.createBuffer(), nrm = gl.createBuffer(), col = gl.createBuffer();
-    this._attribute(pos, shape.pos, this.attr.pos, gl.DYNAMIC_DRAW);
-    this._attribute(nrm, shape.nrm, this.attr.nrm, gl.DYNAMIC_DRAW);
-    this._attribute(col, shape.count * 12, this.attr.col, gl.DYNAMIC_DRAW);
-    const idx = gl.createBuffer();
-    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, idx);
-    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, shape.tris, gl.STATIC_DRAW);
-    gl.bindVertexArray(null);
-    this.meshes.set(shape.name, { vao, pos, nrm, col, idx, count: shape.tris.length,
-      type: shape.tris instanceof Uint32Array ? gl.UNSIGNED_INT : gl.UNSIGNED_SHORT });
+    const vao = gl.createVertexArray(), buffers = [];
+    try {
+      if (!vao) throw new Error(T.errNoWebGL);
+      gl.bindVertexArray(vao);
+      for (let index = 0; index < 4; index++) {
+        const buffer = gl.createBuffer();
+        if (!buffer) throw new Error(T.errNoWebGL);
+        buffers.push(buffer);
+      }
+      const [pos, nrm, col, idx] = buffers;
+      this._attribute(pos, shape.pos, this.attr.pos, gl.DYNAMIC_DRAW);
+      this._attribute(nrm, shape.nrm, this.attr.nrm, gl.DYNAMIC_DRAW);
+      this._attribute(col, shape.count * 12, this.attr.col, gl.DYNAMIC_DRAW);
+      gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, idx);
+      gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, shape.tris, gl.STATIC_DRAW);
+      this.meshes.set(shape.name, { vao, pos, nrm, col, idx, count: shape.tris.length,
+        type: shape.tris instanceof Uint32Array ? gl.UNSIGNED_INT : gl.UNSIGNED_SHORT });
+    } catch (error) {
+      for (const buffer of buffers) gl.deleteBuffer(buffer);
+      if (vao) gl.deleteVertexArray(vao);
+      throw error;
+    } finally {
+      gl.bindVertexArray(null);
+    }
   }
   removeMesh(name) {
     const item=this.meshes.get(name);if(!item)return;
     for(const key of ["pos","nrm","col","idx"])this.gl.deleteBuffer(item[key]);
     this.gl.deleteVertexArray(item.vao);this.meshes.delete(name);
+  }
+  dispose() {
+    if (this.disposed) return;
+    this.disposed = true;
+    for (const name of Array.from(this.meshes.keys())) this.removeMesh(name);
+    this.slotChunks = [];
+    if (this.program) this.gl.deleteProgram(this.program);
+    this.program = null;
+    // Releasing a canvas must release its context too, rather than accumulate
+    // detached WebGL contexts until the browser's garbage collector runs.
+    const extension = this.gl.getExtension("WEBGL_lose_context");
+    if (extension) extension.loseContext();
   }
   _refill(buffer, data) {
     if (!buffer) return;
@@ -166,6 +216,7 @@ class Renderer {
     return out;
   }
   resize() {
+    if (this.disposed) return;
     const dpr = window.devicePixelRatio || 1;
     const w = Math.max(1, Math.round(this.canvas.clientWidth * dpr));
     const h = Math.max(1, Math.round(this.canvas.clientHeight * dpr));
@@ -188,6 +239,7 @@ class Renderer {
     return [zmin, zmax];
   }
   draw(bench) {
+    if (this.disposed) return null;
     const gl = this.gl, view = bench.view;
     this.resize();
     const w = this.canvas.width, h = this.canvas.height;

@@ -34,5 +34,10 @@
   "page.addonNoMesh": "Сначала откройте модель.",
   "page.addonApi": "Несовместимая версия API аддона.",
   "page.addonDisabled": "Аддон выключен.",
-  "page.addonMethod": "Неизвестный метод API аддона."
+  "page.addonMethod": "Неизвестный метод API аддона.",
+  "page.addonUnknownPreview": "Представление не найдено или уже закрыто.",
+  "page.addonPreviewLimit": "Закройте одно из представлений перед открытием нового.",
+  "page.addonPreviewTimeout": "Превышено время загрузки модели для представления.",
+  "page.addonPreviewConfig": "Некорректные ограничения представлений в настройках Morphbench.",
+  "page.addonPreviewMesh": "Для этого представления нужен меш с геометрией из треугольников."
 }

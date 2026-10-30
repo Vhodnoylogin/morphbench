@@ -49,7 +49,7 @@ def run_browser(test, temporary, payload, code, **values):
     if not shutil.which("node"):
         raise unittest.SkipTest("Node executes the actual browser facade")
     scripts = ["core.js", "shapes.js", "view.js", "placements.js", "body_slots.js", "bench.js",
-               "physics_workspace.js", "editor.js"]
+               "physics_workspace.js", "editor.js", "addon_preview_host.js"]
     source = "const input=JSON.parse(require('fs').readFileSync(0,'utf8'));\n"
     source += "const document={getElementById:()=>({textContent:JSON.stringify(input.payload)})};\n"
     source += "\n".join((ROOT / "web/js" / filename).read_text(encoding="utf-8") for filename in scripts)

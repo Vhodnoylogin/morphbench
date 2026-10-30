@@ -12,7 +12,7 @@ const editorVector = (value) => {
 };
 const editorPoint = (matrix,point) => matrix.slice(0,3).map((row)=>row[0]*point[0]+row[1]*point[1]+row[2]*point[2]+row[3]);
 const editorPPBCopy = (owner) => {
-  const state=owner.ppb.state(),copy=new PhysicsWorkspaceMirror(null,DATA.physicsTexts||{},{max_chars:owner.bench.settings.physicsMaxChars,max_fields:owner.bench.settings.physicsMaxFields});
+  const state=owner.ppb.state(),copy=new PhysicsWorkspaceMirror(null,owner.bench._payload.physicsTexts||{},{max_chars:owner.bench.settings.physicsMaxChars,max_fields:owner.bench.settings.physicsMaxFields});
   if(state.document){copy.replace(state.document);for(const [id,value] of Object.entries(state.edits||{}))copy.set(id,value);}
   return copy;
 };
@@ -44,24 +44,25 @@ function editorCapsuleMesh(cap,matrix,segments) {
 class EditorState {
   constructor(bench) {
     this.bench=bench;
-    this.mode=(DATA.workspace||{}).mode||(bench.placements.mode==="slots"?"slots":"morphs");
-    this.tabs={};this.tabs[this.mode]=editorWorkspaceTab(this.mode,(DATA.workspace||{}).tab||WORKSPACE_TABS[this.mode][0]);
-    this.original=editorClone(DATA.colliderEditor||{capsules:[],bodies:[],selected:null,bodyMatrices:{},nodeMatrices:{}});
+    const data=bench._payload;
+    this.mode=(data.workspace||{}).mode||(bench.placements.mode==="slots"?"slots":"morphs");
+    this.tabs={};this.tabs[this.mode]=editorWorkspaceTab(this.mode,(data.workspace||{}).tab||WORKSPACE_TABS[this.mode][0]);
+    this.original=editorClone(data.colliderEditor||{capsules:[],bodies:[],selected:null,bodyMatrices:{},nodeMatrices:{}});
     this.state=editorClone(this.original);this.actions=editorClone(this.original.editActions||[]);
     if(this.original.originalCapsules)this.original.capsules=editorClone(this.original.originalCapsules);
     this.original.selected=null;this.original.changed=[];
     for(const body of this.original.bodies){body.changed=false;body.count=this.original.capsules.filter((cap)=>cap.bone===body.bone).length;}
-    this.physics=new PhysicsWorkspaceMirror(null,DATA.physicsTexts||{},{max_chars:this.bench.settings.physicsMaxChars,max_fields:this.bench.settings.physicsMaxFields});
-    if(DATA.physics&&DATA.physics.document) {
-      this.physics.replace(DATA.physics.document);
-      for(const [id,value] of Object.entries(DATA.physics.edits||{})) this.physics.set(id,value);
+    this.physics=new PhysicsWorkspaceMirror(null,data.physicsTexts||{},{max_chars:this.bench.settings.physicsMaxChars,max_fields:this.bench.settings.physicsMaxFields});
+    if(data.physics&&data.physics.document) {
+      this.physics.replace(data.physics.document);
+      for(const [id,value] of Object.entries(data.physics.edits||{})) this.physics.set(id,value);
     }
-    this.ppb=new PhysicsWorkspaceMirror(null,DATA.physicsTexts||{},{max_chars:this.bench.settings.physicsMaxChars,max_fields:this.bench.settings.physicsMaxFields});
-    if(DATA.ppb&&DATA.ppb.document) {
-      this.ppb.replace(DATA.ppb.document);
-      for(const [id,value] of Object.entries(DATA.ppb.edits||{}))this.ppb.set(id,value);
+    this.ppb=new PhysicsWorkspaceMirror(null,data.physicsTexts||{},{max_chars:this.bench.settings.physicsMaxChars,max_fields:this.bench.settings.physicsMaxFields});
+    if(data.ppb&&data.ppb.document) {
+      this.ppb.replace(data.ppb.document);
+      for(const [id,value] of Object.entries(data.ppb.edits||{}))this.ppb.set(id,value);
     }
-    this.binding=editorClone((DATA.ppb||{}).binding||null);
+    this.binding=editorClone((data.ppb||{}).binding||null);
   }
   checkRecipeSize({actionCount=this.actions.length,physics=this.physics.state(),ppb=this.ppb.state(),binding=this.binding}={}) {
     // The saved recipe also carries owner setup, selection and display state. Reserve
@@ -119,7 +120,7 @@ class EditorState {
     if(this.state.available){const selected=this.state.selected;actions.push({method:"collider_select",args:selected?[selected.bone,selected.index]:[null]});}
     actions.push({method:"respect_file_visibility",args:[this.bench.view.respectFileVisibility,this.bench.view.showFileHidden]},
       {method:"workspace_mode",args:[this.mode]},{method:"workspace_tab",args:[editorWorkspaceTab(this.mode,this.tabs[this.mode]||WORKSPACE_TABS[this.mode][0])]});
-    return {format:"morphbench-workspace",version:1,source:DATA.source||null,actions};
+    return {format:"morphbench-workspace",version:1,source:editorClone(this.bench._payload.source||null),actions};
   }
 }
 const editorOwner = (bench) => bench._editor||(bench._editor=new EditorState(bench));
@@ -165,11 +166,11 @@ Object.assign(BenchMirror.prototype,{
   collider_reset() {const owner=editorOwner(this);if(!owner.state.available)editorError("skeleton");owner.state=editorClone(owner.original);owner.actions=[];owner.binding=null;owner.rebuild();return this.collider_edit_state();},
   physics_replace(document) {
     if(!document||!["fsmp","cbpc"].includes(document.kind))editorError("document");
-    const owner=editorOwner(this),candidate=new PhysicsWorkspaceMirror(null,DATA.physicsTexts||{},{max_chars:this.settings.physicsMaxChars,max_fields:this.settings.physicsMaxFields});
+    const owner=editorOwner(this),candidate=new PhysicsWorkspaceMirror(null,this._payload.physicsTexts||{},{max_chars:this.settings.physicsMaxChars,max_fields:this.settings.physicsMaxFields});
     const state=candidate.replace(document);owner.checkRecipeSize({physics:state});owner.physics=candidate;return state;
   },
   physics_set(id,value) {
-    const owner=editorOwner(this),state=owner.physics.state(),candidate=new PhysicsWorkspaceMirror(null,DATA.physicsTexts||{},{max_chars:this.settings.physicsMaxChars,max_fields:this.settings.physicsMaxFields});
+    const owner=editorOwner(this),state=owner.physics.state(),candidate=new PhysicsWorkspaceMirror(null,this._payload.physicsTexts||{},{max_chars:this.settings.physicsMaxChars,max_fields:this.settings.physicsMaxFields});
     if(state.document){candidate.replace(state.document);for(const [ident,edit] of Object.entries(state.edits||{}))candidate.set(ident,edit);}
     const result=candidate.set(id,value);owner.checkRecipeSize({physics:result});owner.physics=candidate;return result;
   },
@@ -178,7 +179,7 @@ Object.assign(BenchMirror.prototype,{
   physics_envelopes() {return editorOwner(this).physics.envelopes(this.slots_anchors());},
   ppb_replace(document) {
     if(!document||document.kind!=="ppb")editorError("document");
-    const candidate=new PhysicsWorkspaceMirror(null,DATA.physicsTexts||{},{max_chars:this.settings.physicsMaxChars,max_fields:this.settings.physicsMaxFields});
+    const candidate=new PhysicsWorkspaceMirror(null,this._payload.physicsTexts||{},{max_chars:this.settings.physicsMaxChars,max_fields:this.settings.physicsMaxFields});
     candidate.replace(document);
     const normalized=candidate.state(),fields=new Map(normalized.fields.map((field)=>[field.id,field])),groups=new Set(normalized.groups.map((group)=>group.id)),seen=new Set();
     for(const field of normalized.fields)this._ppb_value(field.value);
@@ -279,8 +280,8 @@ Object.assign(BenchMirror.prototype,{
       owner.replaying=replaying;
       Object.assign(owner,{state:before.state,actions:before.actions,mode:before.mode,tabs:before.tabs,binding:before.binding});
       const limits={max_chars:this.settings.physicsMaxChars,max_fields:this.settings.physicsMaxFields};
-      owner.physics=new PhysicsWorkspaceMirror(null,DATA.physicsTexts||{},limits);if(before.physics.document) {owner.physics.replace(before.physics.document);for(const [id,value] of Object.entries(before.physics.edits||{})) owner.physics.set(id,value);}
-      owner.ppb=new PhysicsWorkspaceMirror(null,DATA.physicsTexts||{},limits);if(before.ppb.document){owner.ppb.replace(before.ppb.document);for(const [id,value] of Object.entries(before.ppb.edits||{}))owner.ppb.set(id,value);}
+      owner.physics=new PhysicsWorkspaceMirror(null,this._payload.physicsTexts||{},limits);if(before.physics.document) {owner.physics.replace(before.physics.document);for(const [id,value] of Object.entries(before.physics.edits||{})) owner.physics.set(id,value);}
+      owner.ppb=new PhysicsWorkspaceMirror(null,this._payload.physicsTexts||{},limits);if(before.ppb.document){owner.ppb.replace(before.ppb.document);for(const [id,value] of Object.entries(before.ppb.edits||{}))owner.ppb.set(id,value);}
       this.slots_mode(before.placementMode);this.view.colliders=before.colliders;this.view.bumper=before.bumper;this.view.respectFileVisibility=before.respectFileVisibility;this.view.showFileHidden=before.showFileHidden;owner.rebuild();throw error;
     }
     return this.workspace_state();

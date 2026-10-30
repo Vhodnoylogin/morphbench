@@ -6,6 +6,9 @@
 // names are the API - making one of them look more like JavaScript would cut that tie.
 class BenchMirror {
   constructor(data) {
+    // Lazy workspace owners must read this model's source payload. DATA is the
+    // main page only; independent previews construct their own facade here.
+    this._payload = data;
     this.summary = data.summary;               // null - no mesh open (a page from the server)
     this.names = data.names;
     this.settings = data.settings;

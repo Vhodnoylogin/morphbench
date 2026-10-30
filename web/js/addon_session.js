@@ -52,20 +52,20 @@ Object.assign(BenchMirror.prototype, {
       workspace:this.workspace_state(),colliders:this.collider_edit_state(),fileVisibility:this.file_visibility()}));
   },
   addon_geometry(name) {
-    if(!this.is_open()) throw Error(T.addonNoMesh);
+    if(!this.is_open()) throw Object.assign(Error(T.addonNoMesh),{code:"noMesh"});
     const shape=this.shape(name);
     return {name,space:"model",vertices:Array.from(this.deformed(name)),baseVertices:Array.from(shape.base),
       triangles:Array.from(shape.tris),boneNames:shape.boneNames.slice()};
   },
   addon_morphs() { return {names:this.morphs(),values:this.sliders()}; },
   addon_set_morphs(values) {
-    if(!this.is_open())throw Error(T.addonNoMesh);
+    if(!this.is_open())throw Object.assign(Error(T.addonNoMesh),{code:"noMesh"});
     if(!values||typeof values!=="object"||Array.isArray(values)||Object.entries(values).some(
-      ([name,value])=>!this.morphs().includes(name)||typeof value!=="number"||!Number.isFinite(value)))throw Error(T.addonParams);
+      ([name,value])=>!this.morphs().includes(name)||typeof value!=="number"||!Number.isFinite(value)))throw Object.assign(Error(T.addonParams),{code:"invalidParams"});
     const previous=this.sliders();
     try {
       this.set_sliders(values);
-      if(this.shape_names().some((name)=>Array.from(this.deformed(name)).some((value)=>!Number.isFinite(value))))throw Error(T.addonParams);
+      if(this.shape_names().some((name)=>Array.from(this.deformed(name)).some((value)=>!Number.isFinite(value))))throw Object.assign(Error(T.addonParams),{code:"invalidParams"});
     } catch(error) {this._sliders=new Map(Object.entries(previous));throw error;}
     return this.addon_morphs();
   },
@@ -81,7 +81,7 @@ Object.assign(BenchMirror.prototype, {
       ||("pan" in changes&&(!Array.isArray(changes.pan)||changes.pan.length!==2
         ||!changes.pan.every((value)=>numeric(value)&&Number.isFinite(Math.fround(value)))))
       ||("visibleShapes" in changes&&(!Array.isArray(changes.visibleShapes)||changes.visibleShapes.some(
-        (name)=>typeof name!=="string"||!this.shape_names().includes(name)))))throw Error(T.addonParams);
+        (name)=>typeof name!=="string"||!this.shape_names().includes(name)))))throw Object.assign(Error(T.addonParams),{code:"invalidParams"});
     const previous=this.view;
     this.view=new ViewMirror(this.settings,this.presets(),this.view_state(true));
     try {

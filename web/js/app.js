@@ -78,40 +78,13 @@ class App {
   // Positions with the sliders applied, and the normals that follow from them, into the
   // buffers; the normals are recomputed after every slider move, because the shading is
   // taken off the deformed body.
-  refreshPositions() {
-    for (const name of this.bench.shape_names()) {
-      const s = this.bench.shape(name);
-      this.bench.vertex_normals(name);         // deformed() inside: positions and normals at once
-      this.renderer.setPositions(s);
-      this.renderer.setNormals(s);
-    }
-  }
+  refreshPositions() { ViewportDrawing.refreshPositions(this.bench, this.renderer); }
   // The value comes from the facade, the colour is made here - by the same rule the rasteriser uses.
-  refreshColours() {
-    for (const name of this.bench.shape_names()) {
-      const s = this.bench.shape(name);
-      if (!s.triCount) continue;
-      const key = this.bench.vertex_colour_key(name);
-      let colours;
-      if (key === null) {
-        colours = new Float32Array(s.count * 3).fill(Palette.SHADE);
-      } else if (this.bench.view.colouring === "bone") {
-        const palette = Palette.bones(s.boneNames.length), last = Math.max(s.boneNames.length - 1, 0);
-        colours = new Float32Array(s.count * 3);
-        for (let i = 0; i < s.count; i++) {
-          const k = key[i];
-          if (k < 0) { colours[i * 3] = Palette.NO_BONE[0]; colours[i * 3 + 1] = Palette.NO_BONE[1]; colours[i * 3 + 2] = Palette.NO_BONE[2]; }
-          else { const j = clamp(k, 0, last) * 3; colours[i * 3] = palette[j]; colours[i * 3 + 1] = palette[j + 1]; colours[i * 3 + 2] = palette[j + 2]; }
-        }
-      } else {
-        colours = Palette.heat(key);
-      }
-      this.renderer.setColours(s, colours);
-    }
-  }
+  refreshColours() { ViewportDrawing.refreshColours(this.bench, this.renderer); }
   // The canvas size is part of the view state as well: it reaches the core through the same
   // resize that --size goes through.
   draw() {
+    if (this.previewStageActive) return;
     this.renderer.resize();
     const w = this.canvas.width, h = this.canvas.height, view = this.bench.view;
     if (w !== view.width || h !== view.height) { this.invoke("resize", w, h); return; }
@@ -122,12 +95,7 @@ class App {
   // The cursor point in fractions of half the shorter side of the canvas, measured from the
   // centre, right and up - out of canvas pixels, allowing for the screen density and for
   // where the canvas sits on the page.
-  cursorFraction(e) {
-    const c = this.canvas, rect = c.getBoundingClientRect(), dpr = window.devicePixelRatio || 1;
-    const px = (e.clientX - rect.left) * dpr, py = (e.clientY - rect.top) * dpr;
-    const w = c.width, h = c.height, m = Math.min(w, h) * 0.5;
-    return [(px - w * 0.5) / m, (h * 0.5 - py) / m];
-  }
+  cursorFraction(e) { return ViewportDrawing.cursorFraction(this.canvas, e); }
   bindMouse() {
     const c = this.canvas;
     let drag = null;

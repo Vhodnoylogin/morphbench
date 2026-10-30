@@ -37,6 +37,8 @@ go in a major release, and nowhere else.
   linked-document actions, so accepted edits remain reloadable and exportable.
 - Trimmed unused Blender UI modules and native dependency build files from the bundle;
   retained runtime modules, licences, user documentation and launcher rebuild sources.
+- Excluded repository-only AI/developer instructions from the end-user bundle; development
+  guidance remains linked from the documentation.
 
 ## [0.7.1]
 

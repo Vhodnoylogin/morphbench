@@ -177,7 +177,6 @@ python release.py --list
 | `morphbench.exe` | the launch window — build it *before* the release, it is not built for you |
 | `LICENSE`, `README.md`, `README.ru.md`, `dependencies.json` | the licence, the shop window in both languages, the statement about dependencies |
 | `CHANGELOG.md`, `CHANGELOG.ru.md` | the release history in both languages |
-| `CLAUDE.md` | the manifest: whoever unpacks the archive may hand the folder to an assistant, and this is the file that says what must not be "simplified" |
 | `morphbench/*.py`, `presenters/*.py` | the core and the presentation layers |
 | `locale/*/*.json` | every runtime section in every language; the builder-only `release.json` is omitted |
 | `web/*.html`, `web/*.css`, `web/js/*.js` | the viewer page |
@@ -186,6 +185,9 @@ python release.py --list
 
 The launcher sources stay beside the binary so a mirrored archive still contains the inputs
 needed to rebuild it. The Python runtime code is already source; none of it is compiled away.
+
+Developer instruction files (`CLAUDE.md`, `AGENTS.md`, `SKILL.md`) stay in the source repository.
+They are excluded even when placed inside a directory selected by a content pattern.
 
 Anything not named there cannot reach the archive, however much of it is lying next to us in the
 working copy. This is the whole reason the rule is written this way round: this repository is one
@@ -371,4 +373,4 @@ These are real and they are in the code as described.
 | [page.md](page.md) | the viewer in the browser |
 | [physics.md](physics.md) | what the bench measures: reach spheres and collision capsules |
 | [localisation.md](localisation.md) | how the texts are laid out and how to add a language |
-| [../CLAUDE.md](../CLAUDE.md) | the manifest for an assistant handed this folder and no history |
+| [Repository development guidance](https://github.com/Vhodnoylogin/morphbench/blob/main/CLAUDE.md) | contributor and AI instructions, excluded from the end-user archive |

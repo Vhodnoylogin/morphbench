@@ -213,13 +213,15 @@ from `dependencies.json`.
 | [docs/workspace.md](docs/workspace.md) | the four modes, capsule/configuration editing, session replay and limits |
 | [docs/localisation.md](docs/localisation.md) | how the texts are laid out and how to add a language |
 | [docs/building.md](docs/building.md) | building `morphbench.exe` and the release archive: what is bundled and under what licence |
-| [CLAUDE.md](CLAUDE.md) | the manifest for an AI assistant handed this folder and no history |
 
 Each of these exists twice, in English and in Russian: `NAME.md` and `NAME.ru.md`.
 
 ## Development assistance
 
 Developed with assistance from [Codex (OpenAI)](https://github.com/codex).
+
+[Contributor and AI development guidance](https://github.com/Vhodnoylogin/morphbench/blob/main/CLAUDE.md)
+stays in the source repository and is not included in the end-user archive.
 
 ## Editing workspace
 

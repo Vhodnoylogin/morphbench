@@ -104,6 +104,20 @@ class TestRelease(unittest.TestCase):
         self.assertNotIn(builder, release.own_files(self.home))
         self.assertIn(runtime, release.own_files(self.home))
 
+    def test_developer_instructions_stay_in_repository_not_release(self):
+        docs = self.home / "docs"
+        docs.mkdir()
+        guide = docs / "quickstart.md"
+        guide.write_text("user instructions")
+        instructions = [self.home / "CLAUDE.md", self.home / "AGENTS.md", self.home / "SKILL.md",
+                        docs / "CLAUDE.md", docs / "agents.md", docs / "SKILL.md"]
+        for path in instructions:
+            path.write_text("repository developer instructions")
+        selected = set(release.own_files(self.home))
+        self.assertIn(guide, selected)
+        self.assertTrue(selected.isdisjoint(instructions))
+        self.assertTrue(all(path.is_file() for path in instructions))
+
     def test_incomplete_dependency_preserves_previous_stage(self):
         (self.home / "tri" / "tripfile.py").unlink()
         stage = self.out / "morphbench-0.7.0"

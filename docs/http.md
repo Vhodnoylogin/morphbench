@@ -149,4 +149,5 @@ inheritance and unsupported semantics withhold previews. CBPC returns raw parame
 its clamps are not final displacement or direct angular limits. See [workspace.md](workspace.md).
 
 See [cli.md](cli.md) for computations, [building.md](building.md) for packaging and
-[../CLAUDE.md](../CLAUDE.md) for implementation contracts.
+[repository development guidance](https://github.com/Vhodnoylogin/morphbench/blob/main/CLAUDE.md)
+for implementation contracts; these instructions are not bundled with the release.

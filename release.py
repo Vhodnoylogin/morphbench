@@ -85,9 +85,6 @@ CONTENT = [
     "README.ru.md",
     "CHANGELOG.md",
     "CHANGELOG.ru.md",
-    # The manifest travels with the archive: whoever unpacks it may hand the folder to an
-    # assistant, and it is the file that tells one what must not be "simplified".
-    "CLAUDE.md",
     "dependencies.json",
     "morphbench/*.py",
     "presenters/*.py",
@@ -110,6 +107,9 @@ CONTENT = [
 SKIP = ("__pycache__", ".pyc", "morphbench.json", "morphbench.log")
 # The builder reads these catalogues from source, but release.py itself does not ship.
 BUILD_CATALOGUE = "release.json"
+# Guidance for repository contributors/agents is not part of the end-user package,
+# even if a later instruction file lands under a broadly included documentation path.
+SOURCE_ONLY_INSTRUCTIONS = frozenset(("agents.md", "claude.md", "skill.md"))
 
 
 def load_manifest(path: Path) -> list[dict]:
@@ -129,7 +129,8 @@ def own_files(home: Path) -> list[Path]:
     for pattern in CONTENT:
         for found in sorted(glob.glob(str(home / pattern))):
             p = Path(found)
-            if (p.is_file() and not any(s in str(p) for s in SKIP)
+            if (p.is_file() and p.name.lower() not in SOURCE_ONLY_INSTRUCTIONS
+                    and not any(s in str(p) for s in SKIP)
                     and not (p.parent.parent == home / "locale"
                              and p.name == BUILD_CATALOGUE)):
                 out.append(p)

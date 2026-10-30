@@ -151,4 +151,5 @@ CBPC возвращает только исходные параметры; ег
 или непосредственным угловым пределам. См. [workspace.ru.md](workspace.ru.md).
 
 Расчёты — в [cli.ru.md](cli.ru.md), упаковка — в [building.ru.md](building.ru.md),
-контракты реализации — в [../CLAUDE.md](../CLAUDE.md).
+контракты реализации — в [рекомендациях по разработке в репозитории](https://github.com/Vhodnoylogin/morphbench/blob/main/CLAUDE.md).
+Эти инструкции не входят в архив выпуска.

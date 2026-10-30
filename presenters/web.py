@@ -175,6 +175,8 @@ class WebPage:
         """The only source of numbers for the page: not one of them is fixed in the script."""
         cfg = self.cfg
         return {
+            "addonStateMaxBytes": cfg["addonStateMaxBytes"],
+            "addonStateMaxDepth": cfg["addonStateMaxDepth"],
             "background": [float(x) for x in cfg["background"]],
             "lightFollowCamera": bool(cfg["lightFollowCamera"]),
             "lightCameraDirection": [float(x) for x in cfg["lightCameraDirection"]],

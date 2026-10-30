@@ -646,10 +646,13 @@ def cmd_workspace(args) -> int:
 
 def cmd_addons(args) -> int:
     bench = MorphBench()
-    if args.enable and args.disable:
+    if sum(bool(getattr(args, name, None))
+           for name in ("install", "update", "enable", "disable")) > 1:
         raise ValueError(t("err.addonParams"))
     if args.install:
         bench.addon_install(args.install)
+    if getattr(args, "update", None):
+        bench.addon_update(args.update)
     if args.enable or args.disable:
         bench.addon_enable(args.enable or args.disable, bool(args.enable))
     _out(args, bench.addons())
@@ -844,8 +847,9 @@ class Command:
             parser.add_argument("--respect-file-visibility", action="store_true", help=t("cli.opt.top.fileVisibility"))
             parser.add_argument("--show-file-hidden", action="store_true", help=t("cli.opt.top.fileHidden"))
             self._json(parser)
+        arguments = parser.add_mutually_exclusive_group() if self.name == "addons" else parser
         for arg in self.args:
-            arg.add_to(parser)
+            arg.add_to(arguments)
         if self.mesh == MESH_NONE:
             # Last, because that is where a command without a mesh preamble has always
             # printed it, and the order of the options in `--help` is the order they are
@@ -891,6 +895,7 @@ VIEW_ARGS = (
 COMMANDS = (
     Command("addons", "cli.cmd.addons", cmd_addons, mesh=MESH_NONE, args=(
         Arg("--install", default=None, help_key="cli.opt.addons.install"),
+        Arg("--update", default=None, help_key="cli.opt.addons.update"),
         Arg("--enable", default=None, help_key="cli.opt.addons.enable"),
         Arg("--disable", default=None, help_key="cli.opt.addons.disable"),
     )),

@@ -3,6 +3,47 @@
 // Versioned add-on operations mirror AddonSessionMixin, through the same facade as
 // ordinary controls. No package receives the facade object or live typed arrays.
 Object.assign(BenchMirror.prototype, {
+  addon_state_limits() {
+    const limits={maxBytes:this.settings.addonStateMaxBytes,maxDepth:this.settings.addonStateMaxDepth};
+    if(Object.values(limits).some((value)=>!Number.isSafeInteger(value)||value<=0))
+      throw Object.assign(Error(T.addonParams),{code:"invalidLimits"});
+    return limits;
+  },
+  addon_validate_state(value) {
+    const limits=this.addon_state_limits(),ancestors=new Set();
+    const fail=(code="invalidState")=>{throw Object.assign(Error(T.addonParams),{code});};
+    const text=(value)=>{
+      // Reject unpaired UTF-16 surrogates rather than silently replacing user data.
+      for(let i=0;i<value.length;i++){
+        const c=value.charCodeAt(i);
+        if(c>=0xd800&&c<=0xdbff){const next=value.charCodeAt(++i);if(!(next>=0xdc00&&next<=0xdfff))fail();}
+        else if(c>=0xdc00&&c<=0xdfff)fail();
+      }
+    };
+    const check=(item,depth)=>{
+      if(depth>limits.maxDepth)fail("limitExceeded");
+      if(item===null||typeof item==="boolean")return;
+      if(typeof item==="string"){text(item);return;}
+      if(typeof item==="number"&&Number.isFinite(item))return;
+      if(typeof item!=="object"||ancestors.has(item)||(!Array.isArray(item)&&Object.getPrototypeOf(item)!==Object.prototype&&Object.getPrototypeOf(item)!==null))fail();
+      ancestors.add(item);
+      try{
+        if(Array.isArray(item)){
+          for(let i=0;i<item.length;i++){if(!Object.hasOwn(item,i))fail();check(item[i],depth+1);}
+        }else for(const [key,child] of Object.entries(item)){text(key);check(child,depth+1);}
+      }finally{ancestors.delete(item);}
+    };
+    check(value,0);
+    return JSON.parse(JSON.stringify(value));
+  },
+  addon_decode_state(data) {
+    if(typeof data!=="string")throw Object.assign(Error(T.addonParams),{code:"invalidState"});
+    if(new TextEncoder().encode(data).length>this.addon_state_limits().maxBytes)
+      throw Object.assign(Error(T.addonParams),{code:"limitExceeded"});
+    let value;
+    try{value=JSON.parse(data);}catch(error){throw Object.assign(Error(T.addonParams),{code:"invalidState"});}
+    return this.addon_validate_state(value);
+  },
   addon_scene() {
     const visible = new Set(this.visible_shapes());
     return JSON.parse(JSON.stringify({open:this.is_open(), names:this.names, summary:this.summary,

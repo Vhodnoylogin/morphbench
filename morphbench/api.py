@@ -54,9 +54,10 @@ from .view import ViewState
 from .placements import Placements
 from .workspace import WorkspaceMixin
 from .addon_session import AddonSessionMixin
+from .addon_state import AddonStateMixin
 
 
-class MorphBench(WorkspaceMixin, AddonSessionMixin):
+class MorphBench(WorkspaceMixin, AddonSessionMixin, AddonStateMixin):
     """The open pair - a mesh and its morphs - and everything that can be done with it."""
 
     def __init__(self, config: Config | None = None):

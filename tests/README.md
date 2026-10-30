@@ -91,10 +91,32 @@ and Python/actual-JS parity.
 
 ## Add-on checks
 
+These suites cover API v1 and its additive update/session-data extensions on the development
+branch; the existing 0.8.0 archive does not include them.
+
 `test_addons.py` checks immutable ZIP installation, strict manifests and paths, bounded
 archives, enabled-state persistence, unsafe installed files, rollback and real subprocess
 writer-lock contention. One installed-symlink case skips when Windows denies symlink
 creation; archive symlink rejection still executes. `test_addon_integration.py` exercises
 the facade, CLI, binary HTTP upload, origin/iframe guards, enabled asset serving, Python
 and actual-JS scene/morph/view parity, detached snapshots, atomic rejection, sender/API
-validation, disabled frames and stale deferred navigation. No game or installed mod data.
+validation, disabled frames and stale deferred navigation.
+
+`test_addon_update.py` checks explicit same-ID replacement of disabled packages, opaque version
+labels, duplicate-install refusal, missing/enabled targets, repair of disabled damaged packages,
+invalid replacement rollback, extraction/publication/state-replace failures, complete reader
+snapshots around the atomic commit and real subprocess death before commit. It verifies
+retention of old bytes/unselected generations, legacy v1 migration without fallback to stale
+bytes, manifest/generation binding, facade/CLI exclusivity, bounded raw-ZIP HTTP update with
+origin guards, and current versus stale generation asset routes. Package files and state are
+flushed before commit; process-crash checks do not prove every power-loss durability case.
+Writer-lock contention is covered by `test_addons.py`.
+
+`test_addon_state.py` covers detached finite acyclic JSON, byte/depth limits, exact JSON-text
+byte-bound parity despite encoder formatting differences, and invalid data;
+the actual JavaScript host/facade with simulated `sessionStorage` checks per-ID isolation,
+namespace spoof rejection, persistence across host recreation, corrupt JSON, unavailable/quota
+failures, preservation of the previous value on rejected writes and data reset without morph
+changes. A replacement generation cannot authorize an old frame's mutation or deferred model
+navigation. Node is optional; these checks do not establish a browser's session-restore policy,
+durable project storage or visual UI quality. No game or installed mod data is used.

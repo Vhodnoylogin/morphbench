@@ -154,10 +154,35 @@ for implementation contracts; these instructions are not bundled with the releas
 
 ## Local add-on packages (development)
 
-API v1 on `feature/addons` adds `GET /api/addons`, raw-ZIP `POST /api/addons/install`
-(`application/zip`) and JSON `POST /api/addons/enabled` (`{id,enabled}`). Installation is
-disabled by default. Enabled assets are served at `/addons/<id>/<file>`; their sandbox
-uses the [public browser SDK](addons.md) for preview operations. Browser preview state
-remains distinct from server state. Foreign-origin and iframe requests to the root
-page and server APIs are rejected, including GET actions. Local CLI clients can omit
-`Origin`. The existing 0.8.0 archive does not contain this add-on infrastructure.
+API v1 on `feature/addons` includes these additive development routes:
+
+| Request | Body | Result |
+|---|---|---|
+| `GET /api/addons` | — | `{apiVersion:1, addons:[...]}`; entries include opaque `generation` |
+| `POST /api/addons/install` | Raw ZIP, `Content-Type: application/zip` | Installed entry, disabled; existing ID returns `alreadyInstalled` |
+| `POST /api/addons/update` | Raw ZIP, `Content-Type: application/zip` | Replacement entry, disabled; manifest `id` selects an existing disabled target |
+| `POST /api/addons/enabled` | JSON `{id,enabled}`, `Content-Type: application/json` | The updated list envelope |
+| `GET /addon-assets/<id>/<generation>/<relative-file>` | — | Asset of the current enabled generation; old identity returns `staleGeneration` |
+| `GET /addons/<id>/<relative-file>` | — | Legacy route to the current enabled package |
+
+Update returns `notFound` for a missing manifest ID and `updateRequiresDisabled` for an
+enabled target. Version labels are opaque and not ordered. Install/update use the configured
+ZIP limits, validate before publication, and return package errors as `{error,code}` with a
+failure HTTP status. A successful update creates a new generation but requires explicit
+re-enabling. Registry v2 uses immutable generations and one atomic state pointer; previous
+bytes remain without automated garbage collection. New binaries read legacy v1 registries;
+older binaries reject v2. See [the registry and lifecycle contract](addons.md) for crash limits.
+
+The root viewer binds frames and every SDK request to a generation. Re-enabling a replacement
+does not authorize an old frame: it receives `staleGeneration` and closes on its next request.
+Reload viewers retained across an update. The sandbox uses the [public browser SDK](addons.md)
+for preview operations and `state.get`/`state.set`/`state.reset`; these state methods are SDK
+messages, not HTTP routes. Their host-owned `sessionStorage` value is scoped to add-on ID and
+browser tab/origin and survives model navigation/reload. It is separate from scene state,
+performs no automatic replay and is not durable project storage.
+
+Foreign-origin and iframe requests to the root page and server APIs are rejected, including
+GET actions. Local CLI clients can omit `Origin`. Package CSP `connect-src 'none'` blocks all
+fetch/XHR, including packaged JSON: use local classic JS data, HTML-embedded JSON or user-picked
+files through File API. XML package assets are not allowed. The existing 0.8.0 archive does not
+contain this add-on infrastructure.

@@ -629,5 +629,24 @@ See [PPB scope](ppb.md) and the [workspace guide](workspace.md).
 ## Local add-ons (development)
 
 `mb.py addons --json` lists installed local packages. `--install <ZIP>` installs disabled;
-`--enable <id>` and `--disable <id>` persist activation. No model is required.
-See [API v1 and the neutral example](addons.md); this is not in the existing 0.8.0 archive.
+`--enable <id>` and `--disable <id>` persist activation. `--update <ZIP>` explicitly replaces
+an already installed, disabled package using the manifest's `id` and leaves it disabled.
+The four action flags are mutually exclusive. No model is required.
+
+```text
+python mb.py addons --disable scene-inspector --json
+python mb.py addons --update <package-folder>/scene-inspector.zip --json
+python mb.py addons --enable scene-inspector --json
+```
+
+Installation with an existing ID still returns `alreadyInstalled`; updating a missing ID returns
+`notFound`, and an enabled target returns `updateRequiresDisabled`. Version strings are opaque
+labels, with no semantic-version ordering. A successful install/update creates a new opaque
+`generation`, included in the package entries of `{apiVersion:1, addons:[...]}`. Registry v2
+selects immutable generations through an atomic state pointer and retains previous bytes without
+automatic garbage collection. New binaries read legacy v1 registries; older binaries reject v2.
+Browser add-on session data remains a separate tab/origin-scoped SDK facility; these commands
+do not read, replay or reset it.
+
+These are additive API v1 development extensions. See [the contract and neutral example](addons.md);
+the existing 0.8.0 archive does not include them.

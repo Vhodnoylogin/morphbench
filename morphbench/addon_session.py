@@ -32,11 +32,17 @@ class AddonSessionMixin:
     def addon_install_bytes(self, data: bytes) -> dict:
         return self._addon_packages().install_bytes(data)
 
+    def addon_update(self, path) -> dict:
+        return self._addon_packages().update(path)
+
+    def addon_update_bytes(self, data: bytes) -> dict:
+        return self._addon_packages().update_bytes(data)
+
     def addon_enable(self, identifier: str, enabled: bool) -> dict:
         return self._addon_packages().set_enabled(identifier, enabled)
 
-    def addon_asset(self, identifier: str, name: str) -> tuple[bytes, str]:
-        return self._addon_packages().asset(identifier, name)
+    def addon_asset(self, identifier: str, name: str, *, generation=None) -> tuple[bytes, str]:
+        return self._addon_packages().asset(identifier, name, generation=generation)
 
     def addon_scene(self) -> dict:
         summary = self.summary() if self.is_open() else None

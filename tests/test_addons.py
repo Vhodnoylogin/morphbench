@@ -61,9 +61,9 @@ class RegistryCase(unittest.TestCase):
         self.folder = self.root / "local-state"
         self.registry = AddonRegistry(self.folder)
 
-    def assert_error(self, code, function, *args):
+    def assert_error(self, code, function, *args, **kwargs):
         with self.assertRaises(AddonError) as caught:
-            function(*args)
+            function(*args, **kwargs)
         self.assertEqual(caught.exception.code, code)
         self.assertTrue(str(caught.exception))
         return caught.exception
@@ -73,6 +73,10 @@ class RegistryCase(unittest.TestCase):
         self.assertFalse(self.registry.state_file.exists())
         self.assertEqual(list(self.folder.glob(".stage-*")), [])
 
+    def installed_folder(self, identifier="sample-tool"):
+        row = next(row for row in self.registry.list() if row["id"] == identifier)
+        return self.registry.generations / row["generation"]
+
 
 class TestRegistryLifecycle(RegistryCase):
     def test_local_zip_is_immutable_and_installed_disabled_until_explicitly_enabled(self):
@@ -81,7 +85,9 @@ class TestRegistryLifecycle(RegistryCase):
                                   ("assets/app.js", b"void 0;")))
         source.write_bytes(original)
         row = self.registry.install(source)
-        self.assertEqual(row, dict(manifest(), enabled=False, compatible=True, status="disabled"))
+        self.assertRegex(row["generation"], r"^[0-9a-f]{32}$")
+        self.assertEqual(row, dict(manifest(), generation=row["generation"], enabled=False,
+                                   compatible=True, status="disabled"))
         self.assertEqual(source.read_bytes(), original)
         self.assert_error("disabled", self.registry.asset, "sample-tool", "index.html")
         self.assertEqual(AddonRegistry(self.folder).list(), [row])
@@ -348,6 +354,7 @@ with AddonRegistry(sys.argv[1])._writer():
                 raise
         self.assert_error("busy", self.registry.set_enabled, "sample-tool", True)
         self.assert_error("busy", self.registry.install_bytes, package(manifest(id="new-tool")))
+        self.assert_error("busy", self.registry.update_bytes, package(manifest(version="2.0")))
         self.assertEqual(self.registry.state_file.read_bytes(), before)
         self.assertEqual([row["id"] for row in self.registry.list()], ["sample-tool"])
         self.assertFalse(self.registry.list()[0]["enabled"])
@@ -357,6 +364,9 @@ with AddonRegistry(sys.argv[1])._writer():
         _, stderr = process.communicate(timeout=10)
         self.assertEqual(process.returncode, 0, stderr)
         self.assertTrue(self.registry.set_enabled("sample-tool", True)["enabled"])
+        self.registry.set_enabled("sample-tool", False)
+        self.assertEqual(self.registry.update_bytes(package(manifest(version="2.0")))["version"],
+                         "2.0")
         self.assertEqual(self.registry.install_bytes(package(manifest(id="new-tool")))["id"],
                          "new-tool")
 
@@ -384,8 +394,8 @@ class TestInstalledValidation(RegistryCase):
         self.registry.install_bytes(package(manifest(id="broken-tool")))
         self.registry.install_bytes(package(manifest(id="future-tool")))
         self.registry.set_enabled("future-tool", True)
-        (self.registry.packages / "broken-tool" / "addon.json").write_bytes(b"bad json")
-        (self.registry.packages / "future-tool" / "addon.json").write_text(
+        (self.installed_folder("broken-tool") / "addon.json").write_bytes(b"bad json")
+        (self.installed_folder("future-tool") / "addon.json").write_text(
             json.dumps(manifest(id="future-tool", apiVersion=2)), encoding="utf-8")
         rows = {row["id"]: row for row in self.registry.list()}
         self.assertEqual(rows["sample-tool"]["status"], "disabled")
@@ -401,14 +411,14 @@ class TestInstalledValidation(RegistryCase):
     def test_manually_added_disallowed_assets_prevent_enable_and_serving(self):
         self.registry.install_bytes(package())
         self.registry.set_enabled("sample-tool", True)
-        (self.registry.packages / "sample-tool" / "run.py").write_text("no execution", encoding="utf-8")
+        (self.installed_folder() / "run.py").write_text("no execution", encoding="utf-8")
         self.assertEqual(self.registry.list()[0]["status"], "invalid")
         self.assert_error("unsupportedFile", self.registry.set_enabled, "sample-tool", True)
         self.assert_error("unsupportedFile", self.registry.asset, "sample-tool", "index.html")
 
     def test_installed_manifest_id_must_match_directory(self):
         self.registry.install_bytes(package())
-        path = self.registry.packages / "sample-tool" / "addon.json"
+        path = self.installed_folder() / "addon.json"
         path.write_text(json.dumps(manifest(id="somebody-else")), encoding="utf-8")
         self.assertEqual(self.registry.list()[0]["error"]["code"], "invalidManifest")
         self.assert_error("invalidManifest", self.registry.set_enabled, "sample-tool", True)
@@ -426,7 +436,7 @@ class TestInstalledValidation(RegistryCase):
         self.registry.install_bytes(package())
         outside = self.root / "outside.html"
         outside.write_text("outside secret", encoding="utf-8")
-        target = self.registry.packages / "sample-tool" / "index.html"
+        target = self.installed_folder() / "index.html"
         target.unlink()
         try:
             target.symlink_to(outside)

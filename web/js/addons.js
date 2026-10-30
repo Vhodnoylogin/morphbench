@@ -4,7 +4,7 @@
 // can touch the current preview; installing a package does not execute it.
 class AddonHost {
   constructor(app) {
-    this.app=app;this.active=null;this.frame=null;this.entries=[];this.opened=false;
+    this.app=app;this.active=null;this.generation=null;this.frame=null;this.entries=[];this.opened=false;
     this.panel=el("aside",{id:"addon-panel",class:"inspector",hidden:"hidden"});
     document.querySelector(".workspace").appendChild(this.panel);
     this.nav=el("nav",{id:"addon-nav","aria-label":T.addonTitle});
@@ -31,7 +31,7 @@ class AddonHost {
       this.nav.appendChild(el("button",{type:"button",text:row.name,"data-addon":row.id,
         on:{click:()=>this.select(row.id)}}));
     }
-    if(this.active&&!this.entries.some((entry)=>entry.id===this.active&&entry.enabled&&entry.compatible))this.close();
+    if(this.active&&!this.entries.some((entry)=>entry.id===this.active&&entry.enabled&&entry.compatible&&entry.generation===this.generation))this.close();
     this.paintNav();
     if(this.opened&&!this.active)this.showManager();
   }
@@ -46,13 +46,13 @@ class AddonHost {
   select(identifier) {
     const entry=identifier&&this.entries.find((row)=>row.id===identifier&&row.enabled&&row.compatible);
     if(identifier&&!entry)return;
-    this.destroyFrame();this.opened=true;this.active=identifier;
+    this.destroyFrame();this.opened=true;this.active=identifier;this.generation=entry?entry.generation:null;
     document.getElementById("panel").hidden=true;this.panel.hidden=false;this.panel.textContent="";
     this.panel.appendChild(el("h2",{text:entry?entry.name:T.addonTitle}));
     this.panel.appendChild(el("button",{type:"button",text:T.addonReturn,on:{click:()=>this.close()}}));
     if(entry){
       this.frame=el("iframe",{class:"addon-frame",title:entry.name,sandbox:"allow-scripts",
-        referrerpolicy:"no-referrer",src:"/addons/"+encodeURIComponent(entry.id)+"/"+entry.entry.split("/").map(encodeURIComponent).join("/")});
+        referrerpolicy:"no-referrer",src:"/addon-assets/"+encodeURIComponent(entry.id)+"/"+encodeURIComponent(entry.generation)+"/"+entry.entry.split("/").map(encodeURIComponent).join("/")});
       this.panel.appendChild(this.frame);
     }else this.showManager();
     const url=new URL(window.location.href);
@@ -61,7 +61,7 @@ class AddonHost {
   }
   destroyFrame() {if(this.frame)this.frame.remove();this.frame=null;}
   close() {
-    this.destroyFrame();this.active=null;this.opened=false;this.panel.hidden=true;
+    this.destroyFrame();this.active=null;this.generation=null;this.opened=false;this.panel.hidden=true;
     document.getElementById("panel").hidden=false;
     const url=new URL(window.location.href);url.searchParams.delete("addon");window.history.replaceState(null,"",url);
     this.paintNav();
@@ -77,6 +77,13 @@ class AddonHost {
       try{await this.json("/api/addons/install",{method:"POST",headers:{"Content-Type":"application/zip"},body:upload.files[0]});await this.refresh();}
       catch(exc){error.textContent=String(exc.message||exc);upload.disabled=false;upload.value="";}
     });content.appendChild(upload);
+    content.appendChild(el("p",{text:T.addonUpdateNote}));
+    const update=el("input",{type:"file",accept:".zip,application/zip","aria-label":T.addonUpdate});
+    update.addEventListener("change",async()=>{
+      if(!update.files.length)return;update.disabled=true;
+      try{await this.json("/api/addons/update",{method:"POST",headers:{"Content-Type":"application/zip"},body:update.files[0]});await this.refresh();}
+      catch(exc){error.textContent=String(exc.message||exc);update.disabled=false;update.value="";}
+    });content.appendChild(update);
     if(!this.entries.length)content.appendChild(el("p",{text:T.addonEmpty}));
     for(const row of this.entries){
       const toggle=el("input",{type:"checkbox","aria-label":row.name||row.id});toggle.checked=row.enabled;
@@ -105,6 +112,26 @@ class AddonHost {
     const entries=root?await this.json("/api/catalog?"+new URLSearchParams({root,all:"1"})):[];
     return {root,entries};
   }
+  sessionState(method,identifier,params) {
+    // The host owns the namespace. The opaque frame never receives a storage handle
+    // and cannot name another add-on. sessionStorage survives same-tab navigation.
+    const bench=this.app.bench,key="morphbench:addon-state:v1:"+identifier;
+    this.params(params,method==="state.set"?["value"]:[],method==="state.set"?["value"]:[]);
+    try{
+      const storage=window.sessionStorage;
+      if(method==="state.reset"){storage.removeItem(key);return {value:null};}
+      if(method==="state.set"){
+        const raw=JSON.stringify(bench.addon_validate_state(params.value)),value=bench.addon_decode_state(raw);
+        storage.setItem(key,raw);return {value};
+      }
+      const raw=storage.getItem(key);
+      if(raw===null)return {value:null};
+      return {value:bench.addon_decode_state(raw)};
+    }catch(error){
+      if(error.code&&typeof error.code==="string")throw error;
+      throw this.failure("stateUnavailable",T.addonFailure);
+    }
+  }
   async receive(event) {
     const source=this.frame&&this.frame.contentWindow,request=event.data;
     if(!source||event.source!==source||!request||request.type!=="morphbench-addon:request")return;
@@ -117,6 +144,7 @@ class AddonHost {
       const entry=installed.addons.find((row)=>row.id===this.active&&row.enabled&&row.compatible);
       if(this.frame?.contentWindow!==source)return;
       if(!entry){source.postMessage({...reply,error:{code:"disabled",message:T.addonDisabled}},"*");this.close();return;}
+      if(entry.generation!==this.generation){source.postMessage({...reply,error:{code:"staleGeneration",message:T.addonDisabled}},"*");this.close();return;}
       const params=request.params,bench=this.app.bench;
       const invoke=(method,...args)=>{
         const result=this.app.invoke(method,...args);
@@ -127,7 +155,10 @@ class AddonHost {
         case "host.info":
           this.params(params,[]);
           reply.result={apiVersion:1,addon:{id:entry.id,name:entry.name,version:entry.version},language:document.documentElement.lang,
-            capabilities:["host.info","models.list","models.open","morphs.get","morphs.set","morphs.reset","scene.get","scene.geometry","view.get","view.set"],scope:"browser-session"};break;
+            capabilities:["host.info","models.list","models.open","morphs.get","morphs.set","morphs.reset","scene.get","scene.geometry","view.get","view.set","state.get","state.set","state.reset"],scope:"browser-session",
+            stateScope:"tab-session",stateLimits:bench.addon_state_limits()};break;
+        case "state.get":case "state.set":case "state.reset":
+          reply.result=this.sessionState(request.method,entry.id,params);break;
         case "models.list":this.params(params,[]);reply.result=await this.models();break;
         case "models.open":{
           this.params(params,["name"],["name"]);
@@ -159,13 +190,13 @@ class AddonHost {
     if(this.frame?.contentWindow!==source)return;
     source.postMessage(reply,"*");
     if(after){
-      const identifier=this.active;
+      const identifier=this.active,generation=this.generation;
       setTimeout(async()=>{
-        if(this.frame?.contentWindow!==source||this.active!==identifier)return;
+        if(this.frame?.contentWindow!==source||this.active!==identifier||this.generation!==generation)return;
         try{
           const current=await this.json("/api/addons");
           if(this.frame?.contentWindow===source&&this.active===identifier
-            &&current.addons.some((row)=>row.id===identifier&&row.enabled&&row.compatible))after();
+            &&this.generation===generation&&current.addons.some((row)=>row.id===identifier&&row.enabled&&row.compatible&&row.generation===generation))after();
         }catch(error){/* A stale or disabled frame never initiates navigation. */}
       },0);
     }

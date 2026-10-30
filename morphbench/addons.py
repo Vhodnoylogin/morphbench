@@ -5,10 +5,11 @@ root addon.json and a small allowlist of browser assets; Python, native librarie
 installer hooks are never loaded or executed. Presenters obtain bytes through the
 facade, which can separately isolate the browser document from the workbench.
 
-Installation validates every member before publishing a new directory. Existing IDs
-are immutable in API v1. State replacement and staged package publication are atomic;
-a failed state write removes only the package this installation just created. Reads
-validate installed files again so a damaged package does not become an asset escape.
+Installation refuses existing IDs. Explicit updates require a disabled package and
+validate every member before publication. Immutable generation directories are selected
+by one atomic state-file replacement, so readers see the old or new complete package.
+Previous generations and legacy packages/id directories are retained; failed writes
+remove only this transaction's new directory. Reads validate installed files again.
 """
 from __future__ import annotations
 
@@ -25,6 +26,7 @@ import shutil
 import stat
 import tempfile
 import threading
+import uuid
 import zipfile
 import zlib
 
@@ -52,6 +54,7 @@ _MIME = {
     ".jpeg": "image/jpeg",
 }
 _ID = re.compile(r"[a-z][a-z0-9-]{0,63}\Z", re.ASCII)
+_GENERATION = re.compile(r"[0-9a-f]{32}\Z", re.ASCII)
 _RESERVED = {"CON", "PRN", "AUX", "NUL", "CONIN$", "CONOUT$", "CLOCK$"}
 _RESERVED |= {prefix + number for prefix in ("COM", "LPT")
               for number in "123456789¹²³"}
@@ -139,6 +142,7 @@ class AddonRegistry:
         except (TypeError, ValueError, OSError):
             raise AddonError("storageError", t("err.addonStorage")) from None
         self.packages = self.folder / "packages"
+        self.generations = self.folder / "generations"
         self.state_file = self.folder / "state.json"
         self.lock_file = self.folder / "registry.lock"
         with _LOCKS_GUARD:
@@ -222,12 +226,15 @@ class AddonRegistry:
         self.packages.mkdir(exist_ok=True)
         if not stat.S_ISDIR(_no_link(self.packages).st_mode):
             raise AddonError("storageError", t("err.addonStorage"))
+        self.generations.mkdir(exist_ok=True)
+        if not stat.S_ISDIR(_no_link(self.generations).st_mode):
+            raise AddonError("storageError", t("err.addonStorage"))
 
-    def _state(self) -> dict[str, bool]:
+    def _state(self) -> dict:
         try:
             info = _no_link(self.state_file)
         except FileNotFoundError:
-            return {}
+            return {"version": 2, "enabled": {}, "generations": {}}
         if not stat.S_ISREG(info.st_mode):
             raise AddonError("storageError", t("err.addonStorage"))
         try:
@@ -236,21 +243,31 @@ class AddonRegistry:
                 data = source.read(self.limits["maxTotalBytes"] + 1)
             self._limit("maxTotalBytes", len(data))
             state = _json(data)
-            if (not isinstance(state, dict) or set(state) != {"version", "enabled"}
-                    or type(state["version"]) is not int or state["version"] != 1
+            if (not isinstance(state, dict) or type(state.get("version")) is not int
+                    or state["version"] not in (1, 2)
+                    or set(state) != ({"version", "enabled"} if state["version"] == 1
+                                      else {"version", "enabled", "generations"})
                     or not isinstance(state["enabled"], dict)):
                 raise ValueError()
             for key, enabled in state["enabled"].items():
                 _identifier(key)
                 if type(enabled) is not bool:
                     raise ValueError()
-            return state["enabled"]
+            generations = state.get("generations", {})
+            if not isinstance(generations, dict):
+                raise ValueError()
+            for key, generation in generations.items():
+                _identifier(key)
+                if (key not in state["enabled"] or not isinstance(generation, str)
+                        or not _GENERATION.fullmatch(generation)):
+                    raise ValueError()
+            return {"version": 2, "enabled": state["enabled"], "generations": generations}
         except (OSError, ValueError, UnicodeError):
             raise AddonError("storageError", t("err.addonStorage")) from None
 
-    def _write_state(self, enabled: dict[str, bool]) -> None:
+    def _write_state(self, state: dict) -> None:
         # NamedTemporaryFile is closed before replace, which is necessary on Windows.
-        data = json.dumps({"version": 1, "enabled": enabled}, sort_keys=True).encode("utf-8")
+        data = json.dumps(state, sort_keys=True).encode("utf-8")
         self._limit("maxTotalBytes", len(data))
         temporary = None
         try:
@@ -261,6 +278,7 @@ class AddonRegistry:
                 target.flush()
                 os.fsync(target.fileno())
             os.replace(temporary, self.state_file)
+            temporary = None
         finally:
             if temporary is not None:
                 temporary.unlink(missing_ok=True)
@@ -355,8 +373,8 @@ class AddonRegistry:
         return manifest, entries
 
     def _discard(self, path: Path) -> None:
-        # Only our direct temporary directory or the package just created may be removed.
-        if path.parent not in (self.folder, self.packages):
+        # Called only with the stage or unique generation created by this transaction.
+        if path.parent not in (self.folder, self.generations):
             raise AddonError("storageError", t("err.addonStorage"))
         info = _no_link(path)
         if (not stat.S_ISDIR(info.st_mode) or self.folder.resolve() != self.folder
@@ -367,11 +385,18 @@ class AddonRegistry:
 
     def install(self, path) -> dict:
         """Install a local ZIP without altering it, disabled until explicitly enabled."""
+        return self._from_path(path, update=False)
+
+    def update(self, path) -> dict:
+        """Replace an existing disabled ID from a validated ZIP, leaving it disabled."""
+        return self._from_path(path, update=True)
+
+    def _from_path(self, path, *, update: bool) -> dict:
         try:
             with open(path, "rb") as source:
                 self._limit("maxArchiveBytes", os.fstat(source.fileno()).st_size)
                 data = source.read(self.limits["maxArchiveBytes"] + 1)
-            return self.install_bytes(data)
+            return self._publish_bytes(data, update=update)
         except AddonError:
             raise
         except (OSError, ValueError, TypeError):
@@ -379,6 +404,13 @@ class AddonRegistry:
 
     def install_bytes(self, data: bytes) -> dict:
         """The same ZIP contract for an HTTP upload; no extraction outside the registry."""
+        return self._publish_bytes(data, update=False)
+
+    def update_bytes(self, data: bytes) -> dict:
+        """Explicit same-ID update; version strings have no ordering semantics."""
+        return self._publish_bytes(data, update=True)
+
+    def _publish_bytes(self, data: bytes, *, update: bool) -> dict:
         if not isinstance(data, bytes):
             raise AddonError("invalidArchive", t("err.addonArchive", path=""))
         self._limit("maxArchiveBytes", len(data))
@@ -389,11 +421,27 @@ class AddonRegistry:
                 with zipfile.ZipFile(io.BytesIO(data)) as archive:
                     manifest, entries = self._archive(archive)
                     identifier = manifest["id"]
-                    destination = self.packages / identifier
-                    if any(path.name.casefold() == identifier.casefold()
-                           for path in self.packages.iterdir()):
+                    state = self._state()
+                    names = self._identifiers(state)
+                    exists = any(name.casefold() == identifier.casefold() for name in names)
+                    if not update and exists:
                         raise AddonError("alreadyInstalled", t("err.addonExists", id=identifier))
-                    enabled = self._state()
+                    if update:
+                        if identifier not in names:
+                            raise AddonError("notFound", t("err.addonMissing", id=identifier))
+                        if state["enabled"].get(identifier, False):
+                            raise AddonError("updateRequiresDisabled",
+                                             t("err.addonUpdateEnabled", id=identifier))
+                        # A disabled damaged manifest may be repaired, but a link or
+                        # non-directory storage target must never be traversed.
+                        old_folder = self._package_folder(identifier, state)
+                        if not stat.S_ISDIR(_no_link(old_folder).st_mode):
+                            raise AddonError("storageError", t("err.addonStorage"))
+                    generation = uuid.uuid4().hex
+                    destination = self.generations / generation
+                    # Do not replace a pre-existing path, including an empty directory.
+                    if os.path.lexists(destination):
+                        raise AddonError("storageError", t("err.addonStorage"))
                     stage = Path(tempfile.mkdtemp(prefix=".stage-", dir=self.folder))
                     total = 0
                     for name, is_dir, info in entries.values():
@@ -407,31 +455,55 @@ class AddonRegistry:
                         self._limit("maxFileBytes", len(payload))
                         total += len(payload)
                         self._limit("maxTotalBytes", total)
-                        target.write_bytes(payload)
-                    # rename refuses an existing directory on Windows. An empty conflicting
-                    # directory on POSIX is separately refused by the immutable-ID check.
+                        with target.open("wb") as output:
+                            output.write(payload)
+                            output.flush()
+                            os.fsync(output.fileno())
+                    # The stage is complete before its unique immutable destination is
+                    # published. Only the subsequent state replace changes visibility.
                     stage.rename(destination)
                     stage = None
                     published = destination
-                    enabled[identifier] = False
-                    self._write_state(enabled)
+                    state["enabled"][identifier] = False
+                    state["generations"][identifier] = generation
+                    self._write_state(state)
                     published = None
-                    return dict(manifest, enabled=False, compatible=True, status="disabled")
+                    return dict(manifest, generation=generation, enabled=False,
+                                compatible=True, status="disabled")
             except AddonError:
                 raise
             except (zipfile.BadZipFile, RuntimeError, NotImplementedError, EOFError, zlib.error):
                 raise AddonError("invalidArchive", t("err.addonArchive", path="")) from None
+            except FileNotFoundError:
+                raise AddonError("notFound", t("err.addonMissing", id=identifier)) from None
             except OSError:
                 raise AddonError("storageError", t("err.addonStorage")) from None
             finally:
                 if stage is not None:
                     self._discard(stage)
                 if published is not None:
-                    self._discard(published)
+                    # An injected/abnormal post-commit failure must never delete the
+                    # generation already selected by the authoritative state file.
+                    try:
+                        referenced = published.name in self._state()["generations"].values()
+                    except AddonError:
+                        referenced = True
+                    if not referenced:
+                        self._discard(published)
 
-    def _installed(self, identifier: str) -> tuple[dict, dict]:
+    def _identifiers(self, state: dict) -> set[str]:
+        return {path.name for path in self.packages.iterdir()} | set(state["generations"])
+
+    def _generation(self, identifier: str, state: dict) -> str:
+        return state["generations"].get(identifier, "legacy")
+
+    def _package_folder(self, identifier: str, state: dict) -> Path:
+        generation = state["generations"].get(identifier)
+        return self.generations / generation if generation is not None else self.packages / identifier
+
+    def _installed(self, identifier: str, state: dict) -> tuple[dict, dict]:
         identifier = _identifier(identifier)
-        folder = self.packages / identifier
+        folder = self._package_folder(identifier, state)
         if not stat.S_ISDIR(_no_link(folder).st_mode):
             raise AddonError("invalidManifest", t("err.addonManifest"))
         records = []
@@ -461,21 +533,23 @@ class AddonRegistry:
             raise AddonError("invalidManifest", t("err.addonManifest"))
         return manifest, entries
 
-    def _entry(self, identifier: str, state: dict[str, bool]) -> dict:
+    def _entry(self, identifier: str, state: dict) -> dict:
+        generation = self._generation(identifier, state)
         try:
-            manifest, _ = self._installed(identifier)
+            manifest, _ = self._installed(identifier, state)
             try:
                 self._compatible(manifest)
             except AddonError as error:
-                return dict(manifest, enabled=False, compatible=False, status="incompatible",
+                return dict(manifest, generation=generation, enabled=False,
+                            compatible=False, status="incompatible",
                             error={"code": error.code, "message": str(error)})
-            enabled = state.get(identifier, False)
-            return dict(manifest, enabled=enabled, compatible=True,
+            enabled = state["enabled"].get(identifier, False)
+            return dict(manifest, generation=generation, enabled=enabled, compatible=True,
                         status="enabled" if enabled else "disabled")
         except (AddonError, OSError) as error:
             if not isinstance(error, AddonError):
                 error = AddonError("storageError", t("err.addonStorage"))
-            return {"id": identifier, "enabled": False, "compatible": False,
+            return {"id": identifier, "generation": generation, "enabled": False, "compatible": False,
                     "status": "invalid", "error": {"code": error.code, "message": str(error)}}
 
     def list(self) -> list[dict]:
@@ -483,8 +557,8 @@ class AddonRegistry:
             try:
                 self._storage()
                 state = self._state()
-                return [self._entry(path.name, state)
-                        for path in sorted(self.packages.iterdir(), key=lambda path: path.name)]
+                return [self._entry(identifier, state)
+                        for identifier in sorted(self._identifiers(state))]
             except AddonError:
                 raise
             except OSError:
@@ -498,11 +572,11 @@ class AddonRegistry:
             try:
                 state = self._state()
                 if enabled:
-                    manifest, _ = self._installed(identifier)
+                    manifest, _ = self._installed(identifier, state)
                     self._compatible(manifest)
                 else:
-                    _no_link(self.packages / identifier)
-                state[identifier] = enabled
+                    _no_link(self._package_folder(identifier, state))
+                state["enabled"][identifier] = enabled
                 self._write_state(state)
                 return self._entry(identifier, state)
             except FileNotFoundError:
@@ -512,15 +586,18 @@ class AddonRegistry:
             except OSError:
                 raise AddonError("storageError", t("err.addonStorage")) from None
 
-    def asset(self, identifier: str, path: str) -> tuple[bytes, str]:
+    def asset(self, identifier: str, path: str, *, generation=None) -> tuple[bytes, str]:
         identifier = _identifier(identifier)
         path = _path(path)
         with self._lock:
             try:
                 self._storage()
-                manifest, entries = self._installed(identifier)
+                state = self._state()
+                if generation is not None and generation != self._generation(identifier, state):
+                    raise AddonError("staleGeneration", t("err.addonGeneration", id=identifier))
+                manifest, entries = self._installed(identifier, state)
                 self._compatible(manifest)
-                if not self._state().get(identifier, False):
+                if not state["enabled"].get(identifier, False):
                     raise AddonError("disabled", t("err.addonDisabled", id=identifier))
                 entry = entries.get(path.casefold())
                 if not entry or entry[1] or entry[0] != path:

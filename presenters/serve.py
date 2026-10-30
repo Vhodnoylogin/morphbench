@@ -340,12 +340,18 @@ class WebServer:
         with self.lock:
             return self.bench.addon_install_bytes(data)
 
-    def addon_asset(self, path):
+    def api_addon_update(self, data):
+        with self.lock:
+            return self.bench.addon_update_bytes(data)
+
+    def addon_asset(self, path, *, generation=None, pinned=False):
         identifier, separator, name = unquote(path).partition("/")
+        if pinned:
+            generation, separator, name = name.partition("/")
         if not separator:
             raise FileNotFoundError(t("err.addonParams"))
         with self.lock:
-            return self.bench.addon_asset(identifier, name)
+            return self.bench.addon_asset(identifier, name, generation=generation)
 
     def api_workspace(self, body=None):
         with self.lock:
@@ -591,14 +597,18 @@ class _Handler(BaseHTTPRequestHandler):
                 self._send_json(owner.api_addons())
             elif url.path == "/api/shutdown":
                 self._send_json(owner.api_shutdown())
-            elif url.path.startswith("/addons/"):
-                body, kind = owner.addon_asset(url.path[len("/addons/"):])
-                identifier = unquote(url.path[len("/addons/"):]).partition("/")[0]
+            elif url.path.startswith(("/addons/", "/addon-assets/")):
+                pinned = url.path.startswith("/addon-assets/")
+                prefix = "/addon-assets/" if pinned else "/addons/"
+                relative = url.path[len(prefix):]
+                body, kind = owner.addon_asset(relative, generation=query.get("generation"),
+                                               pinned=pinned)
+                pieces = unquote(relative).split("/")
                 requested = urlsplit("http://" + self.headers.get("Host", ""))
                 origin = ("http://" + requested.netloc if requested.hostname in
                           ("localhost", "127.0.0.1", "::1") and requested.port == owner.port
                           else owner.url.rstrip("/"))
-                package_url = origin + "/addons/" + identifier + "/"
+                package_url = origin + prefix + "/".join(pieces[:2] if pinned else pieces[:1]) + "/"
                 # Browser-only extensions have no direct network, parent DOM, forms,
                 # popups, nested frames or native execution. SDK messages are the door.
                 self._send(body, kind, headers={"Content-Security-Policy":
@@ -627,19 +637,21 @@ class _Handler(BaseHTTPRequestHandler):
         try:
             path = urlsplit(self.path).path
             if path not in ("/api/physics/import", "/api/workspace", "/api/workspace/skeleton",
-                            "/api/addons/install", "/api/addons/enabled"):
+                            "/api/addons/install", "/api/addons/update", "/api/addons/enabled"):
                 raise RequestError(404, t("serve.noSuchPath", path=path))
-            installing = path == "/api/addons/install"
+            uploading = path in ("/api/addons/install", "/api/addons/update")
             if (self._foreign_origin() or self.headers.get_content_type() !=
-                    ("application/zip" if installing else "application/json")):
+                    ("application/zip" if uploading else "application/json")):
                 raise RequestError(403, t("workspace.origin"))
             length = int(self.headers.get("Content-Length", "0"))
-            limit = (self.owner.cfg["addonLimits"]["maxArchiveBytes"] if installing
+            limit = (self.owner.cfg["addonLimits"]["maxArchiveBytes"] if uploading
                      else self.owner.cfg["workspaceRequestLimit"])
             if length <= 0 or length > int(limit):
                 raise RequestError(413, t("workspace.large"))
-            if installing:
-                self._send_json(self.owner.api_addon_install(self.rfile.read(length)))
+            if uploading:
+                operation = (self.owner.api_addon_update if path == "/api/addons/update"
+                             else self.owner.api_addon_install)
+                self._send_json(operation(self.rfile.read(length)))
                 return
             def bad_constant(value):
                 raise ValueError(t("workspace.invalid", field=value))

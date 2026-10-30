@@ -3,7 +3,9 @@
 English version of this page — [updating.md](updating.md).
 
 Раздельный выпуск состоит из двух пакетов: основная загрузка — **Application 0.8.0**,
-а **Runtime 1** (`runtime-1-win64`) — отдельная обязательная загрузка. Один раз установите
+а **Morphbench Launcher v1** — отдельная обязательная загрузка. У Launcher своя независимая
+версия: внутренний идентификатор пакета остаётся **Runtime v1** (`runtime-1-win64`), а архив —
+`morphbench-runtime-1-win64.zip`. Один раз установите
 совместимую пару, затем обновляйте Application, сохраняя требуемый ею Runtime. Пакеты скачивают вручную;
 автоматической загрузки в morphbench нет.
 
@@ -27,7 +29,7 @@ Runtime или Runtime с той же версией Python не станови�
 ## Первая установка
 
 1. Скачайте оба архива: `morphbench-application-0.8.0.zip` (основная загрузка) и
-   `morphbench-runtime-1-win64.zip` (обязательный Runtime 1). Одна Application не запустится.
+   `morphbench-runtime-1-win64.zip` (обязательный Morphbench Launcher v1 / Runtime v1). Одна Application не запустится.
 2. Создайте новую папку установки вне игры и папок модов MO2, например `D:\Tools\Morphbench`.
    Ни один из пакетов не ставят в `Data` игры или как мод MO2.
 3. Распакуйте в неё **содержимое** внешней папки Runtime. Распакуйте **содержимое** внешней
@@ -37,6 +39,11 @@ Runtime или Runtime с той же версией Python не станови�
    `application-manifest.json`, `python/` и `vendor/` лежат рядом.
 5. Запустите `morphbench.exe`. Отдельно ставить Python или Blender не требуется. Для MO2
    добавьте exe этой установки, как описано в [quickstart.ru.md](quickstart.ru.md).
+
+На Nexus оба пакета находятся в **Main Files**; Application отмечена как **Primary**.
+Поддерживаются Manual download и Mod manager download. Загрузка через MO2 помещает архивы
+в **MO2 Downloads**. Оттуда вручную распакуйте содержимое обеих внешних папок в одну папку
+самостоятельного инструмента, описанную выше. Ни один архив не устанавливают как мод для `Data` игры.
 
 Сохраняйте папку установки и путь к её `morphbench.exe`: следующие обновления Application
 сохраняют этот лаунчер, поэтому та же запись MO2 продолжит работать. Запись с `python/python.exe`

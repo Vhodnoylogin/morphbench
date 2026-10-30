@@ -2,8 +2,10 @@
 
 Русская версия этой страницы — [updating.ru.md](updating.ru.md).
 
-Split releases have two packages: the main download is **Application 0.8.0**, and **Runtime 1**
-(`runtime-1-win64`) is a separate required download. Install the matching pair once, then update
+Split releases have two packages: the main download is **Application 0.8.0**, and
+**Morphbench Launcher v1** is a separate required download. The Launcher has its own independent
+version: its internal package identity remains **Runtime v1** (`runtime-1-win64`), and the archive
+remains `morphbench-runtime-1-win64.zip`. Install the matching pair once, then update
 Application while keeping its required Runtime. Downloads are manual; morphbench has no automatic downloader.
 
 This split avoids reuploading the unchanged EXE and native dependencies for every Application
@@ -26,7 +28,7 @@ files before importing native dependencies.
 ## First installation
 
 1. Download both `morphbench-application-0.8.0.zip` (main download) and
-   `morphbench-runtime-1-win64.zip` (required Runtime 1). Application alone cannot run.
+   `morphbench-runtime-1-win64.zip` (required Morphbench Launcher v1 / Runtime v1). Application alone cannot run.
 2. Create a new installation folder outside the game and MO2's mod folders, for example
    `D:\Tools\Morphbench`. Do not install either package into game `Data` or as an MO2 mod.
 3. Extract the **contents** of the Runtime wrapper folder into it. Extract the **contents** of
@@ -36,6 +38,11 @@ files before importing native dependencies.
    `application-manifest.json`, `python/` and `vendor/` are beside one another.
 5. Run `morphbench.exe`. No separate Python or Blender installation is needed. For MO2, add
    this installation's exe as described in [quickstart.md](quickstart.md).
+
+On Nexus, both packages are **Main Files**; Application is **Primary**. Manual download and
+Mod manager download are supported. Downloading through MO2 puts the archives in **MO2 Downloads**.
+From there, manually extract both wrapper-folder contents into the one standalone tool folder
+described above. Do not install either archive as a game `Data` mod.
 
 Keep the installation folder and its `morphbench.exe` path stable: later Application updates
 preserve that launcher, so the same MO2 entry continues to work. An MO2 entry using

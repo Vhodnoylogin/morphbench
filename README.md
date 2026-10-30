@@ -48,7 +48,9 @@ edited or fitted collision capsules, and edited physics configurations into new 
 ## What it needs
 
 **From a release — no separate Python or Blender installation.** Download the main package,
-**Application 0.8.0**, and the separate **required Runtime 1** (`runtime-1-win64`). Runtime contains
+**Application 0.8.0**, and the separate required **Morphbench Launcher v1**. Its independent
+package identity remains **Runtime v1** (`runtime-1-win64`), and its unchanged archive is
+`morphbench-runtime-1-win64.zip`. Runtime contains
 `morphbench.exe`, embedded Python, `numpy`, `pillow` and **PyNifly**; Application contains the
 workbench's Python, browser assets, translations and documentation.
 
@@ -57,6 +59,11 @@ Extract the **contents of both different archive wrapper folders into that same 
 Check that `morphbench.exe`, `mb.py`, `update.py`, `python/`, `vendor/` and both release manifests
 are beside one another, then run `morphbench.exe`. This is a standalone tool, not a game `Data`
 or MO2 mod installation. Keep this folder and the path to `morphbench.exe` stable for MO2.
+
+On Nexus, both downloads are **Main Files** and Application is **Primary**. Manual download
+and Mod manager download are supported. An MO2 manager download places the archives in
+**MO2 Downloads**; manually extract the contents of both wrapper folders into the same
+standalone tool folder as above. Do not install the archives as `Data` mods.
 
 For later Application-only updates, download the new Application ZIP, stop the server and close
 the launcher, then run the installed updater with the bundled Python:

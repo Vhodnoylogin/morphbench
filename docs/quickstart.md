@@ -24,7 +24,9 @@ There are two ways to have morphbench, and they need different things of the mac
 | `morphbench.exe` (the window MO2 launches) | Runtime, beside Application's `mb.py` | built by `launcher\build.cmd` |
 
 The release needs **two downloads for the first installation**: **Application 0.8.0** is the
-main download and **Runtime 1** (`runtime-1-win64`) is a separate required package.
+main download and **Morphbench Launcher v1** is a separate required package. Launcher has its
+own independent version; its internal identity remains **Runtime v1** (`runtime-1-win64`) and
+its unchanged archive is `morphbench-runtime-1-win64.zip`.
 
 1. Download `morphbench-application-0.8.0.zip` and `morphbench-runtime-1-win64.zip`.
 2. Create one installation folder outside the game and MO2's mod folders. Do not install
@@ -33,6 +35,11 @@ main download and **Runtime 1** (`runtime-1-win64`) is a separate required packa
    **same folder**. Do not keep two sibling wrapper folders or nest one inside the other.
 4. Check that `morphbench.exe`, `mb.py`, `update.py`, `python\`, `vendor\`,
    `runtime-manifest.json` and `application-manifest.json` are together, then run `morphbench.exe`.
+
+On Nexus, both packages are **Main Files**, with Application marked **Primary**. Manual download
+and Mod manager download are supported. Manager downloads arrive in **MO2 Downloads**; manually
+extract both archives' wrapper-folder contents into the same standalone tool folder above.
+Do not install them as game `Data` mods.
 
 Keep this folder and its `morphbench.exe` path stable for your MO2 entry. Together the two packages
 are self-contained; no separate Python or Blender installation is needed. `pillow` is the one

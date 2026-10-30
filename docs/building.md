@@ -126,12 +126,19 @@ The header comment in `build.cmd` still says the icon is not versioned. That com
 
 ## Split Runtime and Application packages
 
+The public download name **Morphbench Launcher v1** refers to **Runtime v1**
+(`runtime-1-win64`). Its version is independent of **Application 0.8.0**. The archive name
+remains `morphbench-runtime-1-win64.zip`; changing the display name does not change its manifest
+or native files. Reuse the existing Runtime ZIP and pinned manifest for compatible Application
+updates; do not rebuild or reupload it merely for an Application release or a naming correction.
+
 The installation remains flat: `morphbench.exe`, `mb.py`, `python/`, `vendor/`, `launcher/`
 and the Application directories share one root. This preserves the existing launcher and MO2
 paths. Runtime packaging copies the existing launcher bytes; it does not compile a new exe.
 
-First choose a complete existing release folder containing the launcher, embedded Python,
-vendor dependencies, launcher rebuild sources and licence notices. Package that Runtime:
+To prepare a Runtime for the first time, choose a complete existing release folder containing
+the launcher, embedded Python, vendor dependencies, launcher rebuild sources and licence notices.
+The Runtime v1 packaging command is:
 
 ```
 python release.py --package runtime --runtime-from "<complete-release-folder>" --runtime-version 1 --out "<builds>"
@@ -147,7 +154,7 @@ python release.py --package application --runtime "<runtime-stage>/runtime-manif
 
 This creates `morphbench-application-0.8.0.zip` and a staged `application-manifest.json`.
 The Application manifest records its version, owned file inventory and the exact required
-Runtime identity and content hash. Runtime version `1` is independent of Application version
+Runtime identity and content hash. Runtime **v1** is independent of Application version
 `0.8.0`; a matching-looking name or Python version cannot replace the pinned hash.
 
 | Package | Contents |
@@ -167,6 +174,11 @@ use `update.py` after stopping the server. The install lock prevents the running
 and an updater from using the installation concurrently. Manifests and Runtime hashes are
 checked before native imports; source checkouts without release manifests remain usable.
 See [updating.md](updating.md) for the exact install, check, update, recovery and migration steps.
+
+On Nexus, both packages are **Main Files**, with Application marked **Primary**. Allow Manual
+download and Mod manager download for both files. Manager downloads place the archives in
+**MO2 Downloads**; users must manually merge both wrapper-folder contents into one standalone
+tool folder outside the game and MO2's mod folders. These archives are not installed as `Data` mods.
 
 Review and publish Runtime independently. Any Runtime dependency change, security upgrade or
 launcher rebuild requires a new Runtime review and corresponding manifest; Application-only

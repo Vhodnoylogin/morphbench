@@ -23,7 +23,9 @@ BodySlide собирает тело, morphbench проверяет, что по�
 | `morphbench.exe` (окно, которое запускает MO2) | Runtime, рядом с `mb.py` из Application | собирается `launcher\build.cmd` |
 
 Для первой установки нужны **две загрузки**: **Application 0.8.0** — основной пакет,
-а **Runtime 1** (`runtime-1-win64`) — отдельный обязательный пакет.
+а **Morphbench Launcher v1** — отдельный обязательный пакет. У Launcher своя независимая
+версия; внутренний идентификатор остаётся **Runtime v1** (`runtime-1-win64`), а неизменённый
+архив — `morphbench-runtime-1-win64.zip`.
 
 1. Скачайте `morphbench-application-0.8.0.zip` и `morphbench-runtime-1-win64.zip`.
 2. Создайте одну папку установки вне игры и папок модов MO2. Эти пакеты не ставят
@@ -32,6 +34,11 @@ BodySlide собирает тело, morphbench проверяет, что по�
    **одну папку**. Не оставляйте две соседние внешние папки и не вкладывайте одну в другую.
 4. Убедитесь, что `morphbench.exe`, `mb.py`, `update.py`, `python\`, `vendor\`,
    `runtime-manifest.json` и `application-manifest.json` лежат рядом, затем запустите `morphbench.exe`.
+
+На Nexus оба пакета находятся в **Main Files**, а Application отмечена как **Primary**.
+Поддерживаются Manual download и Mod manager download. Загрузки через менеджер попадают
+в **MO2 Downloads**; вручную распакуйте содержимое внешних папок обоих архивов в одну папку
+самостоятельного инструмента, указанную выше. Не устанавливайте их как моды для `Data` игры.
 
 Сохраняйте эту папку и путь к её `morphbench.exe` для записи MO2. Вместе два пакета
 самодостаточны; отдельная установка Python или Blender не нужна. `pillow` — единственная

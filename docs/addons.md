@@ -3,7 +3,8 @@
 Russian: [addons.ru.md](addons.ru.md).
 
 This document describes API **v1**, including its additive update and session-state extensions,
-shipped in **Application 0.8.0**. Install Application with its required Runtime as described
+shipped in **Application 0.8.0**. Install Application with the required **Morphbench Launcher v1**
+(internal package **Runtime v1**, `runtime-1-win64`) as described
 in [updating.md](updating.md). An add-on is a local HTML/JavaScript/CSS package
 that adds an inspector tab to the server-backed viewer. The central model view stays visible.
 Self-contained HTML exported by `mb.py web` does not activate add-ons.

@@ -13,9 +13,13 @@ go in a major release, and nowhere else.
 
 ## [0.8.0] — 2026-10-30 (split packages and add-ons)
 
-Application keeps version **0.8.0** for this publication; its required Runtime is **1**
+Application keeps version **0.8.0** for this publication; its required Runtime is **v1**
 (`runtime-1-win64`). Both packages are required for a first installation.
 
+- Clarified the public download name **Morphbench Launcher v1** for the unchanged Runtime v1
+  archive and its version independent of Application 0.8.0. Both Nexus packages are Main Files,
+  with Application Primary. Manual and mod-manager downloads are supported; archives downloaded
+  to MO2 Downloads must be manually extracted into one standalone tool folder, not installed as Data mods.
 - Added separate Runtime and Application packages while keeping the flat installation layout
   and the legacy full-release build. Runtime reuses existing launcher/dependency bytes and
   records exact file hashes; Application pins that Runtime and inventories its own files.

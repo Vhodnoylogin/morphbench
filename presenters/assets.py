@@ -53,11 +53,13 @@ class PageAssets:
         "js/bench.js",
         "js/physics_workspace.js",
         "js/editor.js",
+        "js/addon_session.js",
         "js/render.js",
         "js/slots_panel.js",
         "js/panel.js",
         "js/editor_panel.js",
         "js/app.js",
+        "js/addons.js",
         "js/boot.js",
     )
     #: What to tell the browser a file is. Anything not listed is not served at all -

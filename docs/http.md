@@ -151,3 +151,13 @@ its clamps are not final displacement or direct angular limits. See [workspace.m
 See [cli.md](cli.md) for computations, [building.md](building.md) for packaging and
 [repository development guidance](https://github.com/Vhodnoylogin/morphbench/blob/main/CLAUDE.md)
 for implementation contracts; these instructions are not bundled with the release.
+
+## Local add-on packages (development)
+
+API v1 on `feature/addons` adds `GET /api/addons`, raw-ZIP `POST /api/addons/install`
+(`application/zip`) and JSON `POST /api/addons/enabled` (`{id,enabled}`). Installation is
+disabled by default. Enabled assets are served at `/addons/<id>/<file>`; their sandbox
+uses the [public browser SDK](addons.md) for preview operations. Browser preview state
+remains distinct from server state. Foreign-origin and iframe requests to the root
+page and server APIs are rejected, including GET actions. Local CLI clients can omit
+`Origin`. The existing 0.8.0 archive does not contain this add-on infrastructure.

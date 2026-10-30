@@ -1,7 +1,7 @@
 "use strict";
 
 // ---- the page as a whole ---------------------------------------------------------------------
-const POSITION_METHODS = new Set(["set_slider", "set_sliders", "reset_sliders"]);
+const POSITION_METHODS = new Set(["set_slider", "set_sliders", "reset_sliders", "addon_set_morphs", "addon_reset_morphs"]);
 const COLOUR_METHODS = new Set(["colour_by"]);
 
 class App {
@@ -33,6 +33,7 @@ class App {
     this.workspace.refresh();
     this.draw();
     this.updateWorkspaceUrl();
+    this.addons = new AddonHost(this);
   }
   // The one door to every action: the name of a facade method and its arguments.
   invoke(method, ...args) {
@@ -58,6 +59,7 @@ class App {
     if(this.workspace) this.workspace.refresh();
     if (["workspace_mode", "workspace_tab", "workspace_replay"].includes(method)) this.updateWorkspaceUrl();
     this.draw();
+    if(this.addons)this.addons.changed(method);
     return result;
   }
   updateWorkspaceUrl() {

@@ -48,7 +48,7 @@ import webbrowser
 from functools import partial
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import parse_qs, urlsplit
+from urllib.parse import parse_qs, unquote, urlsplit
 
 from morphbench.environment import process_alive, wait_process
 from morphbench.i18n import t
@@ -328,6 +328,25 @@ class WebServer:
                                   max_fields=int(self.cfg["physicsMaxFields"]))
         return {"document": document}
 
+    def api_addons(self, body=None):
+        with self.lock:
+            if body is not None:
+                if not isinstance(body, dict) or set(body) != {"id", "enabled"}:
+                    raise ValueError(t("err.addonParams"))
+                self.bench.addon_enable(body["id"], body["enabled"])
+            return self.bench.addons()
+
+    def api_addon_install(self, data):
+        with self.lock:
+            return self.bench.addon_install_bytes(data)
+
+    def addon_asset(self, path):
+        identifier, separator, name = unquote(path).partition("/")
+        if not separator:
+            raise FileNotFoundError(t("err.addonParams"))
+        with self.lock:
+            return self.bench.addon_asset(identifier, name)
+
     def api_workspace(self, body=None):
         with self.lock:
             if body is not None:
@@ -528,11 +547,14 @@ class _Handler(BaseHTTPRequestHandler):
         super().__init__(*args, **kwargs)
 
     # ---- sending ----------------------------------------------------------------------
-    def _send(self, body: bytes, content_type: str, status: int = 200) -> None:
+    def _send(self, body: bytes, content_type: str, status: int = 200, headers=None) -> None:
         self.send_response(status)
         self.send_header("Content-Type", content_type)
         self.send_header("Content-Length", str(len(body)))
         self.send_header("Cache-Control", "no-store")
+        self.send_header("X-Content-Type-Options", "nosniff")
+        for key, value in (headers or {}).items():
+            self.send_header(key, value)
         self.end_headers()
         self.wfile.write(body)
 
@@ -549,6 +571,9 @@ class _Handler(BaseHTTPRequestHandler):
         query = Query(url.query)
         owner = self.owner
         try:
+            if (url.path == "/" or url.path.startswith("/api/")) and (
+                    self._foreign_origin() or self.headers.get("Sec-Fetch-Dest") == "iframe"):
+                raise RequestError(403, t("workspace.origin"))
             if url.path == "/":
                 html, status = owner.page(query)
                 self._send_html(html, status)
@@ -562,8 +587,25 @@ class _Handler(BaseHTTPRequestHandler):
                 self._send_json(owner.api_root(query))
             elif url.path == "/api/workspace":
                 self._send_json(owner.api_workspace())
+            elif url.path == "/api/addons":
+                self._send_json(owner.api_addons())
             elif url.path == "/api/shutdown":
                 self._send_json(owner.api_shutdown())
+            elif url.path.startswith("/addons/"):
+                body, kind = owner.addon_asset(url.path[len("/addons/"):])
+                identifier = unquote(url.path[len("/addons/"):]).partition("/")[0]
+                requested = urlsplit("http://" + self.headers.get("Host", ""))
+                origin = ("http://" + requested.netloc if requested.hostname in
+                          ("localhost", "127.0.0.1", "::1") and requested.port == owner.port
+                          else owner.url.rstrip("/"))
+                package_url = origin + "/addons/" + identifier + "/"
+                # Browser-only extensions have no direct network, parent DOM, forms,
+                # popups, nested frames or native execution. SDK messages are the door.
+                self._send(body, kind, headers={"Content-Security-Policy":
+                    "default-src 'none'; script-src " + package_url + " " + origin + "/web/addon-sdk.js 'unsafe-inline'; "
+                    "style-src " + package_url + " 'unsafe-inline'; img-src " + package_url + " data:; "
+                    "connect-src 'none'; form-action 'none'; base-uri 'none'; "
+                    "frame-src 'none'; object-src 'none'; sandbox allow-scripts"})
             elif url.path.startswith(PREFIX):
                 body, kind = owner.assets.blob(url.path[len(PREFIX):])
                 self._send(body, kind)
@@ -574,21 +616,31 @@ class _Handler(BaseHTTPRequestHandler):
             else:
                 raise RequestError(404, t("serve.noSuchPath", path=url.path))
         except Exception as e:  # noqa: BLE001 - any refusal goes to the client as a code and a text
-            self._send_json({"error": _message(e)}, _status_of(e))
+            self._send_json({"error": _message(e), **({"code": e.code} if hasattr(e, "code") else {})}, _status_of(e))
+
+    def _foreign_origin(self):
+        origin = self.headers.get("Origin")
+        return bool(origin and urlsplit(origin).netloc != self.headers.get("Host")
+                    or self.headers.get("Sec-Fetch-Site") == "cross-site")
 
     def do_POST(self) -> None:  # noqa: N802
         try:
             path = urlsplit(self.path).path
-            if path not in ("/api/physics/import", "/api/workspace", "/api/workspace/skeleton"):
+            if path not in ("/api/physics/import", "/api/workspace", "/api/workspace/skeleton",
+                            "/api/addons/install", "/api/addons/enabled"):
                 raise RequestError(404, t("serve.noSuchPath", path=path))
-            origin = self.headers.get("Origin")
-            if (origin and urlsplit(origin).netloc != self.headers.get("Host")
-                    or self.headers.get("Sec-Fetch-Site") == "cross-site"
-                    or self.headers.get_content_type() != "application/json"):
+            installing = path == "/api/addons/install"
+            if (self._foreign_origin() or self.headers.get_content_type() !=
+                    ("application/zip" if installing else "application/json")):
                 raise RequestError(403, t("workspace.origin"))
             length = int(self.headers.get("Content-Length", "0"))
-            if length <= 0 or length > int(self.owner.cfg["workspaceRequestLimit"]):
+            limit = (self.owner.cfg["addonLimits"]["maxArchiveBytes"] if installing
+                     else self.owner.cfg["workspaceRequestLimit"])
+            if length <= 0 or length > int(limit):
                 raise RequestError(413, t("workspace.large"))
+            if installing:
+                self._send_json(self.owner.api_addon_install(self.rfile.read(length)))
+                return
             def bad_constant(value):
                 raise ValueError(t("workspace.invalid", field=value))
             try:
@@ -597,12 +649,14 @@ class _Handler(BaseHTTPRequestHandler):
                 raise ValueError(t("workspace.invalid", field="JSON")) from None
             if path == "/api/physics/import":
                 self._send_json(self.owner.api_physics_import(body))
+            elif path == "/api/addons/enabled":
+                self._send_json(self.owner.api_addons(body))
             elif path == "/api/workspace":
                 self._send_json(self.owner.api_workspace(body))
             else:
                 self._send(self.owner.api_skeleton(body), "application/octet-stream")
         except Exception as exc:  # noqa: BLE001
-            self._send_json({"error": _message(exc)}, _status_of(exc))
+            self._send_json({"error": _message(exc), **({"code": exc.code} if hasattr(exc, "code") else {})}, _status_of(exc))
 
     # ---- the journal ------------------------------------------------------------------
     def _quiet(self) -> bool:

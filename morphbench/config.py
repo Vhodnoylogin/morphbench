@@ -28,6 +28,10 @@ _ROOT = Path(__file__).resolve().parent.parent
 _FILE = _ROOT / "morphbench.json"
 
 DEFAULTS = {
+    "addonDirectory": "",
+    "addonLimits": {"maxArchiveBytes": 16777216, "maxFiles": 256,
+                    "maxFileBytes": 4194304, "maxTotalBytes": 16777216,
+                    "maxCompressionRatio": 200, "maxManifestBytes": 65536},
     "visibilityGraphLimit": 100000,
     "workspaceActionLimit": 4096,
     "physicsMaxChars": 2000000,

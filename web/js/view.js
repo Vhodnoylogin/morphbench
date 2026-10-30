@@ -127,12 +127,13 @@ class ViewMirror {
     const n = norm(v);
     return n > 1e-6 ? v.map((x) => x / n) : [0, 0, 1];
   }
-  light_state() {
+  light_state(precise=false) {
+    const r=(value)=>precise?value:rnd(value,3);
     const d = this.lightFollow ? this.lightCameraDir : this.lightWorldDir;
-    return { follow: this.lightFollow, direction: d.map((x) => rnd(x, 3)),
-             cameraDirection: this.lightCameraDir.map((x) => rnd(x, 3)),
-             worldDirection: this.lightWorldDir.map((x) => rnd(x, 3)),
-             ambient: rnd(this.ambient, 3), diffuse: rnd(this.diffuse, 3), fill: rnd(this.fill, 3) };
+    return { follow: this.lightFollow, direction: d.map(r),
+             cameraDirection: this.lightCameraDir.map(r),
+             worldDirection: this.lightWorldDir.map(r),
+             ambient: r(this.ambient), diffuse: r(this.diffuse), fill: r(this.fill) };
   }
   // capsule layer: the bumper is separate and off by default; null or undefined means leave it
   // as it is, the same as None does in ViewState.show_colliders
@@ -162,19 +163,20 @@ class ViewMirror {
     right = n < 1e-5 ? [1, 0, 0] : right.map((x) => x / n);
     return { right: right, up: cross(right, forward), forward: forward };
   }
-  as_dict() {
+  as_dict(precise=false) {
+    const r=(value,digits)=>precise?value:rnd(value,digits);
     return {
-      yaw: rnd(this.yaw, 1), pitch: rnd(this.pitch, 1), preset: this.preset_name(),
-      zoom: rnd(this.zoom, 3),
-      pan: [rnd(this.pan[0], 2), rnd(this.pan[1], 2)],
+      yaw: r(this.yaw, 1), pitch: r(this.pitch, 1), preset: this.preset_name(),
+      zoom: r(this.zoom, 3),
+      pan: [r(this.pan[0], 2), r(this.pan[1], 2)],
       colouring: this.colouring, highlightMorph: this.highlightMorph,
       visible: this.visible === null ? null : Array.from(this.visible).sort(),
       respectFileVisibility: this.respectFileVisibility, showFileHidden: this.showFileHidden,
       colliders: this.colliders, bumper: this.bumper,
       width: this.width, height: this.height,
-      light: this.light_state(),
+      light: this.light_state(precise),
       focus: this.focus === null ? null : { name: this.focus.name,
-        centre: this.focus.centre.map((x) => rnd(x, 2)), radius: rnd(this.focus.radius, 2) },
+        centre: this.focus.centre.map((x) => r(x, 2)), radius: r(this.focus.radius, 2) },
     };
   }
 }

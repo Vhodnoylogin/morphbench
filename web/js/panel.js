@@ -348,6 +348,7 @@ class Panel {
     const workspace = this.bench.workspace_state();
     params.mode = workspace.mode;
     params.tab = workspace.tab;
+    if(this.app.addons&&this.app.addons.active&&params.addon===undefined)params.addon=this.app.addons.active;
     if(params.skeleton===undefined&&this.bench.summary&&this.bench.summary.skeleton)params.skeleton=this.bench.summary.skeleton;
     const q = [];
     for (const k in params) if (params[k] !== undefined && params[k] !== null && params[k] !== "") q.push(k + "=" + encodeURIComponent(params[k]));

@@ -1,0 +1,8 @@
+{
+  "id": "scene-inspector",
+  "name": "Scene inspector",
+  "version": "1.0.0",
+  "apiVersion": 1,
+  "entry": "index.html",
+  "description": "Neutral example of the Morphbench browser add-on API."
+}

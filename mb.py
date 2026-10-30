@@ -644,6 +644,18 @@ def cmd_workspace(args) -> int:
     return 0
 
 
+def cmd_addons(args) -> int:
+    bench = MorphBench()
+    if args.enable and args.disable:
+        raise ValueError(t("err.addonParams"))
+    if args.install:
+        bench.addon_install(args.install)
+    if args.enable or args.disable:
+        bench.addon_enable(args.enable or args.disable, bool(args.enable))
+    _out(args, bench.addons())
+    return 0
+
+
 def cmd_catalog(args) -> int:
     """A catalogue of meshes under a root: number, path from the root, morph format."""
     bench = MorphBench()
@@ -877,6 +889,11 @@ VIEW_ARGS = (
 
 #: Every command of the workbench, in the order `--help` lists them.
 COMMANDS = (
+    Command("addons", "cli.cmd.addons", cmd_addons, mesh=MESH_NONE, args=(
+        Arg("--install", default=None, help_key="cli.opt.addons.install"),
+        Arg("--enable", default=None, help_key="cli.opt.addons.enable"),
+        Arg("--disable", default=None, help_key="cli.opt.addons.disable"),
+    )),
     Command("summary", "cli.cmd.summary", cmd_summary),
     Command("visibility", "cli.cmd.visibility", cmd_visibility),
     Command("shapes", "cli.cmd.shapes", cmd_shapes),

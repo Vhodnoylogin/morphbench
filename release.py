@@ -92,6 +92,7 @@ CONTENT = [
     "web/*.html",
     "web/*.css",
     "web/js/*.js",
+    "web/addon-sdk.js",
     "docs/*.md",
     # The source of the one compiled thing in the archive. GPL-3 lets the source be offered
     # from the same place as the binary rather than inside it, but "the same place" has to be

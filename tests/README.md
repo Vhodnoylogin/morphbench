@@ -88,3 +88,13 @@ and Python/actual-JS parity.
 `test_slot_variants.py` covers three-layer variants, grouped spheres, explicit equal-valued fields, v1/v2 recovery and rejected-batch atomicity, source lifecycle, copied reads, unchanged authored bytes, explicit-only unbound presets and CLI editor roundtrips/output guards. Node executes the actual JS owner/facade and SlotsPanel handlers on synthetic data; this is not visual browser QA.
 
 `test_slots.py` covers atomic placement validation, author/effective isolation, immutable override policy, true node transforms versus deliberately different ragdoll transforms, missing/invalid anchors, one application of uniform scale, access/axis geometry, slots framing, public schema/package layout, strict JSON/file guards and CLI recipe replay. Session checks cover exact checkpoint reopening, explicit overrides equal to changed author defaults, copied reads, selection/mode, malformed batch rejection and bounded replay. When Node is available, it executes the actual browser mirror and compares its effective state, preview, meshes, framing and package bytes with the Python facade; it also exercises the actual panel's recipe upload/download with an unfinished provider and rejected imports. Node is an optional test tool, not a product dependency; the rest uses synthetic in-memory models and frames only.
+
+## Add-on checks
+
+`test_addons.py` checks immutable ZIP installation, strict manifests and paths, bounded
+archives, enabled-state persistence, unsafe installed files, rollback and real subprocess
+writer-lock contention. One installed-symlink case skips when Windows denies symlink
+creation; archive symlink rejection still executes. `test_addon_integration.py` exercises
+the facade, CLI, binary HTTP upload, origin/iframe guards, enabled asset serving, Python
+and actual-JS scene/morph/view parity, detached snapshots, atomic rejection, sender/API
+validation, disabled frames and stale deferred navigation. No game or installed mod data.

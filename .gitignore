@@ -31,6 +31,7 @@ morphbench.json
 /morphbench.launcher.json
 /morphbench.diag.json
 /morphbench.diag.png
+/addons/
 
 # Preview of the icon - an intermediate product of make-icon.py. The icon itself, the .ico,
 # is versioned through LFS: those are the bytes that travel inside morphbench.exe.

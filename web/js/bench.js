@@ -226,7 +226,7 @@ class BenchMirror {
   // shape instead of all of them.
   hide(name) { if (this.view.visible === null) this.view.only(this.shape_names()); return this.view.hide(name).as_dict(); }
   show(name) { return this.view.show(name).as_dict(); }
-  view_state() { return this.view.as_dict(); }
+  view_state(precise=false) { return this.view.as_dict(precise); }
 
   // light: part of the state of the view as well
   light_follow_camera(on) { return this.view.light_follow_camera(on).as_dict(); }

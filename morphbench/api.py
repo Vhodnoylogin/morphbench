@@ -53,9 +53,10 @@ from .ragdoll import RagdollMap
 from .view import ViewState
 from .placements import Placements
 from .workspace import WorkspaceMixin
+from .addon_session import AddonSessionMixin
 
 
-class MorphBench(WorkspaceMixin):
+class MorphBench(WorkspaceMixin, AddonSessionMixin):
     """The open pair - a mesh and its morphs - and everything that can be done with it."""
 
     def __init__(self, config: Config | None = None):

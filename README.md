@@ -241,3 +241,10 @@ the browser tab is disabled in 0.8.0. The backend supports named skeleton-node p
 local transforms/access spheres, author defaults and temporary effective overrides, session
 recipes, Body Slots schema-v1 JSON and `.bslots` exports. It does not edit game saves,
 equipment or inventories. See [docs/slots.md](docs/slots.md) for the offline workflow and limits.
+
+## Development add-ons
+
+`feature/addons` adds a versioned local browser add-on host on top of the 0.8.0 source.
+Install a ZIP, enable its inspector tab, and use API v1 to select models, read geometry,
+set existing morphs and control the view. [Contract and workflow](docs/addons.md);
+[neutral example](examples/scene-inspector/). This feature is not in the published 0.8.0 archive.

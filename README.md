@@ -18,11 +18,9 @@ The project was extracted from Skyrim-Mods on 2026-10-02. All 42 retained histor
 the module contents and Git LFS were verified on 2026-10-03. The old local and remote
 `Skyrim-Mods/morphbench` branches were deleted after verification; historical checkouts remain.
 
-Development of the next collider/physics workspace continues on
-[`feature/collider-physics-ppb`](https://github.com/Vhodnoylogin/morphbench/tree/feature/collider-physics-ppb).
-It includes visual capsule editing, bidirectional source-preserving [PPB tuning editing](docs/ppb.md)
-and the skeleton-only blank-page fix. These changes are not included in the public 0.7.1-r2 archive.
-It also distinguishes [native file visibility](docs/visibility.md) from the viewer's shape selection.
+Version **0.8.0** includes visual capsule editing, bidirectional source-preserving
+[PPB tuning editing](docs/ppb.md), the skeleton-only blank-page fix and browser add-ons with
+API v1. It distinguishes [native file visibility](docs/visibility.md) from the viewer's shape selection.
 Version **0.8.0** enables only **Morphs** and **Colliders**; Physics and Body Slots
 are disabled in browser navigation. Their code and script APIs remain for development.
 See the [editing workspace](docs/workspace.md) and [changelog](CHANGELOG.md).
@@ -49,15 +47,33 @@ edited or fitted collision capsules, and edited physics configurations into new 
 
 ## What it needs
 
-**From a release — no separate Python or Blender installation.** Split releases have two packages:
-**Runtime** contains `morphbench.exe`, embedded Python, `numpy`, `pillow` and **PyNifly**;
-**Application** contains the workbench's Python, browser assets, translations and documentation.
-For the first installation, extract the contents of both packages into the **same folder**,
-so `morphbench.exe`, `mb.py`, `python/` and both release manifests are beside one another.
-The archive wrapper folders have different names; merge their contents, not those folders.
-Then run `morphbench.exe`. Later Application updates reuse the exact Runtime they require.
-See [installation, updates and recovery](docs/updating.md), including migration from older
-single-archive releases.
+**From a release — no separate Python or Blender installation.** Download the main package,
+**Application 0.8.0**, and the separate **required Runtime 1** (`runtime-1-win64`). Runtime contains
+`morphbench.exe`, embedded Python, `numpy`, `pillow` and **PyNifly**; Application contains the
+workbench's Python, browser assets, translations and documentation.
+
+For the first installation, create one tool folder outside the game and MO2's mod folders.
+Extract the **contents of both different archive wrapper folders into that same folder**.
+Check that `morphbench.exe`, `mb.py`, `update.py`, `python/`, `vendor/` and both release manifests
+are beside one another, then run `morphbench.exe`. This is a standalone tool, not a game `Data`
+or MO2 mod installation. Keep this folder and the path to `morphbench.exe` stable for MO2.
+
+For later Application-only updates, download the new Application ZIP, stop the server and close
+the launcher, then run the installed updater with the bundled Python:
+
+```powershell
+.\python\python.exe .\update.py --package "<application.zip>" --json
+```
+
+Run this from the installation folder and keep the downloaded ZIP outside it. The updater reuses
+the exact required Runtime and preserves settings and add-ons. Older single-archive users must
+install both packages in a **new folder**, then copy their settings and add-ons.
+See [installation, updates and recovery](docs/updating.md) for checks and migration details.
+
+The split avoids uploading unchanged EXE/native dependencies with each Application update and
+repeating quarantine review of those same binaries. The Runtime upload remains subject to Nexus
+security checks and may require quarantine review; the split does not guarantee antivirus approval
+or a Nexus review exemption.
 
 Blender is not bundled or needed: morphbench never touches `bpy`; it uses PyNifly's folder,
 which normally happens to live among Blender's add-ons. The legacy full archive remains a
@@ -258,9 +274,10 @@ local transforms/access spheres, author defaults and temporary effective overrid
 recipes, Body Slots schema-v1 JSON and `.bslots` exports. It does not edit game saves,
 equipment or inventories. See [docs/slots.md](docs/slots.md) for the offline workflow and limits.
 
-## Development add-ons
+## Browser add-ons
 
-`feature/addons` adds a versioned local browser add-on host on top of the 0.8.0 source.
+Application 0.8.0 includes a versioned local browser add-on host.
 Install a ZIP, enable its inspector tab, and use API v1 to select models, read geometry,
-set existing morphs and control the view. [Contract and workflow](docs/addons.md);
-[neutral example](examples/scene-inspector/). This feature is not in the published 0.8.0 archive.
+set existing morphs, control the view and save add-on state for the current browser tab.
+Installed add-ons can be explicitly updated while disabled. [Contract and workflow](docs/addons.md);
+[neutral example](examples/scene-inspector/).

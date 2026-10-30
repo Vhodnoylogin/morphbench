@@ -15,17 +15,40 @@ mean physically is in [physics.md](physics.md); the whole tool at a glance is in
 
 There are two ways to have morphbench, and they need different things of the machine.
 
-| | From the release archive | From a source checkout |
+| | From the release packages | From a source checkout |
 |---|---|---|
-| Python 3.12 | inside, in `python\` | installed, on `PATH` |
-| `numpy` | inside, in `vendor\` | `pip install numpy` |
-| `pillow` | inside, in `vendor\` | `pip install pillow` |
-| PyNifly add-on | inside, in `vendor\io_scene_nifly` | in the Blender add-ons folder |
-| `morphbench.exe` (the window MO2 launches) | inside, beside `mb.py` | built by `launcher\build.cmd` |
+| Python 3.12 | Runtime, in `python\` | installed, on `PATH` |
+| `numpy` | Runtime, in `vendor\` | `pip install numpy` |
+| `pillow` | Runtime, in `vendor\` | `pip install pillow` |
+| PyNifly add-on | Runtime, in `vendor\io_scene_nifly` | in the Blender add-ons folder |
+| `morphbench.exe` (the window MO2 launches) | Runtime, beside Application's `mb.py` | built by `launcher\build.cmd` |
 
-The release is meant to be self-contained: unpack it anywhere and keep the folder together —
-there is nothing else to download. `pillow` is the one optional piece: without it everything works
-except writing PNG frames (`render`, `sheet`).
+The release needs **two downloads for the first installation**: **Application 0.8.0** is the
+main download and **Runtime 1** (`runtime-1-win64`) is a separate required package.
+
+1. Download `morphbench-application-0.8.0.zip` and `morphbench-runtime-1-win64.zip`.
+2. Create one installation folder outside the game and MO2's mod folders. Do not install
+   these packages into game `Data` or as an MO2 mod.
+3. Extract the **contents** of each archive's differently named wrapper folder into that
+   **same folder**. Do not keep two sibling wrapper folders or nest one inside the other.
+4. Check that `morphbench.exe`, `mb.py`, `update.py`, `python\`, `vendor\`,
+   `runtime-manifest.json` and `application-manifest.json` are together, then run `morphbench.exe`.
+
+Keep this folder and its `morphbench.exe` path stable for your MO2 entry. Together the two packages
+are self-contained; no separate Python or Blender installation is needed. `pillow` is the one
+optional source dependency: without it everything works except writing PNG frames (`render`, `sheet`).
+
+For subsequent updates, download only Application when it requires your installed Runtime.
+Save your work, stop the server and close the launcher before running this from the installation
+folder with the bundled Python (keep the downloaded ZIP outside that folder):
+
+```powershell
+.\python\python.exe .\update.py --package "<application.zip>" --json
+```
+
+The updater preserves Runtime, settings and installed add-ons. Users of an older single archive
+must install both packages into a **new folder**, then copy their settings and add-ons.
+See [installation, update checks and recovery](updating.md) for the full procedure.
 
 **PyNifly is not optional, and it is not ours.** It is the only reader of NIF and TRI here; the
 workbench has no parsers of its own for these formats and must not grow any, because a second
@@ -36,11 +59,13 @@ found at all, the answer is plain: *PyNifly add-on not found; name its folder wi
 **Blender itself is not needed** — `bpy` is never imported, only the add-on folder is read; that
 folder simply tends to live among Blender's add-ons.
 
-`morphbench.exe` looks for python in this order: the `MORPHBENCH_PYTHON` variable, the
-`python` key in `morphbench.json`, the `python\` folder the release archive carries beside it,
-then `PATH`, the registry and `py.exe`. The bundled folder comes before `PATH` on purpose — it is
-what makes the archive answer the same way on every machine — and the two explicit overrides are
-there for the rare case of pointing it somewhere else. An unpacked release needs nothing set.
+In a manifested split installation, `morphbench.exe` validates and uses the bundled
+`python\python.exe`. An environment or settings override must resolve to that exact bundled
+path; another interpreter is refused. Nothing needs to be set for a normal release installation.
+
+For a source checkout, the launcher looks for Python in this order: `MORPHBENCH_PYTHON`, the
+`python` key in `morphbench.json`, a local `python\` folder, `PATH`, the registry and `py.exe`.
+Interpreter overrides are for source checkouts; a split release keeps its pinned Runtime.
 
 ## Opening a mesh
 

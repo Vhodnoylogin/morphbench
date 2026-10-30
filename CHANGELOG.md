@@ -11,7 +11,10 @@ go in a major release, and nowhere else.
 
 Эта страница на русском: [CHANGELOG.ru.md](CHANGELOG.ru.md).
 
-## [Unreleased]
+## [0.8.0] — 2026-10-30 (split packages and add-ons)
+
+Application keeps version **0.8.0** for this publication; its required Runtime is **1**
+(`runtime-1-win64`). Both packages are required for a first installation.
 
 - Added separate Runtime and Application packages while keeping the flat installation layout
   and the legacy full-release build. Runtime reuses existing launcher/dependency bytes and
@@ -22,6 +25,14 @@ go in a major release, and nowhere else.
 - Documented first installation, Application updates and fresh-folder migration from a legacy
   full archive in English and Russian. Runtime changes require separate review; stable hashes
   do not establish antivirus or Nexus clearance.
+- The split avoids reuploading unchanged EXE/native dependencies and repeating quarantine
+  review for those binaries with each Application update. Runtime uploads remain subject to Nexus
+  security checks and may require quarantine review; native dependency or security changes require a new Runtime.
+- Added browser add-on API v1: inspector tabs, model selection, geometry/scene snapshots,
+  existing morph controls and view controls. Add-ons stay separate local packages.
+- Added tab-session JSON state, explicit same-ID add-on updates while disabled, immutable
+  package generations and generation-pinned SDK requests/assets. Application updates preserve
+  installed add-ons; browser session state is not durable project storage.
 
 ## [0.8.0] — 2026-10-29
 

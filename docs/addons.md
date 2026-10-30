@@ -3,8 +3,8 @@
 Russian: [addons.ru.md](addons.ru.md).
 
 This document describes API **v1**, including its additive update and session-state extensions,
-on the development branch `feature/addons`. It is not a
-feature of the existing 0.8.0 release archive. An add-on is a local HTML/JavaScript/CSS package
+shipped in **Application 0.8.0**. Install Application with its required Runtime as described
+in [updating.md](updating.md). An add-on is a local HTML/JavaScript/CSS package
 that adds an inspector tab to the server-backed viewer. The central model view stays visible.
 Self-contained HTML exported by `mb.py web` does not activate add-ons.
 
@@ -25,6 +25,10 @@ They are never bundled or versioned; the default source-checkout folder is Git-i
 An empty setting uses `addons` beside the active configuration file. Installation still refuses
 an existing ID with `alreadyInstalled`; replacement requires the separate **update** operation.
 Incompatible or damaged packages cannot be enabled.
+
+Application updates preserve installed add-ons and their registry files. They do not update
+the add-on packages themselves; use the separate operation below. The SDK's tab-session data
+keeps its browser-session lifetime and is not durable project storage.
 
 To update, disable the package, upload the replacement ZIP with the manager's update control,
 inspect the result, and explicitly enable it again. The target is the ZIP manifest's `id`;
@@ -118,7 +122,7 @@ before publication/commit. Readers see a complete old or new package; injected f
 process crash before the state commit are tested. This does not establish durability through
 every power-loss or filesystem failure. Previous generations and legacy package bytes remain
 on disk; there is no automated garbage collection. A crash may leave an unselected generation.
-The new binary reads legacy v1 registries and writes v2 state on mutation. Older binaries reject
+The current host reads legacy v1 registries and writes v2 state on mutation. Older hosts reject
 v2 state; retaining old package bytes does not make such a downgrade supported.
 
 To pack the neutral example, run this from `examples/scene-inspector`, with an output folder

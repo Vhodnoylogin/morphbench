@@ -21,6 +21,10 @@ go in a major release, and nowhere else.
 - Added source-preserving PPB tuning import/edit/export and explicit live links between
   a selected tuning record and an editable capsule. Runtime PPB overrides and auto-fit
   still require validation in the game.
+- Unified skeleton and PPB capsule editing in the Colliders inspector. Source loading,
+  record association and saving share the selected capsule; advanced source controls remain
+  available. Old PPB-tab links and recipes open Edit capsules. Geometry and export formats
+  are unchanged.
 - Fixed standalone skeleton loading and framing when the NIF has no renderable mesh.
 - Added static NIF visibility diagnostics and an independent inspection policy for locally
   or ancestrally hidden shapes. This does not evaluate game controllers or camera culling.

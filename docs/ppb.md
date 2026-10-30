@@ -7,25 +7,30 @@ an edited **new file**. The source editor preserves comments, command order, dup
 unknown text, UTF-8 BOM and original line endings. An edit replaces only the selected decimal
 number's source span. Exporting without edits reproduces the imported UTF-8 text exactly.
 
+These controls are part of **Colliders → Edit capsules**, in its source and saving area.
+PPB is a settings source for the common capsule editor, not a separate tab. Links and recipes
+that selected the former PPB tab now open Edit capsules without discarding source data or edits.
+
 PPB's runtime plugin is for **Skyrim VR**. Editing its text is possible outside either game,
 but SE/AE does not execute PPB's runtime re-scaling or auto-fit. A static exported Havok
 skeleton can be assessed independently on a compatible runtime; it does not provide those
 PPB features. Visible TRI morphs and Havok capsule geometry are separate: changing a mesh
 does not by itself fit the capsules. CBPC and FSMP also have their own collision definitions.
 
-In **Colliders**, select a PPB source group and an existing NIF capsule independently. The two
-copy actions move the selected seven geometric values between them: endpoint A, endpoint B and
-radius. This is an explicit manual copy in body-local game units. Check the chosen body, side,
-shape and coordinate frame before using the result. The action does not discover a matching
-bone, transform coordinates between different bodies or create a missing list child. Editing
-the source's `Enable` number remains separate; copying geometry does not activate a runtime
-override. The session retains the source document and numeric edits for replay.
+Select an existing NIF capsule in the common editor, open the settings file and choose a source
+record to associate with that capsule. There is no second NIF capsule selector. The association
+is explicit: check the chosen body, side, shape and coordinate frame before using the result.
+The editor does not discover a matching bone, transform coordinates between different bodies
+or create a missing list child. Advanced source controls retain the two one-way copy actions
+for endpoint A, endpoint B and radius in body-local game units. Editing the source's `Enable`
+number remains separate; copying geometry does not activate a runtime override. The session
+retains the source document and numeric edits for replay.
 
 ## Visual source editing
 
-Select a complete PPB record and an editable NIF capsule, then choose **Link these records for
-visual editing**. Linking starts by copying that record's geometry into the selected capsule
-in the working copy. The banner names both ends of the link; it does not claim that PPB would
+Select a complete source record and link it to the editable capsule selected in the common
+editor. Linking starts by copying that record's geometry into the selected capsule in the
+working copy. The source status names both ends of the link; it does not claim that PPB would
 choose this capsule in the game. Only one link is active at a time.
 
 Move the linked capsule with Shift + left-drag, or drag its centre handle. These moves update
@@ -35,7 +40,7 @@ edit leaves the other numeric spans untouched. `Enable`, earlier duplicate assig
 unrelated records remain separate. The link requires a positive radius and representable
 provider values; a rejected edit leaves both text and geometry unchanged.
 
-**Unlink and keep edits** ends synchronization without discarding changes. A successful source
+Unlinking ends synchronization without discarding changes. A successful source
 or skeleton replacement, capsule reset, fitting, duplication or removal also ends the link;
 it cannot silently move to a renumbered list child. Editing a different capsule does not alter
 the linked record. A workspace recipe restores the final values and explicit link, bound to

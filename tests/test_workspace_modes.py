@@ -5,7 +5,9 @@ import common
 from presenters.web import WebPage
 from presenters.serve import WebServer, Query
 from morphbench.journal import Journal
-from test_workspace_integration import run_browser
+from presenters.physics_document import parse_document
+from test_ppb_document import block
+from test_workspace_integration import action, make_bench, run_browser
 
 
 class TestWorkspaceModes(unittest.TestCase):
@@ -35,7 +37,40 @@ class TestWorkspaceModes(unittest.TestCase):
                 self.assertEqual(bench._placements.mode, "mesh")
             _, status = server.page(Query("mode=colliders&tab=ppb"))
             self.assertEqual(status, 200)
-            self.assertEqual(bench.workspace_state()["tab"], "ppb")
+            self.assertEqual(bench.workspace_state(), {"mode": "colliders", "tab": "edit", "tabs": ["edit", "display"]})
+
+    def test_old_ppb_recipe_opens_common_editor_and_preserves_linked_edits(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            bench = make_bench(common.config(temporary))
+            document = parse_document("ppb", "# retained source\r\n" + block())
+            group = document["capsules"][0]["id"]
+            payload = WebPage(bench).payload()
+            actions = [action("workspace_mode", "colliders"), action("workspace_tab", "ppb"),
+                       action("ppb_replace", document), action("ppb_link", group, "A", 0),
+                       action("collider_set", "A", 0, {"radius": 8})]
+            bench.workspace_replay(actions)
+            result = run_browser(self, temporary, payload, """
+const bench=new BenchMirror(DATA);bench.workspace_replay(input.actions);
+const recipe=bench.workspace_recipe(),restored=new BenchMirror(DATA);restored.workspace_replay(recipe.actions);
+const legacyPayload=JSON.parse(JSON.stringify(DATA));legacyPayload.workspace={mode:'colliders',tab:'ppb',tabs:['edit','ppb','display']};
+const old=DATA.workspace;DATA.workspace=legacyPayload.workspace;
+const legacy=new BenchMirror(DATA),legacyState=legacy.workspace_state();DATA.workspace=old;
+console.log(JSON.stringify({state:bench.workspace_state(),text:bench.ppb_export(),caps:bench.collider_edit_state(),
+ binding:bench.ppb_state().binding,recipe,restoredState:restored.workspace_state(),restoredText:restored.ppb_export(),
+ restoredCaps:restored.collider_edit_state(),legacyState}));
+""", actions=actions)
+            expected = {"mode": "colliders", "tab": "edit", "tabs": ["edit", "display"]}
+            self.assertEqual(bench.workspace_state(), expected)
+            self.assertEqual(result["state"], expected)
+            self.assertEqual(result["legacyState"], expected)
+            self.assertEqual(result["restoredState"], expected)
+            self.assertEqual(result["text"], bench.ppb_export())
+            self.assertIn("# retained source\r\n", result["text"])
+            self.assertIn("capForeR 8\r\n", result["text"])
+            self.assertEqual(result["binding"], bench.ppb_state()["binding"])
+            self.assertEqual(result["restoredText"], result["text"])
+            self.assertEqual(result["restoredCaps"], result["caps"])
+            self.assertEqual(result["recipe"]["actions"][-1], action("workspace_tab", "edit"))
 
     def test_browser_navigation_blocks_experimental_modes_and_skips_them_on_keyboard(self):
         with tempfile.TemporaryDirectory() as temporary:

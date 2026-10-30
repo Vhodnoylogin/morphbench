@@ -9,6 +9,10 @@ in the centre, and the current inspector on the right. Ragdoll capsules are show
 mode. Experimental physics and [placement](slots.md) code, documents and scripted APIs are
 retained for further development; they are not offered as release UI features.
 
+Colliders has **Edit capsules** and **Display** tabs. Skeleton geometry and PPB settings use
+the same capsule editor; PPB is a source of settings, not a separate editing mode. Old links
+and saved recipes that select the former PPB tab open Edit capsules while retaining their data.
+
 `bench.workspace_modes()` returns the enabled browser modes. `workspace_mode()` and numeric
 CLI/HTTP operations retain their existing scripted contract, including experimental modes.
 Opening their saved recipes in the browser keeps the data and returns navigation to Morphs.
@@ -42,22 +46,27 @@ it replays the recipe against the original skeleton and downloads a new NIF. Cap
 bind the skeleton's path and SHA-256, so a different or changed source is rejected. The same
 recipe can produce a new NIF through the CLI without a browser.
 
-## PPB capsule tuning
+## Capsule sources and saving
 
-In **Colliders → PPB**, open an existing `PPB_tuning.txt`. Choose a source capsule record
-and the target NIF capsule independently. Edit supported numeric fields, copy source geometry
-to the selected capsule, or move a capsule visually and copy its geometry back to the source.
-Import and unlinked numeric source edits do not apply geometry implicitly. Copying preserves `Enable`;
-it does not activate an override. Download the edited tuning to a **new file** or retain the
-source and edits in a workspace recipe. Comments, unknown commands, duplicates and line endings
-are preserved. Incomplete or ambiguous source records cannot transfer geometry.
+In **Colliders → Edit capsules**, the source and saving controls also open an existing
+`PPB_tuning.txt`. Keep the capsule selected in the common editor and choose the source record
+to associate with it. There is one NIF capsule selection for the picture and the source controls.
+The record association stays explicit: the editor does not guess a matching bone, side or list
+child, and incomplete or ambiguous source records cannot supply geometry.
 
-For continuous visual editing, choose **Link these records for visual editing**. This copies
-the source geometry into the selected working capsule; subsequent moves, endpoint/radius edits
-and active PPB numeric edits keep text and geometry synchronized. `Enable` remains independent.
-The banner identifies the explicit pair. **Unlink and keep edits** ends synchronization.
-Resetting or changing the capsule list, fitting, or replacing either source ends it too;
-workspace recipes restore it. See [the PPB workflow](ppb.md#visual-source-editing).
+Link the chosen record to the selected capsule for continuous visual editing. This first copies
+the source geometry into the working capsule. Then use the same drag gesture and endpoint/radius
+controls as for skeleton-only editing; active source-number edits also keep text and geometry
+synchronized. `Enable` remains independent. The source status identifies the explicit pair.
+Unlinking keeps the edits and ends synchronization. Resetting or changing the capsule list,
+fitting, or replacing either source ends it too; workspace recipes restore it.
+See [the PPB workflow](ppb.md#visual-source-editing).
+
+Advanced source controls retain supported numeric fields, raw text and one-way geometry copying.
+Import and unlinked numeric source edits do not apply geometry implicitly. Copying preserves
+`Enable`; it does not activate an override. Save the edited tuning to a **new file**, export a
+new skeleton NIF when needed, or retain the source and edits in a workspace recipe. Comments,
+unknown commands, duplicates and line endings are preserved.
 
 The picture shows the NIF geometry or the manual values you copied into it. It does not resolve
 PPB's actor-specific rules, mirroring, auto-fit or runtime shape changes. See [PPB details](ppb.md)

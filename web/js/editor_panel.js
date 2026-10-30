@@ -25,7 +25,7 @@ class EditorPanel {
   makeColliders() {
     const section=this.section("colliders","edit",T.edCollider);
     this.capsuleSelect=el("select",{"aria-label":T.edChoose,on:{change:()=>{
-      const cap=this.bench.collider_edit_state().capsules[Number(this.capsuleSelect.value)];if(cap)this.app.invoke("collider_select",cap.bone,cap.index);
+      const cap=this.bench.collider_edit_state().capsules[Number(this.capsuleSelect.value)];if(this.capsuleSelect.value!==""&&cap)this.app.invoke("collider_select",cap.bone,cap.index);
     }}});section.appendChild(this.capsuleSelect);
     section.appendChild(el("p",{class:"muted",text:T.edFrame}));
     this.ppbEditStatus=el("p",{class:"ppb-binding",hidden:true});section.appendChild(this.ppbEditStatus);
@@ -51,11 +51,6 @@ class EditorPanel {
     section.appendChild(this.button(T.edReset,()=>this.app.invoke("collider_reset")));
     section.appendChild(el("p",{class:"muted",text:T.edDrag}));
     this.colliderNote=el("p",{class:"muted"});section.appendChild(this.colliderNote);
-    section.appendChild(el("div",{class:"row editor-actions"},[
-      this.button(T.edRecipe,()=>this.download("morphbench-edits.json",JSON.stringify(this.bench.workspace_recipe(),null,2))),
-      this.button(T.edSkeleton,()=>this.exportSkeleton())]));
-    this.recipeUpload=el("input",{type:"file",accept:".json","aria-label":T.edImportRecipe,on:{change:()=>this.importRecipe()}});
-    section.appendChild(el("label",{class:"slot-field"},[T.edImportRecipe,this.recipeUpload]));
   }
   async importRecipe() {
     try {
@@ -77,31 +72,40 @@ class EditorPanel {
     }catch(error){this.fail(error);}
   }
   makePPB() {
-    const section=this.section("colliders","ppb",T.edPpb);
-    section.appendChild(el("p",{class:"warn",text:T.edPpbScope}));
+    // One geometry editor; format-specific controls are source/save adapters.
+    const section=this.section("colliders","edit",T.edSourceSave);
+    this.sourceStatus=el("p",{class:"editor-source-status"});section.appendChild(this.sourceStatus);
+    this.ppbExport=this.button(T.edPpbExport,()=>{if(this.bench.ppb_state().document)this.download("PPB_tuning.morphbench.txt",this.bench.ppb_export(),"text/plain;charset=utf-8");});
+    section.appendChild(el("div",{class:"row editor-actions"},[
+      this.button(T.edSkeleton,()=>this.exportSkeleton()),this.ppbExport,
+      this.button(T.edRecipe,()=>this.download("morphbench-edits.json",JSON.stringify(this.bench.workspace_recipe(),null,2)))]));
+    this.ppbSettings=el("details",{class:"collider-source-settings"},[el("summary",{text:T.edPpbLoad})]);
+    section.appendChild(this.ppbSettings);
+    const source=this.ppbSettings;
     this.ppbUpload=el("input",{type:"file",accept:".txt","aria-label":T.edPpbLoad,on:{change:()=>this.importPPB()}});
-    section.appendChild(el("label",{class:"slot-field"},[T.edPpbLoad,this.ppbUpload]));
+    source.appendChild(el("label",{class:"slot-field"},[T.edPpbLoad,this.ppbUpload]));
+    source.appendChild(el("p",{class:"muted",text:T.edPpbEmpty}));
+    this.ppbControls=el("div");source.appendChild(this.ppbControls);
     this.ppbGroup=el("select",{"aria-label":T.edPpbGroup,on:{change:()=>this.refreshPPB()}});
-    section.appendChild(el("label",{class:"slot-field"},[T.edPpbGroup,this.ppbGroup]));
-    this.ppbTarget=el("select",{"aria-label":T.edPpbTarget,on:{change:()=>{
-      const cap=this.bench.collider_edit_state().capsules[Number(this.ppbTarget.value)];
-      if(this.ppbTarget.value!==""&&cap)this.app.invoke("collider_select",cap.bone,cap.index);
-    }}});
-    section.appendChild(el("label",{class:"slot-field"},[T.edPpbTarget,this.ppbTarget]));
+    this.ppbControls.appendChild(el("label",{class:"slot-field"},[T.edPpbGroup,this.ppbGroup]));
+    this.ppbTarget=el("p",{class:"muted"});this.ppbControls.appendChild(this.ppbTarget);
     this.ppbLink=this.button(T.edPpbLink,()=>{const cap=this.selected();if(cap)this.app.invoke("ppb_link",this.ppbGroup.value,cap.bone,cap.index);});
     this.ppbUnlink=this.button(T.edPpbUnlink,()=>this.app.invoke("ppb_unlink"));
-    section.appendChild(el("div",{class:"row editor-actions"},[this.ppbLink,this.ppbUnlink]));
-    this.ppbLinkStatus=el("p",{class:"ppb-binding",hidden:true});section.appendChild(this.ppbLinkStatus);
-    section.appendChild(el("details",null,[el("summary",{text:T.edPpbLinkHelpTitle}),el("p",{class:"muted",text:T.edPpbLinkHelp})]));
-    this.ppbFields=el("div",{class:"physics-fields"});section.appendChild(this.ppbFields);
+    this.ppbControls.appendChild(el("div",{class:"row editor-actions"},[this.ppbLink,this.ppbUnlink]));
+    this.ppbLinkStatus=el("p",{class:"ppb-binding",hidden:true});this.ppbControls.appendChild(this.ppbLinkStatus);
+    this.ppbControls.appendChild(el("p",{class:"muted",text:T.edPpbScope}));
+    const advanced=el("details",{class:"collider-source-advanced"},[el("summary",{text:T.edPpbAdvanced}),
+      el("p",{class:"muted",text:T.edPpbLinkHelp})]);this.ppbControls.appendChild(advanced);
+    this.ppbFields=el("div",{class:"physics-fields"});advanced.appendChild(this.ppbFields);
     const transfer=(method)=>{const cap=this.selected();if(cap)this.app.invoke(method,this.ppbGroup.value,cap.bone,cap.index);};
     this.ppbTo=this.button(T.edPpbTo,()=>transfer("ppb_to_collider"));
     this.ppbFrom=this.button(T.edPpbFrom,()=>transfer("ppb_from_collider"));
-    section.appendChild(el("div",{class:"row editor-actions"},[this.ppbTo,this.ppbFrom]));
-    this.ppbNote=el("p",{class:"muted",style:"white-space:pre-line"});section.appendChild(this.ppbNote);
+    advanced.appendChild(el("div",{class:"row editor-actions"},[this.ppbTo,this.ppbFrom]));
+    this.ppbNote=el("p",{class:"muted",style:"white-space:pre-line"});this.ppbControls.appendChild(this.ppbNote);
     this.ppbSource=el("textarea",{rows:"8","aria-label":T.edPpbSource,spellcheck:"false",style:"width:100%",on:{input:()=>{this.ppbRawDirty=true;}}});
-    section.appendChild(el("details",null,[el("summary",{text:T.edPpbSource}),this.ppbSource,this.button(T.edApplySource,()=>this.parsePPB(this.ppbSource.value))]));
-    section.appendChild(this.button(T.edPpbExport,()=>{if(this.bench.ppb_state().document)this.download("PPB_tuning.morphbench.txt",this.bench.ppb_export(),"text/plain;charset=utf-8");}));
+    advanced.appendChild(el("details",null,[el("summary",{text:T.edPpbSource}),this.ppbSource,this.button(T.edApplySource,()=>this.parsePPB(this.ppbSource.value))]));
+    this.recipeUpload=el("input",{type:"file",accept:".json","aria-label":T.edImportRecipe,on:{change:()=>this.importRecipe()}});
+    section.appendChild(el("label",{class:"slot-field"},[T.edImportRecipe,this.recipeUpload]));
   }
   async importPPB() {
     try {
@@ -117,6 +121,7 @@ class EditorPanel {
       const response=await fetch("/api/physics/import",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({kind:"ppb",text})});
       const parsed=await response.json();if(!response.ok)throw Error(parsed.error);
       this.ppbRawDirty=false;this.ppbFieldSignature="";this.app.invoke("ppb_replace",parsed.document);
+      this.ppbSettings.open=true;
     }catch(error){this.fail(error);}
   }
   refreshPPB() {
@@ -126,17 +131,12 @@ class EditorPanel {
       for(const cap of capsules)this.ppbGroup.appendChild(el("option",{value:cap.id,text:cap.slot+(cap.index?" · C"+cap.index:" · 0")}));
       this.ppbGroup.dataset.signature=signature;
     }
-    const collider=this.bench.collider_edit_state(),targetSignature=JSON.stringify(collider.capsules.map((cap)=>[cap.bone,cap.index,cap.editable]));
-    if(this.ppbTarget.dataset.signature!==targetSignature) {
-      this.ppbTarget.textContent="";this.ppbTarget.appendChild(el("option",{value:"",text:T.edPpbTarget}));
-      collider.capsules.forEach((cap,index)=>this.ppbTarget.appendChild(el("option",{value:String(index),text:cap.bone+" · "+cap.index})));
-      this.ppbTarget.dataset.signature=targetSignature;
-    }
     const binding=state.binding,selected=this.selected(),target=binding||selected;
     if(binding)this.ppbGroup.value=binding.capsule;
-    this.ppbGroup.disabled=!!binding;this.ppbTarget.disabled=!!binding;
-    const targetIndex=target?collider.capsules.findIndex((cap)=>cap.bone===target.bone&&cap.index===target.index):-1;
-    this.ppbTarget.value=targetIndex<0?"":String(targetIndex);
+    this.ppbGroup.disabled=!!binding;
+    this.ppbTarget.textContent=target?say(T.edPpbTarget,{bone:target.bone,index:target.index}):T.edPpbChooseTarget;
+    this.ppbControls.hidden=!state.document;this.ppbExport.hidden=!state.document;
+    this.sourceStatus.textContent=state.document?(binding?T.edSourceLinked:T.edSourceLoaded):T.edSourceNif;
     const cap=capsules.find((item)=>item.id===this.ppbGroup.value),fields=(state.fields||[]).filter((field)=>cap&&field.group===cap.id),fieldSignature=JSON.stringify(fields.map((field)=>[field.id,field.label]));
     if(this.ppbFieldSignature!==fieldSignature) {
       this.ppbFieldSignature=fieldSignature;this.ppbFields.textContent="";this.ppbInputs=new Map();
@@ -157,7 +157,8 @@ class EditorPanel {
       const text=say(T.edPpbLinked,{record:record?record.slot+(record.index?" · C"+record.index:" · 0"):binding.capsule,bone:binding.bone,index:binding.index});
       this.ppbLinkStatus.textContent=this.ppbEditStatus.textContent=text;
     }
-    this.ppbLinkStatus.hidden=this.ppbEditStatus.hidden=!binding;
+    this.ppbLinkStatus.hidden=!binding;
+    this.ppbEditStatus.hidden=!binding||!selected||selected.bone!==binding.bone||selected.index!==binding.index;
     if(binding){this.ppbTo.disabled=true;this.ppbFrom.disabled=true;}
     this.ppbNote.textContent=state.document?Array.from(new Set((state.warnings||[]).filter((warning)=>!warning.group||(cap&&warning.group===cap.id)).map((warning)=>warning.message||warning.code))).join("\n"):T.edPpbEmpty;
     if(!this.ppbRawDirty)this.ppbSource.value=state.document?this.bench.ppb_export():"";

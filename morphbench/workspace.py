@@ -13,7 +13,7 @@ from .i18n import t
 
 WORKSPACE_TABS = {
     "morphs": ("sliders", "display"),
-    "colliders": ("edit", "ppb", "display"),
+    "colliders": ("edit", "display"),
     "physics": ("configuration", "ranges"),
     "slots": ("author", "display"),
 }
@@ -39,6 +39,10 @@ class WorkspaceMixin:
 
     def workspace_tab(self, tab):
         mode = self.workspace_state()["mode"]
+        # PPB controls now belong to the common editor; retained links and recipes
+        # still reach it without losing their document or geometry edits.
+        if mode == "colliders" and tab == "ppb":
+            tab = "edit"
         if tab not in WORKSPACE_TABS[mode]:
             raise ValueError(t("workspace.invalid", field="tab"))
         if not hasattr(self, "_workspace_tabs"):
@@ -49,7 +53,10 @@ class WorkspaceMixin:
     def workspace_state(self):
         mode = getattr(self, "_workspace_mode", "slots" if self._placements.mode == "slots" else "morphs")
         tabs = WORKSPACE_TABS[mode]
-        return {"mode": mode, "tab": getattr(self, "_workspace_tabs", {}).get(mode, tabs[0]),
+        tab = getattr(self, "_workspace_tabs", {}).get(mode, tabs[0])
+        if mode == "colliders" and tab == "ppb":
+            tab = "edit"
+        return {"mode": mode, "tab": tab,
                 "tabs": list(tabs)}
 
     def _physics_owner(self):

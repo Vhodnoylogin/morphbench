@@ -6,8 +6,8 @@ paints the vertices by bone, by morph offset or by edge strain — in a browser,
 without loading a save. Everything the numbers say elsewhere in the tool (`shapes`, `strain`,
 `bounds`, `colliders`) you can here point at.
 
-It shows. It does not edit: nothing on the page writes to your mesh, your morph file or your
-mod folder. The page is a window onto files that already exist.
+The page reads existing files. Capsule and configuration edits stay in the workspace until
+you export a new file; no action overwrites the source mesh, morph file or installed mod.
 
 Two ways to open it, and the difference matters:
 
@@ -25,8 +25,9 @@ python mb.py serve --root "D:\SteamLibrary\steamapps\common\SkyrimVR\Data"
 ```
 
 The release workspace offers **Morphs** and **Colliders**. Physics and Slots are disabled.
-The collider inspector supports visual capsule movement and new-file export; see
-[workspace.md](workspace.md) for gestures, PPB editing and saved recipes.
+The common collider inspector supports visual capsule movement, settings sources including PPB,
+and new-file export. It has no separate PPB tab; see [workspace.md](workspace.md) for gestures,
+source association and saved recipes.
 
 Every option of both commands is in [cli.md](cli.md); getting the first mesh open, including
 the launch from inside Mod Organizer 2, is in [quickstart.md](quickstart.md).

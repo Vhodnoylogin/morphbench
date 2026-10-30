@@ -155,6 +155,7 @@ console.log(JSON.stringify({results,tiny}));
                               action("workspace_mode", "colliders"), action("workspace_tab", "ppb")]})
         self.assertEqual(result["ppb"]["kind"], "ppb")
         self.assertIn("capForeR 4", result["ppbText"])
+        self.assertEqual(result["workspace"]["tab"], "edit")
         self.assertEqual(request("api/workspace"), result)
 
     def test_cli_new_path_export_and_session_reopen_preserve_source(self):

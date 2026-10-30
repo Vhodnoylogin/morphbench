@@ -1,7 +1,9 @@
 "use strict";
 // Numerical browser facade for mode and body-local capsule edits. Text formats
 // are recognized by the server adapter; this owner keeps normalized documents.
-const WORKSPACE_TABS = {morphs:["sliders","display"],colliders:["edit","ppb","display"],physics:["configuration","ranges"],slots:["author","display"]};
+const WORKSPACE_TABS = {morphs:["sliders","display"],colliders:["edit","display"],physics:["configuration","ranges"],slots:["author","display"]};
+// Retained PPB links, payloads and recipes now open the common capsule editor.
+const editorWorkspaceTab = (mode,tab) => mode==="colliders"&&tab==="ppb"?"edit":tab;
 const editorClone = (value) => JSON.parse(JSON.stringify(value));
 const editorError = (field) => { throw new Error(say(T["edInvalid"] || T.slotsInvalid,{field})); };
 const editorVector = (value) => {
@@ -43,7 +45,7 @@ class EditorState {
   constructor(bench) {
     this.bench=bench;
     this.mode=(DATA.workspace||{}).mode||(bench.placements.mode==="slots"?"slots":"morphs");
-    this.tabs={};this.tabs[this.mode]=(DATA.workspace||{}).tab||WORKSPACE_TABS[this.mode][0];
+    this.tabs={};this.tabs[this.mode]=editorWorkspaceTab(this.mode,(DATA.workspace||{}).tab||WORKSPACE_TABS[this.mode][0]);
     this.original=editorClone(DATA.colliderEditor||{capsules:[],bodies:[],selected:null,bodyMatrices:{},nodeMatrices:{}});
     this.state=editorClone(this.original);this.actions=editorClone(this.original.editActions||[]);
     if(this.original.originalCapsules)this.original.capsules=editorClone(this.original.originalCapsules);
@@ -116,19 +118,19 @@ class EditorState {
     if(this.binding)actions.push({method:"ppb_link",args:[this.binding.capsule,this.binding.bone,this.binding.index]});
     if(this.state.available){const selected=this.state.selected;actions.push({method:"collider_select",args:selected?[selected.bone,selected.index]:[null]});}
     actions.push({method:"respect_file_visibility",args:[this.bench.view.respectFileVisibility,this.bench.view.showFileHidden]},
-      {method:"workspace_mode",args:[this.mode]},{method:"workspace_tab",args:[this.tabs[this.mode]||WORKSPACE_TABS[this.mode][0]]});
+      {method:"workspace_mode",args:[this.mode]},{method:"workspace_tab",args:[editorWorkspaceTab(this.mode,this.tabs[this.mode]||WORKSPACE_TABS[this.mode][0])]});
     return {format:"morphbench-workspace",version:1,source:DATA.source||null,actions};
   }
 }
 const editorOwner = (bench) => bench._editor||(bench._editor=new EditorState(bench));
 Object.assign(BenchMirror.prototype,{
-  workspace_state() {const owner=editorOwner(this);return {mode:owner.mode,tab:owner.tabs[owner.mode]||WORKSPACE_TABS[owner.mode][0],tabs:WORKSPACE_TABS[owner.mode].slice()};},
+  workspace_state() {const owner=editorOwner(this);return {mode:owner.mode,tab:editorWorkspaceTab(owner.mode,owner.tabs[owner.mode]||WORKSPACE_TABS[owner.mode][0]),tabs:WORKSPACE_TABS[owner.mode].slice()};},
   workspace_mode(mode="morphs") {
     mode=mode==="mesh"?"morphs":mode;if(!Object.hasOwn(WORKSPACE_TABS,mode)) editorError("mode");
     editorOwner(this).mode=mode;this.slots_mode(mode==="slots"?"slots":"mesh");
     this.show_colliders(mode==="colliders",false);return this.workspace_state();
   },
-  workspace_tab(tab) {const owner=editorOwner(this);if(!WORKSPACE_TABS[owner.mode].includes(tab)) editorError("tab");owner.tabs[owner.mode]=tab;return this.workspace_state();},
+  workspace_tab(tab) {const owner=editorOwner(this);tab=editorWorkspaceTab(owner.mode,tab);if(!WORKSPACE_TABS[owner.mode].includes(tab)) editorError("tab");owner.tabs[owner.mode]=tab;return this.workspace_state();},
   collider_edit_state() {return editorClone(editorOwner(this).state);},
   collider_select(bone,index=0) {const owner=editorOwner(this);if(bone===null)owner.state.selected=null;else{owner.capsule(bone,index,false);owner.state.selected={bone,index};}return this.collider_edit_state();},
   collider_set(bone,index,changes) {

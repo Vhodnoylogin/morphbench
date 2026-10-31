@@ -15,6 +15,7 @@ import zipfile
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import common
 from test_workspace_integration import run_browser
+from test_addons import manifest, package
 from morphbench import MorphBench
 from morphbench.journal import Journal
 from presenters.serve import WebServer
@@ -204,6 +205,15 @@ class TestAddonHTTP(unittest.TestCase):
         self.assertEqual(self.call("/api/environment")[0], 200)
         self.assertEqual(self.call("/?mode=colliders", headers={"Sec-Fetch-Dest": "iframe"})[0], 403)
         self.assertEqual(self.bench.workspace_state()["mode"], "morphs")
+
+    def test_invalid_unicode_upload_is_rejected_without_poisoning_addon_listing(self):
+        archive = package(manifest(name="bad\ud800name"))
+        status, _, body = self.call("/api/addons/install", archive, "application/zip")
+        self.assertEqual(status, 400, body)
+        self.assertEqual(json.loads(body)["code"], "invalidManifest")
+        status, _, body = self.call("/api/addons")
+        self.assertEqual(status, 200, body)
+        self.assertEqual(json.loads(body)["addons"], [])
 
     def test_unsupported_api_returns_clear_code_without_any_installation(self):
         output = io.BytesIO()

@@ -52,7 +52,7 @@ from .morphs import MorphSet
 from .ragdoll import RagdollMap
 from .view import ViewState
 from .placements import Placements
-from .workspace import WorkspaceMixin
+from .workspace import WorkspaceMixin, workspace_edit
 from .addon_session import AddonSessionMixin
 from .addon_state import AddonStateMixin
 
@@ -892,6 +892,9 @@ class MorphBench(WorkspaceMixin, AddonSessionMixin, AddonStateMixin):
                 rig.apply_fit(bone, fitted)
             out.append(row)
         if apply:
+            candidate = copy.copy(self)
+            candidate.rig, candidate._ppb_binding = rig, None
+            candidate._workspace_check_recipe()
             self.rig = rig
             self._ppb_binding = None
         return out
@@ -913,6 +916,7 @@ class MorphBench(WorkspaceMixin, AddonSessionMixin, AddonStateMixin):
         self._require_rig()
         return self.rig.select(bone, index)
 
+    @workspace_edit
     def collider_set(self, bone: str, index: int = 0, changes: dict | None = None,
                      p1=None, p2=None, radius: float | None = None) -> dict:
         """Atomically edit endpoints/radius in the body's frame; keyword fields remain valid."""
@@ -930,6 +934,7 @@ class MorphBench(WorkspaceMixin, AddonSessionMixin, AddonStateMixin):
             return self._ppb_edit_collider(bone, index, changes=values)
         return self.rig.set_capsule(bone, index, values)
 
+    @workspace_edit
     def collider_translate(self, bone: str, index: int, delta) -> dict:
         """Translate both endpoints by one body-local displacement."""
         self._require_rig()
@@ -937,6 +942,7 @@ class MorphBench(WorkspaceMixin, AddonSessionMixin, AddonStateMixin):
             return self._ppb_edit_collider(bone, index, delta=delta)
         return self.rig.translate(bone, index, delta)
 
+    @workspace_edit
     def collider_add(self, bone: str, p1, p2, radius: float) -> dict:
         """Add a capsule to an existing supported body, with explicit local geometry."""
         self._require_rig()
@@ -944,6 +950,7 @@ class MorphBench(WorkspaceMixin, AddonSessionMixin, AddonStateMixin):
         self._ppb_binding = None
         return result
 
+    @workspace_edit
     def collider_remove(self, bone: str, index: int = 0) -> dict:
         """Remove a bundle member while retaining at least one shape on the body."""
         self._require_rig()
@@ -951,6 +958,7 @@ class MorphBench(WorkspaceMixin, AddonSessionMixin, AddonStateMixin):
         self._ppb_binding = None
         return result
 
+    @workspace_edit
     def collider_reset(self) -> dict:
         """Discard edits and fitting since this skeleton was loaded."""
         self._require_rig()

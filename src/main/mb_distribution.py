@@ -586,10 +586,26 @@ def update(root: Path, archive: Path, *, check=False) -> dict:
         if old:
             verify_files(root, old)  # Preserve hand-edited application files by refusing.
         old_files = old["files"] if old else {}
-        affected = sorted(set(old_files) | set(contents) | {APP_MANIFEST})
+        # Windows may spell one existing owned file differently in the new inventory.
+        # Journal it once under its old name, so rollback restores the original snapshot;
+        # do not later delete the same file as an apparently obsolete old path.
+        old_paths = {os.path.normcase(name): name for name in old_files}
+        aliases = {}
+        for name in contents:
+            previous = old_paths.get(os.path.normcase(name))
+            if previous is not None and previous != name:
+                target = safe_path(root, name)
+                if os.path.lexists(target) and target.samefile(safe_path(root, previous)):
+                    aliases[name] = previous
+        affected = sorted(set(old_files) | (set(contents) - aliases.keys()) | {APP_MANIFEST})
         before = {}
         for name in affected:
             target = safe_path(root, name)
+            for parent in target.parents:
+                if parent == root:
+                    break
+                if os.path.lexists(parent) and not parent.is_dir():
+                    raise PackageError("userCollision", path=parent.relative_to(root).as_posix())
             if os.path.lexists(target):
                 if not target.is_file() or (name not in old_files and name != APP_MANIFEST):
                     raise PackageError("userCollision", path=name)
@@ -599,7 +615,8 @@ def update(root: Path, archive: Path, *, check=False) -> dict:
         result = {"ok": True, "checked": bool(check), "version": app["version"],
                   "previousVersion": old["version"] if old else None,
                   "runtime": {key: runtime[key] for key in ("id", "contentHash")},
-                  "written": len(contents), "removed": sorted(set(old_files) - set(contents))}
+                  "written": len(contents),
+                  "removed": sorted(set(old_files) - set(contents) - set(aliases.values()))}
         if check:
             return result
         transaction = safe_path(root, TRANSACTION)

@@ -197,6 +197,10 @@ class PhysicsWorkspace:
             self._edits[field_id] = value
         return self.state()
 
+    def recipe_size(self):
+        """Setup plus numeric edits, without copying the source document."""
+        return 0 if self._document is None else 1 + len(self._edits)
+
     def state(self):
         if self._document is None:
             return {"kind": None, "text": "", "fields": [], "groups": [], "records": [],

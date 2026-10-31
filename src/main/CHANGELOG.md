@@ -20,10 +20,12 @@ go in a major release, and nowhere else.
 
 ## [Unreleased]
 
-- Organize maintained production source under `src/main/` and checks/fixtures under
-  `src/test/`; keep root CLI delegates and generated output under ignored `target/`.
-- Pin the existing Launcher v1 Runtime as a build dependency. Installed package paths,
-  browser feature availability and CLI/SDK/HTTP contracts remain unchanged.
+- Preserve fitted capsule geometry in saved recipes and skeleton exports.
+- Keep recovery recipes within the shared browser/server action budget after repeated edits.
+- Reject malformed Unicode in add-on metadata before installation, keeping add-on lists readable.
+- Reject oversized capsule radii without NumPy overflow warnings.
+- Support Windows case-only renames of owned Application files and reject conflicting
+  parent files during update preflight, before opening a transaction.
 
 ## [0.8.6] — 2026-10-31
 

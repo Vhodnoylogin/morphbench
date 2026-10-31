@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import copy
 import struct
+from functools import wraps
 
 from .i18n import t
 
@@ -23,7 +24,53 @@ WORKSPACE_TABS = {
 WORKSPACE_ENABLED_MODES = ("morphs", "colliders")
 
 
+def workspace_edit(method):
+    """Publish direct edits only when their complete recovery recipe remains usable.
+
+    A replay already snapshots all owners and checks its final state once. Direct
+    facade calls stage the same editable owners, including linked PPB geometry.
+    """
+    @wraps(method)
+    def guarded(self, *args, **kwargs):
+        if getattr(self, "_workspace_editing", False):
+            return method(self, *args, **kwargs)
+        # Existing operations already validate atomically. Away from the recipe
+        # boundary, at most seven source-number edits and one geometry action can
+        # be added by a single call. Fitting stages its own arbitrary-size bundle.
+        # Avoid copying whole rigs/source documents merely to check that count.
+        if self._workspace_recipe_size() + 8 <= int(self.cfg["workspaceActionLimit"]):
+            return method(self, *args, **kwargs)
+        candidate = copy.copy(self)
+        candidate.rig = copy.deepcopy(self.rig)
+        for name in ("_physics_workspace", "_ppb_workspace", "_ppb_binding"):
+            if hasattr(self, name):
+                setattr(candidate, name, copy.deepcopy(getattr(self, name)))
+        candidate._workspace_editing = True
+        result = method(candidate, *args, **kwargs)
+        candidate._workspace_editing = False
+        candidate._workspace_check_recipe()
+        candidate.__dict__.pop("_workspace_editing", None)
+        self.__dict__.update(candidate.__dict__)
+        return result
+    return guarded
+
+
 class WorkspaceMixin:
+    def _workspace_recipe_size(self):
+        """Count recovery actions without taking expensive public document snapshots."""
+        count = 3 + (len(self.rig.edit_actions) + 2 if self.rig is not None else 0)
+        for name in ("_physics_workspace", "_ppb_workspace"):
+            owner = getattr(self, name, None)
+            if owner is not None:
+                count += owner.recipe_size()
+        count += bool(getattr(self, "_ppb_binding", None))
+        return count
+
+    def _workspace_check_recipe(self):
+        """Match the browser's final recipe budget, rather than just its input batch."""
+        if self._workspace_recipe_size() > int(self.cfg["workspaceActionLimit"]):
+            raise ValueError(t("workspace.invalid", field="actions"))
+
     def workspace_modes(self):
         """Modes offered by this release's browser navigation, in display order."""
         return list(WORKSPACE_ENABLED_MODES)
@@ -65,11 +112,13 @@ class WorkspaceMixin:
             self._physics_workspace = PhysicsWorkspace(max_chars=int(self.cfg["physicsMaxChars"]), max_fields=int(self.cfg["physicsMaxFields"]))
         return self._physics_workspace
 
+    @workspace_edit
     def physics_replace(self, document):
         if not isinstance(document, dict) or document.get("kind") not in ("fsmp", "cbpc"):
             raise ValueError(t("physicsw.document"))
         return self._physics_owner().replace(document)
 
+    @workspace_edit
     def physics_set(self, field_id, value):
         return self._physics_owner().set(field_id, value)
 
@@ -90,6 +139,7 @@ class WorkspaceMixin:
                                                    max_fields=int(self.cfg["physicsMaxFields"]))
         return self._ppb_workspace
 
+    @workspace_edit
     def ppb_replace(self, document):
         if not isinstance(document, dict) or document.get("kind") != "ppb":
             raise ValueError(t("physicsw.document"))
@@ -140,6 +190,7 @@ class WorkspaceMixin:
             raise ValueError(t("ppbw.float"))
         return result
 
+    @workspace_edit
     def ppb_set(self, field_id, value):
         candidate = copy.deepcopy(self._ppb_owner())
         candidate.set(field_id, self._ppb_value(value))
@@ -213,6 +264,7 @@ class WorkspaceMixin:
             raise ValueError(t("ppbw.transfer"))
         return ids, values
 
+    @workspace_edit
     def ppb_link(self, capsule_id, bone, index):
         """Explicitly bind one current source record to an existing editable NIF capsule."""
         _, values = self._ppb_geometry(capsule_id)
@@ -223,6 +275,7 @@ class WorkspaceMixin:
         self._ppb_binding = {"capsule": capsule_id, "bone": bone, "index": int(index)}
         return self.ppb_state()
 
+    @workspace_edit
     def ppb_unlink(self):
         """Detach the live binding while retaining both owners' current edits."""
         self._ppb_binding = None
@@ -266,11 +319,13 @@ class WorkspaceMixin:
         self.rig, self._ppb_workspace = rig, owner
         return result
 
+    @workspace_edit
     def ppb_to_collider(self, capsule_id, bone, index):
         """Copy explicit source geometry to one user-selected existing NIF capsule."""
         _, values = self._ppb_geometry(capsule_id)
         return self.collider_set(bone, index, {"p1": values[:3], "p2": values[3:6], "radius": values[6]})
 
+    @workspace_edit
     def ppb_from_collider(self, capsule_id, bone, index):
         """Copy selected NIF geometry to existing source spans, preserving every other byte."""
         ids, _ = self._ppb_geometry(capsule_id)
@@ -318,9 +373,12 @@ class WorkspaceMixin:
                   self.view.colliders, self.view.bumper, copy.deepcopy(getattr(self, "_ppb_workspace", None)),
                   copy.deepcopy(getattr(self, "_ppb_binding", None)),
                   self.view.respect_file_visibility, self.view.show_file_hidden)
+        editing = getattr(self, "_workspace_editing", False)
+        self._workspace_editing = True
         try:
             for action in actions:
                 getattr(self, action["method"])(*action["args"])
+            self._workspace_check_recipe()
         except Exception:
             self.rig, physics, state, tabs, placement_mode, colliders, bumper, ppb, binding, respect_file, show_hidden = before
             self._ppb_binding = binding
@@ -338,4 +396,9 @@ class WorkspaceMixin:
             self.view.bumper = bumper
             self.view.respect_file_visibility, self.view.show_file_hidden = respect_file, show_hidden
             raise
+        finally:
+            if editing:
+                self._workspace_editing = editing
+            else:
+                self.__dict__.pop("_workspace_editing", None)
         return self.workspace_state()

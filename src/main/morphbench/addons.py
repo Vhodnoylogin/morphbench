@@ -300,6 +300,10 @@ class AddonRegistry:
                     raise ValueError()
             if "description" in manifest and not isinstance(manifest["description"], str):
                 raise ValueError()
+            # JSON permits isolated UTF-16 surrogates, but HTTP metadata must be UTF-8.
+            for value in manifest.values():
+                if isinstance(value, str):
+                    value.encode("utf-8")
             entry = _path(manifest["entry"])
             if Path(entry).suffix.lower() != ".html":
                 raise ValueError()

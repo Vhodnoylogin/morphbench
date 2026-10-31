@@ -342,7 +342,8 @@ console.log(JSON.stringify({visible:bench.collider_edit_state(),recipe:bench.wor
         initial = copy.deepcopy(self.bench.collider_edit_state())
         browser = run_browser(self, self.tmp.name, WebPage(self.bench).payload(), """
 const bench=new BenchMirror(DATA);
-for(let index=0;index<4;index++)bench.collider_set(index%2?'A':'B',0,{radius:index+4});
+bench.collider_set('B',0,{radius:4});
+for(let index=0;index<3;index++)bench.collider_add('A',[index,0,0],[index,0,1],index+4);
 console.log(JSON.stringify({recipe:bench.workspace_recipe(),state:bench.collider_edit_state()}));
 """)
         self.assertEqual(len(browser["recipe"]["actions"]), 9)
@@ -352,8 +353,11 @@ console.log(JSON.stringify({recipe:bench.workspace_recipe(),state:bench.collider
         output = self.root / "budget-export.nif"
         output.write_bytes(exported)
         written = ColliderSet.from_nif(output, self.cfg).edit_state()["capsules"]
-        for actual, expected in zip(written, browser["state"]["capsules"]):
-            self.assertEqual(actual["bone"], expected["bone"])
+        written = {(row["bone"], row["index"]): row for row in written}
+        expected_rows = {(row["bone"], row["index"]): row for row in browser["state"]["capsules"]}
+        self.assertEqual(written.keys(), expected_rows.keys())
+        for key, actual in written.items():
+            expected = expected_rows[key]
             self.assertAlmostEqual(actual["radius"], expected["radius"], places=4)
             np.testing.assert_allclose(actual["p1"], expected["p1"], atol=1e-4)
             np.testing.assert_allclose(actual["p2"], expected["p2"], atol=1e-4)
@@ -510,17 +514,19 @@ console.log(JSON.stringify({state:bench.collider_edit_state(),recipe,recovered:r
             self.assert_state_equal(result["recovered"], expected)
 
     def test_maximum_accepted_edit_session_remains_replayable_in_both_clients(self):
+        self.cfg._values["workspaceActionLimit"] = 9
         result = self.run_js(WebPage(self.bench).payload(), """
 const bench=new BenchMirror(DATA),limit=bench.settings.workspaceActionLimit;
 const snapshot=()=>JSON.stringify([bench.collider_edit_state(),bench.workspace_state(),bench.workspace_recipe()]);
-let accepted=0,rejected=false;
+bench.collider_set('B',0,{radius:4});
+let accepted=1,rejected=false;
 for(let index=0;index<limit;index++){
  const before=snapshot();
- try{bench.collider_set(index%2?'A':'B',0,{radius:index+4});accepted++;}
+ try{bench.collider_add('A',[index,0,0],[index,0,1],index+4);accepted++;}
  catch(error){rejected=before===snapshot();break;}
 }
-// Re-editing the last capsule can coalesce at the boundary without losing data.
-bench.collider_set((accepted-1)%2?'A':'B',0,{radius:123.5});
+// Independent edits coalesce across other bodies' topology even at the boundary.
+bench.collider_set('B',0,{radius:123.5});
 const recipe=bench.workspace_recipe(),fresh=new BenchMirror(DATA);
 fresh.workspace_replay(recipe.actions);
 console.log(JSON.stringify({accepted,rejected,recipe,state:bench.collider_edit_state(),restored:fresh.collider_edit_state()}));
@@ -563,7 +569,9 @@ console.log(JSON.stringify({rejected,recipe,text:bench.ppb_export(),restoredText
         ppb = parse_document("ppb", block())
         result = self.run_js(WebPage(self.bench).payload(), """
 const bench=new BenchMirror(DATA);bench.ppb_replace(input.ppb);
-for(let index=0;index<3;index++)bench.collider_set(index%2?'A':'B',0,{radius:index+4});
+bench.collider_add('A',[0,0,0],[0,0,1],4);
+bench.collider_set('B',0,{radius:5});
+bench.collider_add('A',[1,0,0],[1,0,1],6);
 const recipe=bench.workspace_recipe(),fresh=new BenchMirror(DATA);fresh.ppb_replace(input.ppb);
 fresh.ppb_set(input.ppb.capsules[0].fields.AX,8);
 // The receiver's old source edit coexists briefly with the restored geometry;

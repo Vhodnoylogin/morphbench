@@ -98,9 +98,9 @@ and Python/actual-JS parity.
 
 ## Add-on checks
 
-These suites cover the shipped API v1 package/update/session-data contract and the new
-independent-preview extension on its feature branch. Published Application 0.8.0 includes
-the former; independent previews remain separate development.
+These suites cover the API v1 package/update/session-data contract available since Application
+0.8.0 and the independent previews, prepared exports and embedded WebAssembly support included
+in Application 0.8.5. Offline coverage does not establish visual quality or actual MO2/usvfs execution.
 
 `test_addons.py` checks immutable ZIP installation, strict manifests and paths, bounded
 archives, enabled-state persistence, unsafe installed files, rollback and real subprocess

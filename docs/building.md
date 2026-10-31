@@ -126,65 +126,67 @@ The header comment in `build.cmd` still says the icon is not versioned. That com
 
 ## Split Runtime and Application packages
 
-The public download name **Morphbench Launcher v1** refers to **Runtime v1**
-(`runtime-1-win64`). Its version is independent of **Application 0.8.0**. The archive name
-remains `morphbench-runtime-1-win64.zip`; changing the display name does not change its manifest
-or native files. Reuse the existing Runtime ZIP and pinned manifest for compatible Application
-updates; do not rebuild or reupload it merely for an Application release or a naming correction.
+**Morphbench Launcher v1** supplies Runtime `runtime-1-win64`; its native inventory and
+manifest are reused byte-for-byte. **Application 0.8.5** has its own version and pins that
+Runtime identity/content hash. New split packages use this layout:
 
-The installation remains flat: `morphbench.exe`, `mb.py`, `python/`, `vendor/`, `launcher/`
-and the Application directories share one root. This preserves the existing launcher and MO2
-paths. Runtime packaging copies the existing launcher bytes; it does not compile a new exe.
-
-To prepare a Runtime for the first time, choose a complete existing release folder containing
-the launcher, embedded Python, vendor dependencies, launcher rebuild sources and licence notices.
-The Runtime v1 packaging command is:
-
-```
-python release.py --package runtime --runtime-from "<complete-release-folder>" --runtime-version 1 --out "<builds>"
+```text
+root/Morphbench/
+  launcher/                  unchanged Runtime plus App-owned entry shim/translations
+  app/                       workbench, browser, docs and updater
+  plugins/                   empty, user-owned
+  application-manifest.json
 ```
 
-This creates `morphbench-runtime-1-win64.zip`. Its staged `runtime-manifest.json` has Runtime
-identity `runtime-1-win64`, a SHA-256 inventory of the Runtime files and a `contentHash` for
-that inventory. Use the staged manifest path reported by the build in the next command:
+The `root/` envelope supports optional MO2 Root Builder. Manual installation extracts
+`Morphbench` from inside it. The new ZIP hash differs from the previous flat Runtime ZIP,
+even though all original inventoried Runtime files and its content hash remain unchanged.
+Do not rebuild the EXE or native dependencies for this packaging change.
+
+Seed the Runtime package from a complete audited release or an existing verified Runtime stage:
 
 ```
-python release.py --package application --runtime "<runtime-stage>/runtime-manifest.json" --version 0.8.0 --out "<builds>"
+python release.py --package runtime --runtime-from "<audited-runtime>" --runtime-version 1 --out "<builds>"
+python release.py --package application --runtime "<runtime-stage>/runtime-manifest.json" --version 0.8.5 --out "<builds>"
 ```
 
-This creates `morphbench-application-0.8.0.zip` and a staged `application-manifest.json`.
-The Application manifest records its version, owned file inventory and the exact required
-Runtime identity and content hash. Runtime **v1** is independent of Application version
-`0.8.0`; a matching-looking name or Python version cannot replace the pinned hash.
+These produce `morphbench-runtime-1-win64.zip` and `morphbench-application-0.8.5.zip`.
+The staged Runtime manifest path is reported by the first command. Both split commands
+now default to `--layout structured`; they use no compiler, pip, network or native imports.
+Only the archive gets the `root/Morphbench` envelope; inspect its finished contents, not
+just the staging directory, before publication.
 
-| Package | Contents |
-|---|---|
-| Runtime | `morphbench.exe`, `python/`, `vendor/`, launcher rebuild sources and third-party licence notices |
-| Application | `mb.py`, `mb_distribution.py`, `update.py`, `morphbench/`, `presenters/`, `web/`, `locale/`, `docs/` and release documentation/licences |
+Application contains `app/mb.py`, `app/mb_distribution.py`, `app/mb_paths.py`, `app/update.py`,
+`app/morphbench/`, `app/presenters/`, `app/web/`, `app/locale/`, `app/docs/` and release
+licences/documentation. It also owns exactly `launcher/mb.py` and the two launcher translation
+JSON files. Both packages deliberately repeat those same three files so the unchanged EXE
+can start from its physical MO2 mod source before App discovery. They are outside the
+immutable native Runtime inventory; Application has higher MO2 priority when updating them.
 
-Application packages exclude native `.exe`, `.dll`, `.pyd` and `.so` files, Runtime directories
-`python/`, `vendor/`, `launcher/`, per-machine configuration, installed add-ons, tests,
-caches and nested archives. They carry Python and JavaScript source, which is still executable
-code. The package inventory defines ownership; the updater does not infer ownership from a
-directory name.
+Application excludes native `.exe`, `.dll`, `.pyd`, `.so`, dependency folders, machine settings,
+installed plugins, tests, caches and nested archives. Python/JavaScript remain executable code.
+The manifest defines exact ownership; the updater never infers ownership from folder names.
+Runtime keeps its original notices, licences and rebuild sources, alongside all native files.
 
-For a first install, users extract the contents of **both** archives into one new directory,
-merging the contents of their differently named wrapper folders. Later Application updates
-use `update.py` after stopping the server. The install lock prevents the running Application
-and an updater from using the installation concurrently. Manifests and Runtime hashes are
-checked before native imports; source checkouts without release manifests remain usable.
-See [updating.md](updating.md) for the exact install, check, update, recovery and migration steps.
+For existing flat installations, build a compatible Application snapshot explicitly:
 
-On Nexus, both packages are **Main Files**, with Application marked **Primary**. Allow Manual
-download and Mod manager download for both files. Manager downloads place the archives in
-**MO2 Downloads**; users must manually merge both wrapper-folder contents into one standalone
-tool folder outside the game and MO2's mod folders. These archives are not installed as `Data` mods.
+```
+python release.py --package application --layout flat --runtime "<runtime-manifest.json>" --version 0.8.5 --out "<separate-flat-builds>"
+```
 
-Review and publish Runtime independently. Any Runtime dependency change, security upgrade or
-launcher rebuild requires a new Runtime review and corresponding manifest; Application-only
-updates cannot replace those files. Reusing the same bytes avoids unnecessary native changes,
-but stable hashes do not guarantee antivirus or Nexus clearance. Installation and updates
-provide no automatic downloader for end users.
+Use a separate output directory to avoid overwriting the structured ZIP of the same version.
+Cross-layout in-place updates are refused; migration installs both structured packages into
+a fresh folder, then copies user state. The legacy full archive remains flat; requesting
+`--package full --layout structured` is refused.
+
+On Nexus, both packages are Main Files, Application Primary; allow Manual and Mod manager
+download for both. Add Root Builder as an optional requirement for root deployment through
+MO2. Instructions must distinguish manual extraction, Root Builder source/deployment updates
+and legacy flat installs. See [updating.md](updating.md) and [install-layout.md](install-layout.md).
+
+Native dependency or EXE changes require a new independently reviewed Runtime and an App
+manifest pinning it. An Application-only release reuses the required native bytes. Hashes
+are not signatures or antivirus/Nexus approval; packaging changes can still require review.
 
 ## Legacy full release archive
 

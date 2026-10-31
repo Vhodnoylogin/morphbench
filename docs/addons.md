@@ -3,8 +3,9 @@
 Russian: [addons.ru.md](addons.ru.md).
 
 This document describes API **v1**. The package-update and session-state extensions shipped in
-**Application 0.8.0**. Independent previews and prepared file exports are further additive extensions: the published
-Application 0.8.0 baseline does not provide them. Check the connected host's capabilities before
+**Application 0.8.0**. **Application 0.8.5** adds independent previews, prepared file exports
+and embedded WebAssembly support. The published Application 0.8.0 baseline does not provide
+these extensions. Check the connected host's capabilities before
 using them; `apiVersion:1` alone does not establish their availability.
 Install Application with the required **Morphbench Launcher v1**
 (internal package **Runtime v1**, `runtime-1-win64`) as described
@@ -28,7 +29,10 @@ disposed with their owning frame.
 
 Package files and enabled state are per-machine data in the configured `addonDirectory`.
 They are never bundled or versioned; the default source-checkout folder is Git-ignored.
-An empty setting uses `addons` beside the active configuration file. Installation still refuses
+In the structured release, an empty setting uses `Morphbench/plugins` beside `app`.
+Existing flat installations and source checkouts use `addons` beside the active configuration
+file. An explicit nonempty path retains its meaning; relative paths use the process working
+directory (normally `launcher` with the EXE). Installation still refuses
 an existing ID with `alreadyInstalled`; replacement requires the separate **update** operation.
 Incompatible or damaged packages cannot be enabled.
 
@@ -44,7 +48,9 @@ including when its installed files are damaged. A successful update leaves the p
 label or an older-looking label can be installed. Validation or publication failures preserve
 the previously selected package and activation state.
 
-The same operations are available without opening a mesh:
+The same operations are available without opening a mesh. These source-checkout examples
+use `python mb.py`; from a structured release's `Morphbench` directory, substitute
+`.\launcher\python\python.exe .\launcher\mb.py`:
 
 ```text
 python mb.py addons --json

@@ -1,7 +1,7 @@
 # WebAssembly inside an add-on
 
-This feature-branch extension permits a local browser add-on to compile embedded
-WebAssembly bytes. The published Application 0.8.0 baseline does not promise this policy.
+Application **0.8.5** permits a local browser add-on to compile embedded WebAssembly
+bytes. The published Application 0.8.0 baseline does not provide this policy.
 The module executes inside the add-on's existing opaque-origin sandbox, not in Python,
 the host page or the game process. API v1 and independent previews keep their contracts.
 

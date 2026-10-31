@@ -11,6 +11,22 @@ go in a major release, and nowhere else.
 
 Эта страница на русском: [CHANGELOG.ru.md](CHANGELOG.ru.md).
 
+## [0.8.5] — 2026-10-31
+
+- Package new installations as `root/Morphbench/launcher`, `app` and `plugins`.
+  Kezyma's Root Builder is optional for MO2 installation; manual installation and
+  existing flat tool folders remain supported. Cross-layout updates require a new folder.
+- Locate a complete Application in the game root when the unchanged Launcher v1
+  starts from a separate MO2 mod source. Keep all original Runtime bytes unchanged.
+- Preserve settings, plugins and native dependencies across Application updates,
+  including the narrow application-owned launcher bootstrap/translation overlay.
+- Add independent add-on previews with orientation links, generation-pinned model
+  payloads and isolated cameras. Existing main-view APIs remain compatible.
+- Add user-confirmed JSON/XML exports and embedded WebAssembly for sandboxed add-ons.
+  Exports default to 1 MiB; an explicit host setting permits up to 32 MiB. Prepared
+  files expire after five minutes and download object URLs after one minute.
+  Add-on filesystem, network and native-code privileges remain unchanged.
+
 ## [0.8.0] — 2026-10-30 (split packages and add-ons)
 
 Application keeps version **0.8.0** for this publication; its required Runtime is **v1**

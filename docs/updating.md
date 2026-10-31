@@ -1,141 +1,120 @@
 # Installing and updating morphbench
 
-Русская версия этой страницы — [updating.ru.md](updating.ru.md).
+Русская версия — [updating.ru.md](updating.ru.md).
 
-Split releases have two packages: the main download is **Application 0.8.0**, and
-**Morphbench Launcher v1** is a separate required download. The Launcher has its own independent
-version: its internal package identity remains **Runtime v1** (`runtime-1-win64`), and the archive
-remains `morphbench-runtime-1-win64.zip`. Install the matching pair once, then update
-Application while keeping its required Runtime. Downloads are manual; morphbench has no automatic downloader.
+Download both **Application 0.8.5** (main file) and **Morphbench Launcher v1**.
+Their versions are independent: the required Runtime identity remains `runtime-1-win64`.
+Its inventoried EXE, Python and native dependencies are unchanged; the new ZIP envelope
+changes the archive hash. No separate Python or Blender installation is needed.
 
-This split avoids reuploading the unchanged EXE and native dependencies for every Application
-update, and repeating quarantine review for those same binaries. The Runtime upload remains
-subject to Nexus security checks and may require quarantine review. The split does not guarantee
-antivirus approval, exemption from Nexus review for source archives, or that an Application upload
-cannot be quarantined.
-
-| Package | What it supplies | How it is identified |
-|---|---|---|
-| Runtime | `morphbench.exe`, embedded `python/`, `vendor/`, launcher rebuild sources and third-party notices | `runtime-manifest.json`: Runtime version/identity, exact file SHA-256 hashes and `contentHash` |
-| Application | workbench Python, browser files, translations, documentation and `update.py` | `application-manifest.json`: Application version, owned files and required Runtime identity/hash |
-
-Runtime and Application versions are independent: Application `0.8.0` can require
-`runtime-1-win64`. The required content hash must also match exactly. A newer Runtime, or one
-with the same Python version, is not automatically a substitute. Both manifests stay in the
-installation root and show the installed versions. Release startup checks them and the Runtime
-files before importing native dependencies.
+Separating the packages avoids reuploading the same native binaries and repeating their
+quarantine review for each Application update. Each upload remains subject to Nexus checks;
+this is not antivirus approval or a review exemption. Manual and Mod manager downloads are supported.
 
 ## First installation
 
-1. Download both `morphbench-application-0.8.0.zip` (main download) and
-   `morphbench-runtime-1-win64.zip` (required Morphbench Launcher v1 / Runtime v1). Application alone cannot run.
-2. Create a new installation folder outside the game and MO2's mod folders, for example
-   `D:\Tools\Morphbench`. Do not install either package into game `Data` or as an MO2 mod.
-3. Extract the **contents** of the Runtime wrapper folder into it. Extract the **contents** of
-   the Application wrapper folder into the **same folder**. The wrapper names differ; do not
-   leave the packages as two sibling folders or put one inside the other.
-4. Check that `morphbench.exe`, `mb.py`, `update.py`, `runtime-manifest.json`,
-   `application-manifest.json`, `python/` and `vendor/` are beside one another.
-5. Run `morphbench.exe`. No separate Python or Blender installation is needed. For MO2, add
-   this installation's exe as described in [quickstart.md](quickstart.md).
+Download `morphbench-application-0.8.5.zip` and `morphbench-runtime-1-win64.zip`.
+Both archives start at `root/Morphbench/` and merge into:
 
-On Nexus, both packages are **Main Files**; Application is **Primary**. Manual download and
-Mod manager download are supported. Downloading through MO2 puts the archives in **MO2 Downloads**.
-From there, manually extract both wrapper-folder contents into the one standalone tool folder
-described above. Do not install either archive as a game `Data` mod.
+```text
+Morphbench/
+  launcher/                  EXE, Python, vendor and entry shim
+    morphbench.exe
+    mb.py
+    runtime-manifest.json
+  app/                       application, browser, docs and updater
+    mb.py
+    update.py
+    morphbench.json          created user settings
+  plugins/                   installed add-ons and state
+  application-manifest.json
+```
 
-Keep the installation folder and its `morphbench.exe` path stable: later Application updates
-preserve that launcher, so the same MO2 entry continues to work. An MO2 entry using
-`python/python.exe` with arguments `mb.py serve` also works; set **Start in** to this same installation folder.
+- **Manual:** merge `Morphbench` from inside both `root` folders into a writable tools
+  directory or the game root beside `SkyrimSE.exe` / `SkyrimVR.exe`. For example, use
+  `D:\Tools\Morphbench`, not `D:\Tools\root\Morphbench`. Run `launcher\morphbench.exe`.
+- **MO2:** install each ZIP as a separate enabled mod, preserving `root/Morphbench`.
+  Install optional [Kezyma's Root Builder](https://www.nexusmods.com/skyrimspecialedition/mods/31720).
+  Application must be below Launcher in the left pane (higher priority). Build the root
+  deployment through Root Builder, then register the deployed game's
+  `Morphbench\launcher\morphbench.exe` in MO2 and run it through MO2.
+
+Root Builder is unnecessary for manual/external installations. Ordinary Data VFS does not
+place root files: do not install these archives as ordinary `Data` contents. Both Nexus
+packages are Main Files, Application Primary; Manual and Mod manager downloads are supported.
+See [install-layout.md](install-layout.md) for layout details and automatic App discovery
+when Launcher is in a physical mod source and App/plugins are deployed in the game root.
 
 ## Update Application
 
-For subsequent updates, download only the new Application ZIP if it requires the Runtime
-already installed. Keep the ZIP outside the installation folder.
-Save your work, stop the server with the launcher's **Stop** button and close the launcher.
-Alternatively, run this in PowerShell from the installation folder:
+Keep the downloaded ZIP outside the installation. Save your work, stop the server and
+close the launcher. From `Morphbench`, stop/check/update with:
 
 ```powershell
-.\python\python.exe .\mb.py serve --stop
+.\launcher\python\python.exe .\launcher\mb.py serve --stop
+.\launcher\python\python.exe .\app\update.py --check --package "<application.zip>" --json
+.\launcher\python\python.exe .\app\update.py --package "<application.zip>" --json
 ```
 
-The following commands are also for PowerShell; replace `<install>` and `<application.zip>`
-with actual paths. Check the package and installed files before applying it:
+`--check` verifies without applying changes; it may create/use the install lock. Review
+its version, Runtime requirement and result. The target defaults from `update.py`, not
+from the working directory. `Morphbench` and `Morphbench/app` identify the same installation.
+Use `--target "<install>"` only when explicitly selecting another installation.
+
+The updater checks exact Runtime identity/hash, inventories and installed owned files.
+Modified owned files and concurrent updaters are refused. A running Application holds a
+shared lock; an update needs an exclusive lock. Wait for completion before restarting.
+
+For Root Builder, **update the persistent MO2 mod source**, then rebuild deployment.
+Sync changed settings/plugins back to their persistent source before clearing deployment;
+verify where Root Builder saved them. Deployment/sync/clear are outside the standalone
+updater's preservation guarantee. With separate Launcher/App mods, extract the App ZIP
+over its existing `root/Morphbench` source, preserving `app/morphbench.json` and `plugins`,
+or use the updater against a complete persistent installation with an intact sibling
+Runtime. An App-only source cannot pass the updater's Runtime check.
+
+## Preservation and recovery
+
+Only inventoried App files and the narrow launcher shim/translation overlay are replaced.
+Obsolete files are removed only when previously App-owned. The updater preserves
+`app/morphbench.json`, `launcher/morphbench.launcher.json`, `plugins` including its registry,
+generations/state/sessions, custom `addonDirectory`, exports, unknown user files and the
+original native Runtime. Both packages deliberately repeat the same App-owned shim and
+launcher translations so a separately placed Launcher can start.
+
+Updates use backups and a recovery journal, not an atomic whole-directory swap. If interrupted,
+keep the Application stopped, preserve backups/journal and recover from `Morphbench`:
 
 ```powershell
-& "<install>\python\python.exe" "<install>\update.py" --check --package "<application.zip>" --json
+.\launcher\python\python.exe .\app\update.py --recover --json
 ```
 
-`--check` reports verification evidence as JSON without applying the update. Only the install
-lock may be created or used. Review the reported Application version, required Runtime and
-verification result. Then apply the same ZIP:
+Restart only after successful recovery; then check/retry the package. Preserve the installation
+and report if recovery reports conflicts or missing backups. Do not edit manifests to bypass checks.
+
+## Existing flat installations and migration
+
+Published 0.8.0 installations keep EXE, `mb.py`, `python`, `vendor`, settings and `addons`
+beside one another. They remain supported and accept **flat** Application snapshots:
 
 ```powershell
-& "<install>\python\python.exe" "<install>\update.py" --package "<application.zip>" --json
+.\python\python.exe .\update.py --check --package "<flat-application.zip>" --json
+.\python\python.exe .\update.py --package "<flat-application.zip>" --json
 ```
 
-The target defaults to the directory containing `update.py`, independently of the current
-working directory. Use `--target "<install>"` only when explicitly targeting another split
-installation. Wait for successful completion before restarting morphbench.
+Cross-layout updates are refused. To migrate a flat split installation or a legacy full archive:
 
-The updater checks the exact Runtime requirement, package inventory and installed Application
-files. It refuses existing Application files whose bytes differ from their installed manifest.
-Keep your source edits separately; do not replace the manifest to bypass that check. A running
-Application holds a shared install lock; the updater needs an exclusive lock. If the lock is
-busy, stop the process that owns the installation and retry. Concurrent updaters are refused.
+1. Stop it and retain the old folder intact.
+2. Install both new structured packages in a **new folder**.
+3. Copy `morphbench.json` to `app`, launcher state to `launcher`, and the entire old add-on
+   directory including registry/generations/state to `plugins`.
+4. Clear `addonDirectory` for the new default or explicitly retain your custom path.
+   Relative custom paths use the process working directory, normally `launcher` with the EXE;
+   use an absolute path for an external registry.
+5. Update the MO2 executable path and verify settings/plugins before continuing.
 
-## What is preserved
-
-An Application update replaces manifest-owned Application files and removes obsolete files
-only when the previous Application manifest owned them. It preserves:
-
-- `morphbench.json` and `morphbench.launcher.json`;
-- installed add-ons, including their generation, state and session files;
-- a custom `addonDirectory` and other unknown user files;
-- Runtime files and the existing launcher binary.
-
-The updater does not adopt unknown files as Application files. File ownership comes from the
-manifests. A package cannot use an Application update to replace Runtime or user state.
-
-## Recover an interrupted update
-
-Updates use backups and a recovery journal. They replace individual owned files; this is not
-an atomic swap of the whole installation directory. If an update is interrupted before commit,
-keep the Application stopped and recover with the installed updater:
-
-```powershell
-& "<install>\python\python.exe" "<install>\update.py" --recover --json
-```
-
-Recovery restores the recorded pre-update Application from the transaction's backups. Keep
-the recovery journal and backup files intact until the updater finishes. Read its JSON result;
-restart only after recovery succeeds, then check and retry the desired package. If recovery
-reports a conflict or missing backup, preserve the installation and the report for diagnosis.
-
-## Move from a legacy full archive
-
-A legacy single-archive installation has no Application ownership manifest. The updater does
-not guess which of its files belong to the release and does not automatically convert it.
-
-1. Stop the old server and keep the old folder intact.
-2. Install the matching Runtime and Application into a **new folder** as above.
-3. Copy your own `morphbench.json`, `morphbench.launcher.json` and installed add-ons to the
-   new folder. Keep the add-on directory's generation, state and session files together.
-   If you use a custom `addonDirectory`, explicitly keep or change that configured path.
-4. Point your MO2 entry at the new installation and check its settings before continuing.
-
-Copy your own state, rather than overlaying the old program files onto the new installation.
-Source checkouts without release manifests remain usable for development; this updater is for
-manifested split installations.
-
-## Runtime changes and verification limits
-
-An Application update cannot upgrade Python, native dependencies or the launcher. A Runtime
-change, including a native dependency update or security fix, requires a new, separately reviewed
-Runtime release and an Application manifest that pins it. Follow that release's installation instructions.
-
-Hashes establish which bytes are installed and required. They are not signatures, antivirus
-approval or Nexus moderation clearance. Python and JavaScript are executable code even in an
-Application package with no native binaries. Use packages from a source you trust.
-
-For producing either package or a legacy full archive, see [building.md](building.md).
+Do not overlay old program files. Source checkouts without release manifests remain usable;
+the updater is for manifested split installations. Native dependency/EXE changes require a
+new separately reviewed Runtime and a matching App manifest. Hashes identify bytes, not
+signatures or antivirus/Nexus approval. Python/JavaScript remain executable code.
+See [building.md](building.md) for package creation.

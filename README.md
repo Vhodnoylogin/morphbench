@@ -1,6 +1,6 @@
 # morphbench
 
-Development packages use **Morphbench/launcher**, **Morphbench/app** and
+Release packages use **Morphbench/launcher**, **Morphbench/app** and
 **Morphbench/plugins**, with a `root/` archive envelope for optional MO2 Root Builder.
 Existing flat installations remain supported. See [installation and migration](docs/install-layout.md).
 
@@ -22,10 +22,10 @@ The project was extracted from Skyrim-Mods on 2026-10-02. All 42 retained histor
 the module contents and Git LFS were verified on 2026-10-03. The old local and remote
 `Skyrim-Mods/morphbench` branches were deleted after verification; historical checkouts remain.
 
-Version **0.8.0** includes visual capsule editing, bidirectional source-preserving
+Version **0.8.5** includes visual capsule editing, bidirectional source-preserving
 [PPB tuning editing](docs/ppb.md), the skeleton-only blank-page fix and browser add-ons with
 API v1. It distinguishes [native file visibility](docs/visibility.md) from the viewer's shape selection.
-Version **0.8.0** enables only **Morphs** and **Colliders**; Physics and Body Slots
+Version **0.8.5** enables only **Morphs** and **Colliders**; Physics and Body Slots
 are disabled in browser navigation. Their code and script APIs remain for development.
 See the [editing workspace](docs/workspace.md) and [changelog](CHANGELOG.md).
 
@@ -51,40 +51,41 @@ edited or fitted collision capsules, and edited physics configurations into new 
 
 ## What it needs
 
-**From a release — no separate Python or Blender installation.** Download the main package,
-**Application 0.8.0**, and the separate required **Morphbench Launcher v1**. Its independent
-package identity remains **Runtime v1** (`runtime-1-win64`), and its unchanged archive is
-`morphbench-runtime-1-win64.zip`. Runtime contains
-`morphbench.exe`, embedded Python, `numpy`, `pillow` and **PyNifly**; Application contains the
-workbench's Python, browser assets, translations and documentation.
+**From a release — no separate Python or Blender installation.** Download
+**Application 0.8.5** and the separate required **Morphbench Launcher v1**.
+Application contains the workbench's Python, browser assets, translations and documentation;
+Launcher contains the unchanged native Runtime (`runtime-1-win64`). Their versions are independent.
 
-For the first installation, create one tool folder outside the game and MO2's mod folders.
-Extract the **contents of both different archive wrapper folders into that same folder**.
-Check that `morphbench.exe`, `mb.py`, `update.py`, `python/`, `vendor/` and both release manifests
-are beside one another, then run `morphbench.exe`. This is a standalone tool, not a game `Data`
-or MO2 mod installation. Keep this folder and the path to `morphbench.exe` stable for MO2.
+Both archives start at `root/Morphbench/`. Merge their `Morphbench` directories into one
+writable tools folder or the game root. Run `Morphbench/launcher/morphbench.exe`.
+The result has `launcher/`, `app/` and `plugins/` under one `Morphbench` directory.
+Do not copy the literal `root` folder into the game or place its contents in `Data`.
 
-On Nexus, both downloads are **Main Files** and Application is **Primary**. Manual download
-and Mod manager download are supported. An MO2 manager download places the archives in
-**MO2 Downloads**; manually extract the contents of both wrapper folders into the same
-standalone tool folder as above. Do not install the archives as `Data` mods.
+For installation through MO2, optionally use
+[Kezyma's Root Builder](https://www.nexusmods.com/skyrimspecialedition/mods/31720).
+Install both ZIPs as separate enabled mods, keeping `root/Morphbench`; give Application
+higher priority than Launcher and build the root deployment. Register the deployed
+`Morphbench/launcher/morphbench.exe` in MO2. A manual external installation also works
+through MO2 and does not require Root Builder. On Nexus, both downloads are Main Files,
+Application Primary; Manual and Mod manager download are supported.
 
-For later Application-only updates, download the new Application ZIP, stop the server and close
-the launcher, then run the installed updater with the bundled Python:
+Stop the server and close the launcher before an Application update. From `Morphbench`:
 
 ```powershell
-.\python\python.exe .\update.py --package "<application.zip>" --json
+.\launcher\python\python.exe .\app\update.py --check --package "<application.zip>" --json
+.\launcher\python\python.exe .\app\update.py --package "<application.zip>" --json
 ```
 
-Run this from the installation folder and keep the downloaded ZIP outside it. The updater reuses
-the exact required Runtime and preserves settings and add-ons. Older single-archive users must
-install both packages in a **new folder**, then copy their settings and add-ons.
-See [installation, updates and recovery](docs/updating.md) for checks and migration details.
+The updater preserves native Runtime, settings and plugins. With Root Builder, sync state
+back to persistent mod sources before clearing deployment and update those sources,
+then rebuild. See [installation, updates and recovery](docs/updating.md) for exact steps.
+Existing flat installations remain supported; cross-layout in-place updates are refused.
+Migrate into a new folder and copy your settings/plugins as described there.
 
-The split avoids uploading unchanged EXE/native dependencies with each Application update and
-repeating quarantine review of those same binaries. The Runtime upload remains subject to Nexus
-security checks and may require quarantine review; the split does not guarantee antivirus approval
-or a Nexus review exemption.
+The split avoids reuploading unchanged native binaries and repeating their quarantine review
+for each Application update. The new archive envelope changes its ZIP hash. Each upload
+remains subject to Nexus security checks; the split does not guarantee antivirus approval
+or a review exemption.
 
 Blender is not bundled or needed: morphbench never touches `bpy`; it uses PyNifly's folder,
 which normally happens to live among Blender's add-ons. The legacy full archive remains a
@@ -108,7 +109,9 @@ a second reading that could drift away from the first never appears.
 
 ## Starting it
 
-Everything runs from the installation or repository root. A first look at a mesh:
+The examples below use a source checkout's `python mb.py ...`. In a structured release,
+run `.\launcher\python\python.exe .\launcher\mb.py ...` from `Morphbench` instead.
+A first look at a mesh from sources:
 
 ```
 python mb.py summary body.nif
@@ -150,16 +153,17 @@ the merged `Data`.
 
 1. A release already includes the window. From sources, build it once with
    `launcher\build.cmd`; the result lands beside `mb.py`.
-2. In MO2, add an executable: the binary is `morphbench.exe`; `--start` as an argument raises the
+2. In MO2, add an executable: use the release's `Morphbench/launcher/morphbench.exe`
+   (or the built EXE in the source root); `--start` as an argument raises the
    server and opens the page in one click. "Start in" is not needed.
 3. Run that entry from MO2. The window reports whether it is under MO2, and the page will not step
    outside `Data`.
 
 **The window is a convenience, not a condition.** MO2 launches executables rather than scripts,
 which is the only reason it exists - but `python.exe` is an executable too. An entry whose
-**Binary** is `<path to morphbench>\python\python.exe` and whose **Arguments** are
+**Binary** is `<path to Morphbench>\launcher\python\python.exe` and whose **Arguments** are
 `mb.py serve` does the same job: MO2 injects usvfs into it exactly the same way, and the server
-sees the same merged `Data`. Set **Start in** to the morphbench folder for that variant. Anyone
+sees the same merged `Data`. Set **Start in** to `Morphbench/launcher` for that variant. Anyone
 who would rather not run an unsigned binary downloaded from the internet can work this way and
 lose nothing but the buttons.
 
@@ -217,13 +221,13 @@ require runtime evidence.
 own, in both languages: what the layer is, what it may depend on, and what must never import it.
 Open the folder and the boundary is right there.
 
-A split installation keeps this flat layout. Runtime supplies `morphbench.exe`, `python\`,
-`vendor\` (numpy, pillow, PyNifly), the launcher rebuild sources and third-party notices.
-Application supplies the workbench and its documentation. `runtime-manifest.json` identifies
-the Runtime and its exact file hashes; `application-manifest.json` identifies the Application,
-its owned files and the required Runtime identity/hash. Application updates preserve settings,
-launcher state, installed add-ons and other user files. Tests and `release.py` remain in the
-repository. Source checkouts without release manifests remain usable.
+A structured release puts Runtime and the entry shim in `Morphbench/launcher`, the workbench
+and documentation in `Morphbench/app`, and installed add-ons in `Morphbench/plugins`.
+`launcher/runtime-manifest.json` identifies the exact Runtime files;
+`application-manifest.json` in `Morphbench` identifies App ownership and required Runtime.
+Application updates preserve settings, launcher state, plugins and unknown user files.
+Tests and `release.py` remain in the repository. Old flat installations and source checkouts
+retain their original layout; source checkouts without release manifests remain usable.
 
 The line between the core and the presenters is hard, and there is a way to check it: if an action
 cannot be performed from the command line, the line was drawn wrong. Everything the viewer can do
@@ -269,7 +273,7 @@ stays in the source repository and is not included in the end-user archive.
 
 ## Editing workspace
 
-The 0.8.0 viewer enables **Morphs** and **Colliders**, with mode tabs above the view, models
+The 0.8.5 viewer enables **Morphs** and **Colliders**, with mode tabs above the view, models
 on the left and an inspector on the right. Edit supported collision capsules, save a
 replayable workspace and export new files. **Physics** and **Slots** remain disabled in the
 browser. Experimental FSMP XML/CBPC TXT editing remains accessible through `mb.py workspace`
@@ -281,14 +285,14 @@ See [the workspace workflow](docs/workspace.md) for controls, automation and off
 Local preview variants add independent author → definition → variant inheritance. Session recipes preserve variants and edit targets; `mb.py slots --editor` recovers unfinished projects and exports unbound placement presets. Authored JSON and `.bslots` remain authored-only. See [the Slots workflow](docs/slots.md).
 
 Experimental Slots authoring remains available through `mb.py slots` and the local HTTP API;
-the browser tab is disabled in 0.8.0. The backend supports named skeleton-node placements,
+the browser tab is disabled in 0.8.5. The backend supports named skeleton-node placements,
 local transforms/access spheres, author defaults and temporary effective overrides, session
 recipes, Body Slots schema-v1 JSON and `.bslots` exports. It does not edit game saves,
 equipment or inventories. See [docs/slots.md](docs/slots.md) for the offline workflow and limits.
 
 ## Browser add-ons
 
-Application 0.8.0 includes a versioned local browser add-on host.
+Application 0.8.5 includes a versioned local browser add-on host.
 Install a ZIP, enable its inspector tab, and use API v1 to select models, read geometry,
 set existing morphs, control the view and save add-on state for the current browser tab.
 Installed add-ons can be explicitly updated while disabled. [Contract and workflow](docs/addons.md);

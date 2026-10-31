@@ -28,6 +28,10 @@ the reference: every command, every option, what comes back.
 python mb.py <command> <mesh.nif> [options]
 ```
 
+These examples use a source checkout. From a structured release's `Morphbench` directory,
+replace `python mb.py` with `.\launcher\python\python.exe .\launcher\mb.py`. Existing flat
+installations use `.\python\python.exe .\mb.py`. The command arguments are unchanged.
+
 The morph file is picked up beside the mesh on its own — the same name, or the name without
 the weight suffix `_0`/`_1`. The skeleton is picked up the same way: `skeleton.nif` in the
 same folder (the name is the `skeletonFile` setting), and after it the `skeleton.hkx` of the
@@ -626,7 +630,7 @@ See [PPB scope](ppb.md) and the [workspace guide](workspace.md).
 
 `web` and `serve` also accept `--mode mesh|slots` and `--slots-project author.json`; the default is mesh inspection. `serve` accepts `--skeleton` on a new server. A running server can open `/?mode=slots` and import JSON through the self-contained page; no HTTP mutation routes are added.
 
-## Local add-ons (development)
+## Local add-ons
 
 `mb.py addons --json` lists installed local packages. `--install <ZIP>` installs disabled;
 `--enable <id>` and `--disable <id>` persist activation. `--update <ZIP>` explicitly replaces
@@ -648,5 +652,7 @@ automatic garbage collection. New binaries read legacy v1 registries; older bina
 Browser add-on session data remains a separate tab/origin-scoped SDK facility; these commands
 do not read, replay or reset it.
 
-These are additive API v1 development extensions. See [the contract and neutral example](addons.md);
-the existing 0.8.0 archive does not include them.
+Package updates and tab-session data are part of API v1, available since Application 0.8.0.
+Application 0.8.5 also includes independent previews, prepared JSON/XML exports and embedded
+WebAssembly support. Check the connected host's capabilities before using these additions;
+`apiVersion:1` alone does not establish their availability. See [the contract and neutral example](addons.md).

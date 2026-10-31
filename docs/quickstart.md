@@ -13,49 +13,39 @@ mean physically is in [physics.md](physics.md); the whole tool at a glance is in
 
 ## What you need
 
-There are two ways to have morphbench, and they need different things of the machine.
+Download **Application 0.8.5** and **Morphbench Launcher v1** for a first installation.
+Launcher provides the pinned Runtime (`runtime-1-win64`), including Python 3.12, numpy,
+pillow and PyNifly; no separate Python or Blender is needed. Application provides the
+workbench, browser, documentation and updater. Launcher and Application versions are independent.
 
-| | From the release packages | From a source checkout |
-|---|---|---|
-| Python 3.12 | Runtime, in `python\` | installed, on `PATH` |
-| `numpy` | Runtime, in `vendor\` | `pip install numpy` |
-| `pillow` | Runtime, in `vendor\` | `pip install pillow` |
-| PyNifly add-on | Runtime, in `vendor\io_scene_nifly` | in the Blender add-ons folder |
-| `morphbench.exe` (the window MO2 launches) | Runtime, beside Application's `mb.py` | built by `launcher\build.cmd` |
+Both ZIPs start at `root/Morphbench/`. For manual installation, merge their `Morphbench`
+folders into one writable tools directory or the game root, then run
+`Morphbench/launcher/morphbench.exe`. Do not put the literal `root` folder in the game or
+place these files under Data. The installation contains `launcher/`, `app/` and `plugins/`.
 
-The release needs **two downloads for the first installation**: **Application 0.8.0** is the
-main download and **Morphbench Launcher v1** is a separate required package. Launcher has its
-own independent version; its internal identity remains **Runtime v1** (`runtime-1-win64`) and
-its unchanged archive is `morphbench-runtime-1-win64.zip`.
+For MO2 installation, use optional [Kezyma's Root Builder](https://www.nexusmods.com/skyrimspecialedition/mods/31720).
+Install both ZIPs as separate enabled mods with their `root/Morphbench` tree intact.
+Give Application higher priority than Launcher, build the root deployment, and register
+`Morphbench/launcher/morphbench.exe` from the deployed game root as an MO2 executable.
+A manual/external installation can also run through MO2 without Root Builder. Ordinary
+Data VFS alone does not deploy root files. Both Nexus packages are Main Files, Application
+Primary; Manual and Mod manager download are supported.
 
-1. Download `morphbench-application-0.8.0.zip` and `morphbench-runtime-1-win64.zip`.
-2. Create one installation folder outside the game and MO2's mod folders. Do not install
-   these packages into game `Data` or as an MO2 mod.
-3. Extract the **contents** of each archive's differently named wrapper folder into that
-   **same folder**. Do not keep two sibling wrapper folders or nest one inside the other.
-4. Check that `morphbench.exe`, `mb.py`, `update.py`, `python\`, `vendor\`,
-   `runtime-manifest.json` and `application-manifest.json` are together, then run `morphbench.exe`.
-
-On Nexus, both packages are **Main Files**, with Application marked **Primary**. Manual download
-and Mod manager download are supported. Manager downloads arrive in **MO2 Downloads**; manually
-extract both archives' wrapper-folder contents into the same standalone tool folder above.
-Do not install them as game `Data` mods.
-
-Keep this folder and its `morphbench.exe` path stable for your MO2 entry. Together the two packages
-are self-contained; no separate Python or Blender installation is needed. `pillow` is the one
-optional source dependency: without it everything works except writing PNG frames (`render`, `sheet`).
-
-For subsequent updates, download only Application when it requires your installed Runtime.
-Save your work, stop the server and close the launcher before running this from the installation
-folder with the bundled Python (keep the downloaded ZIP outside that folder):
+Keep the executable path stable. Before an Application update, stop the server and close
+the launcher. From `Morphbench`, use the bundled Python (keep the ZIP outside the installation):
 
 ```powershell
-.\python\python.exe .\update.py --package "<application.zip>" --json
+.\launcher\python\python.exe .\app\update.py --check --package "<application.zip>" --json
+.\launcher\python\python.exe .\app\update.py --package "<application.zip>" --json
 ```
 
-The updater preserves Runtime, settings and installed add-ons. Users of an older single archive
-must install both packages into a **new folder**, then copy their settings and add-ons.
-See [installation, update checks and recovery](updating.md) for the full procedure.
+With Root Builder, sync settings/plugins back to persistent mod sources before clearing
+deployment and update those sources before rebuilding. The updater preserves settings/plugins
+and native Runtime. Existing flat installations remain supported but cannot accept a structured
+update in place. See [installation, migration and recovery](updating.md).
+
+For a source checkout, install Python 3.12, numpy and PyNifly yourself; pillow is needed for
+PNG output (`render`, `sheet`). Build the optional launcher with `launcher/build.cmd`.
 
 **PyNifly is not optional, and it is not ours.** It is the only reader of NIF and TRI here; the
 workbench has no parsers of its own for these formats and must not grow any, because a second
@@ -67,7 +57,7 @@ found at all, the answer is plain: *PyNifly add-on not found; name its folder wi
 folder simply tends to live among Blender's add-ons.
 
 In a manifested split installation, `morphbench.exe` validates and uses the bundled
-`python\python.exe`. An environment or settings override must resolve to that exact bundled
+`launcher\python\python.exe`. An environment or settings override must resolve to that exact bundled
 path; another interpreter is refused. Nothing needs to be set for a normal release installation.
 
 For a source checkout, the launcher looks for Python in this order: `MORPHBENCH_PYTHON`, the
@@ -76,14 +66,14 @@ Interpreter overrides are for source checkouts; a split release keeps its pinned
 
 ## Opening a mesh
 
-Everything is run from the module folder, the one holding `mb.py`:
+The examples below use `python mb.py ...` from a source checkout:
 
 ```
 python mb.py summary "meshes\actors\character\character assets\femalebody_1.nif"
 ```
 
-From the release, where python is bundled and possibly not on `PATH`, the same call reads
-`python\python.exe mb.py ...`.
+From a structured release's `Morphbench` directory, replace `python mb.py` with
+`.\launcher\python\python.exe .\launcher\mb.py`; the rest of each command is unchanged.
 
 Four lines come back, and they are worth reading slowly the first time:
 
@@ -168,7 +158,8 @@ launcher\build.cmd
 ```
 
 2. In MO2 open the executables list (the gears button), add an entry, and set **Binary** to
-   `<path to morphbench>\morphbench.exe`. Put `--start` in **Arguments** if you want the server up
+   `<path to Morphbench>\launcher\morphbench.exe` (or the built source-root EXE).
+   Put `--start` in **Arguments** if you want the server up
    and the page open in one click. "Start in" can stay empty.
 
 3. Run that entry from MO2. The window's status line should say it is under MO2 and show the
@@ -179,9 +170,9 @@ launcher\build.cmd
 
 **The window is a convenience, not a condition.** MO2 launches executables rather than scripts,
 which is the only reason it exists - but `python.exe` is an executable too. An entry whose
-**Binary** is `<path to morphbench>\python\python.exe` and whose **Arguments** are
+**Binary** is `<path to Morphbench>\launcher\python\python.exe` and whose **Arguments** are
 `mb.py serve` does the same job: MO2 injects usvfs into it exactly the same way, and the server
-sees the same merged `Data`. Set **Start in** to the morphbench folder for that variant. Anyone
+sees the same merged `Data`. Set **Start in** to `Morphbench/launcher` for that variant. Anyone
 who would rather not run an unsigned binary downloaded from the internet can work this way and
 lose nothing but the buttons.
 

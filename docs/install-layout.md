@@ -1,7 +1,7 @@
 # Portable installation and Root Builder
 
-This branch adds a structured layout. Existing flat installations remain supported;
-published 0.8.0 archives retain their original layout until a new package is published.
+Application 0.8.5 uses a structured layout with Morphbench Launcher v1.
+Existing flat 0.8.0 installations remain supported; migrate into a fresh folder.
 
 ```text
 Morphbench/
@@ -44,6 +44,10 @@ refuses ambiguity instead of choosing SE or VR by order. It never scans drives o
 resolves virtual paths into individual mod directories. The selected App uses the
 launcher's exact Runtime, and defaults its plugin directory to `plugins` beside `app`.
 An explicit nonempty `addonDirectory` setting retains its existing behavior.
+
+When using Root Builder 5.1.1, register the **deployed game-root executable** if you need
+arguments such as `--start` or `--root`. Its redirect from a physical mod-source EXE does
+not reliably forward those arguments. A source EXE can still open the normal launcher UI.
 
 The unchanged EXE receives no new flags: `--start` and `--root` retain their meaning.
 `MORPHBENCH_APP` is a process environment override for ambiguous installations.

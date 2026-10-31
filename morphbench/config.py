@@ -36,6 +36,8 @@ DEFAULTS = {
     "addonStateMaxDepth": 32,
     "addonExportMaxBytes": 1048576,
     "addonExportAuthorizeTimeoutMs": 8000,
+    "addonExportPendingTtlMs": 300000,
+    "addonExportUrlTtlMs": 60000,
     "addonMaxPreviews": 4,
     "addonPreviewLoadTimeoutMs": 8000,
     "addonLimits": {"maxArchiveBytes": 16777216, "maxFiles": 256,

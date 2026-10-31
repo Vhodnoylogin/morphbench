@@ -506,8 +506,31 @@ add-on do not alter the prepared bytes: prepare again to export those changes. C
 the pending control without changing the model, session data or installed add-on. Returning
 to the inspector, changing add-ons or closing the frame clears pending exports.
 
-`host.info.exportLimits` returns `{maxBytes,authorizeTimeoutMs,formats:["json","xml"],
-maxFilenameBytes:255,pendingFiles:1}`. `addonExportMaxBytes` defaults to **1048576** UTF-8 bytes;
+`host.info.exportLimits` returns `{maxBytes,authorizeTimeoutMs,pendingTtlMs,urlTtlMs,
+maxSupportedBytes:33554432,formats:["json","xml"],maxFilenameBytes:255,pendingFiles:1,retainedUrls:1}`.
+`addonExportMaxBytes` defaults to **1048576** UTF-8 bytes; this is a default, not a fixed SDK
+transport limit. For a large geometry export, explicitly configure the host before startup:
+
+```json
+{
+  "addonExportMaxBytes": 33554432,
+  "addonExportPendingTtlMs": 300000,
+  "addonExportUrlTtlMs": 60000
+}
+```
+
+The hard supported maximum is **32 MiB**. Values above it fail with `invalidExportConfig`;
+an export above the configured byte limit fails with `limitExceeded` and preserves the previous
+snapshot. Pending snapshots expire after **300000 ms** by default, including during authorization;
+retained object URLs expire after **60000 ms**. Both TTL settings must be positive safe integers
+at most **3600000 ms**. The host emits `exports.expired` with `{filename,format,bytes,
+reason:"pendingExpired"}` and displays an expiry message; prepare again to obtain a new snapshot.
+Timers are also guarded by deadline checks when the browser throttles callbacks.
+Restart the server and reload the viewer after changing host settings or installing this
+extension. Reloading static JavaScript while an older backend still serves its old settings
+payload does not upgrade that backend. Earlier hosts without these TTL fields have only their
+older resource-lifetime contract; check the connected host's reported limits.
+
 `addonExportAuthorizeTimeoutMs` defaults to **8000 ms** and must be below the SDK's 10-second
 request deadline. Limits must be positive safe integers. Text is valid Unicode and is exported
 byte-for-byte as UTF-8, with no newline, numeric or whitespace normalization. JSON must parse;
@@ -524,7 +547,12 @@ snapshot, including after asynchronous registry authorization. A timeout, cancel
 replacement or late authorization cannot trigger a download for an old snapshot. The Blob is
 inert `text/plain;charset=utf-8` with the supplied download filename; the browser chooses its
 destination and may ask, block or cancel. The host retains at most one object URL and revokes
-it on the next download or frame teardown.
+it on the next download, its TTL, or frame teardown. The host bounds retained resources to one
+pending text and one object URL, each within the configured byte limit. This is not a peak-heap
+guarantee: the producer, `postMessage` copy, UTF-8 encoder, JSON/XML parser and Blob can coexist.
+Validation is synchronous; checks before and after validation/allocation prevent publishing or
+downloading after a deadline, but cannot preempt a parser already running. Large export text
+need not be rendered into a textarea or the document to be downloaded.
 
 `exports.requested` carries `{filename,format,bytes}` after a browser download request. It is
 not a disk-save acknowledgement. Validation failures use `invalidParams`, oversized content

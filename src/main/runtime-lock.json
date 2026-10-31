@@ -1,11 +1,19 @@
 {
   "schemaVersion": 1,
-  "id": "runtime-1-win64",
-  "contentHash": "aad6812c97658f2f6b6fa3b21e750cf3833d5bdcc1b95724b453eba11df74f9a",
+  "id": "runtime-2-win64",
+  "contentHash": "33e727848a29f940ed5f6ad9352a5f8bb36858163978de2b655ec402752a1349",
   "python": "3.12.8",
-  "archive": "https://github.com/Vhodnoylogin/morphbench/releases/download/v0.8.5/morphbench-runtime-1-win64.zip",
-  "archiveSha256": "bb0dd7ac499aa2764fb7c954780b01fb26c503402b7999216da810df061b5624",
+  "archive": "https://github.com/Vhodnoylogin/morphbench/releases/download/v0.8.6/morphbench-runtime-2-win64.zip",
+  "archiveSha256": "74903f814fe9e1642cc07f4a053e118e707fbb8eeb33b12823fc4d74380b2a99",
   "manifestPath": "root/Morphbench/launcher/runtime-manifest.json",
-  "sourceCommit": "cf4dfdb577a5c10f77cd4145e9615cc2c237dd88",
-  "note": "Application builds reuse this exact audited dependency inventory. Do not rebuild or replace native files under the same Runtime identity. This is build metadata, not a second maintained copy of dependency source."
+  "sourceCommit": "172e6d2b73f5505ef77b17f21a96d1f222bdc60f",
+  "applicationApi": 1,
+  "pythonAbi": "cp312-win_amd64",
+  "launcherProtocol": 1,
+  "correspondingNativeSource": {
+    "archive": "https://github.com/Vhodnoylogin/morphbench/releases/download/v0.8.6/morphbench-nifly-corresponding-source.zip",
+    "sha256": "eac96bd45bc26a5bb0031d73d3e52695340cd417506ee1b51a26454b7fe7daff"
+  },
+  "note": "Exact native build dependency pin; installed Application schema 2 checks API/ABI compatibility independently of Runtime ID/content hash. Keep each published Runtime inventory immutable.",
+  "nativeLauncherSourceCommit": "5440a09c58192e336d73f822dd0e1f87034f236b"
 }

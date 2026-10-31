@@ -72,7 +72,7 @@
     "screenshots": "Existing authentic 0.8.0 Morphs/Colliders captures remain representative; no game/model assets are bundled."
   },
   "addonDistribution": "CLAW add-on is a separate Nexus mod and is not bundled in either package.",
-  "historicalPublicationEvidence": "Earlier file versions and vendor-review correspondence remain in Git history and the project journal; this manifest describes 0.8.5.",
+  "historicalPublicationEvidence": "Top-level 0.8.5 metadata is retained as historical provenance; currentPublication is the verified 0.8.6 / Launcher v2 delivery.",
   "requirementsMethod": "file-to-file",
   "optionalRequirementDisclosure": "Root Builder is optional for MO2 root deployment; manual/external installation needs no Root Builder. Launcher v1 is required.",
   "pluginAuthoring": {
@@ -85,25 +85,71 @@
     "url": "https://www.nexusmods.com/skyrimspecialedition/mods/194795?tab=posts&comment_id=178713507",
     "source": "docs/nexus-architecture-post-0.8.5.bbcode"
   },
-  "nextPublication": {
-    "status": "draft-not-uploaded",
-    "sourceBranch": "main",
-    "sourceCommit": null,
-    "sourceLayout": "src/main production source; src/test reusable checks and fixtures; ignored target output",
-    "mainFiles": [
+  "currentPublication": {
+    "applicationVersion": "0.8.6",
+    "launcherVersion": "v2",
+    "sourceCommit": "3032b52fb92bf4e8ebcb7e9ca086c53776bb1e2c",
+    "runtimeSourceCommit": "172e6d2b73f5505ef77b17f21a96d1f222bdc60f",
+    "nativeLauncherSourceCommit": "5440a09c58192e336d73f822dd0e1f87034f236b",
+    "runtimeId": "runtime-2-win64",
+    "runtimeContentHash": "33e727848a29f940ed5f6ad9352a5f8bb36858163978de2b655ec402752a1349",
+    "applicationRequires": {
+      "apiVersion": 1,
+      "pythonAbi": "cp312-win_amd64"
+    },
+    "files": [
       {
-        "name": "Morphbench Application",
-        "version": null,
-        "primary": true
+        "name": "morphbench-application-0.8.6.zip",
+        "bytes": 586401,
+        "sha256": "6f8aa8f7f128cbb309ed8d9089198380d3be3533f6f242abef1277121076721f"
       },
       {
-        "name": "Morphbench Launcher",
-        "version": "v1",
-        "primary": false,
-        "runtimeLock": "src/main/runtime-lock.json",
-        "reuseFrozenRuntime": true
+        "name": "morphbench-nifly-corresponding-source.zip",
+        "bytes": 3035127,
+        "sha256": "eac96bd45bc26a5bb0031d73d3e52695340cd417506ee1b51a26454b7fe7daff"
+      },
+      {
+        "name": "morphbench-runtime-2-win64.zip",
+        "bytes": 29649997,
+        "sha256": "74903f814fe9e1642cc07f4a053e118e707fbb8eeb33b12823fc4d74380b2a99"
       }
     ],
-    "note": "Use descriptive version-free Nexus display names and separate version fields. Record the exact source commit, archive hashes and actual installation/publication evidence before release. Existing file IDs, hashes, names and publication/post records above describe the historical 0.8.5 publication and are not rewritten by this draft."
+    "qualification": {
+      "sourceChecks": 837,
+      "packagedDependencyChecks": 836,
+      "existingWindowsSkips": 1,
+      "nativeCompiledChecks": 15,
+      "nativeFileChecks": 114,
+      "realModelCases": 4,
+      "actualArchiveQa": "archive-qa/final-qa-result.json",
+      "installedWindow": "installed-window-qualification.json",
+      "sourcePassed": 836,
+      "packagedDependencyPassed": 835
+    },
+    "publication": {
+      "github": {
+        "url": "https://github.com/Vhodnoylogin/morphbench/releases/tag/v0.8.6",
+        "releaseId": 430124069,
+        "assetsVerified": true
+      },
+      "nexus": {
+        "url": "https://www.nexusmods.com/skyrimspecialedition/mods/194795?tab=files",
+        "applicationFileId": 829889,
+        "launcherFileId": 829890,
+        "applicationVersionId": "7318625102273",
+        "launcherVersionId": "7318625102274",
+        "applicationStatus": "available; public VirusTotal archive hash matches",
+        "launcherStatus": "uploaded; public virus scanning in progress (not yet a quarantine decision)",
+        "descriptionUpdated": true,
+        "properRussianReadback": true,
+        "oldFilesArchived": [
+          829572,
+          829573
+        ],
+        "modManagerDownload": true,
+        "optionalRootBuilderPreserved": true,
+        "method": "documented Nexus v3 API with existing personal key; no native file dialogs"
+      }
+    }
   }
 }

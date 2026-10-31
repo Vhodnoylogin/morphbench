@@ -334,6 +334,8 @@ def runtime_extra(name: str) -> bool:
             or (name.startswith("vendor/numpy/") and Path(name).suffix == ".lib")
             or (name.startswith("vendor/numpy/_core/") and "_tests." in parts[-1])
             or name in ("vendor/bin/f2py.exe", "vendor/bin/numpy-config.exe",
+                        "vendor/numpy/f2py/setup.cfg",
+                        "vendor/numpy/f2py/_backends/meson.build.template",
                         "vendor/io_scene_nifly/pyn/pynifly.md",
                         "python/python312/ctypes/macholib/fetch_macholib.bat"))
 

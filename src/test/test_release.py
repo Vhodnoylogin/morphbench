@@ -146,6 +146,15 @@ class TestRelease(unittest.TestCase):
 
 
 class TestRuntimeContents(unittest.TestCase):
+    def test_runtime_omits_unused_f2py_build_configuration_and_keeps_licences(self):
+        contents = {"vendor/numpy/f2py/setup.cfg": b"build configuration",
+                    "vendor/numpy/f2py/_backends/meson.build.template": b"build template",
+                    "vendor/numpy/f2py/__init__.py": b"importable module",
+                    "vendor/numpy-2.dist-info/licenses/setup.cfg": b"required notice"}
+        retained = release.trim_runtime_contents(contents)
+        self.assertEqual(set(retained), {"vendor/numpy/f2py/__init__.py",
+                                       "vendor/numpy-2.dist-info/licenses/setup.cfg"})
+
     def setUp(self):
         self.box = tempfile.TemporaryDirectory()
         self.addCleanup(self.box.cleanup)

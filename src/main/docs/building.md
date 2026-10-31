@@ -33,6 +33,38 @@ contracts. Retain historical tags/assets and verify integration and worktrees be
 retiring task branches. Build from a known source commit, retain dependency pins, record
 the output hash and source identity, and publish build output as release assets.
 
+## End-user package boundary
+
+The owner's standing packaging rule, clarified on 31 October 2026, classifies files
+by their runtime purpose. A user archive contains what is needed to install and use
+Morphbench, required copyright/licence and source-availability notices, and brief user
+instructions. The Python/JavaScript application, entry shim, browser SDK used by installed
+plugins, interpreter and runtime libraries stay. Additional C#/C++ source bundles,
+compilers/toolchains, developer rebuild directions and test fixtures stay on GitHub or
+in an explicitly separate developer/SDK/test product. Link matching source and build
+directions at the exact release commit. Public source visibility alone does not grant
+redistribution rights, and this rule does not waive component licence obligations.
+
+**Transition status, audited 31 October 2026:** the current content selector still includes
+`docs/building.md` and its Russian twin in Application; the frozen Runtime v1 inventory
+also retains historical launcher build inputs and dependency development extras. The
+recipes below describe that existing behaviour, not completed compliance with the new
+boundary. Before the next publication, adjust the new Application/full-package selection,
+check source/notice references and inspect the finished ZIPs. Preserve necessary runtime
+Python/JavaScript and the unchanged SDK contract when removing developer-only material.
+The packaged README also contains source-build directions and moving `main` links;
+separate those from user instructions and add a brief immutable release-source notice.
+The next App/release metadata must also supplement inherited Runtime notice inaccuracies:
+its licence is named `RUNTIME-LICENSE`, and workbench code is in the separate Application.
+
+Do not mutate the pinned Runtime v1 inventory or replace published historical archives
+to perform this cleanup. Changes to that inventory need a new Runtime identity/pin and
+separate qualification. Existing native-source provenance gaps remain documented below;
+copying a generic repository URL or keeping rebuild files does not resolve them.
+
+Canonical owner policy:
+[Release artifacts and metadata](https://github.com/Vhodnoylogin/ai-project-meta/blob/55e5087852e6ac9c5037b3aeccb3812fa617e7eb/infrastructure/admin/knowledge/release-branches.md#release-artifacts-and-metadata).
+
 ## Build artefacts
 
 | Artefact | Built from | By | Lands in |

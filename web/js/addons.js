@@ -23,6 +23,10 @@ class AddonHost {
     if(!this.previewHost)this.previewHost=new AddonPreviewHost(this);
     return this.previewHost;
   }
+  exportManager() {
+    if(!this.exportHost)this.exportHost=new AddonExportHost(this);
+    return this.exportHost;
+  }
   notify(event,data) {
     if(this.frame)this.frame.contentWindow.postMessage({type:"morphbench-addon:event",apiVersion:1,event,data},"*");
   }
@@ -66,7 +70,7 @@ class AddonHost {
     if(identifier)url.searchParams.set("addon",identifier);else url.searchParams.delete("addon");
     window.history.replaceState(null,"",url);this.paintNav();
   }
-  destroyFrame() {if(this.previewHost)this.previewHost.reset();if(this.frame)this.frame.remove();this.frame=null;}
+  destroyFrame() {if(this.previewHost)this.previewHost.reset();if(this.exportHost)this.exportHost.reset();if(this.frame)this.frame.remove();this.frame=null;}
   close() {
     this.destroyFrame();this.active=null;this.generation=null;this.opened=false;this.panel.hidden=true;
     document.getElementById("panel").hidden=false;
@@ -162,8 +166,11 @@ class AddonHost {
         case "host.info":
           this.params(params,[]);
           reply.result={apiVersion:1,addon:{id:entry.id,name:entry.name,version:entry.version},language:document.documentElement.lang,
-            capabilities:["host.info","models.list","models.open","morphs.get","morphs.set","morphs.reset","scene.get","scene.geometry","view.get","view.set","state.get","state.set","state.reset",...ADDON_PREVIEW_METHODS],previewLimits:this.previewManager().limits(),scope:"browser-session",
+            capabilities:["host.info","models.list","models.open","morphs.get","morphs.set","morphs.reset","scene.get","scene.geometry","view.get","view.set","state.get","state.set","state.reset",...ADDON_PREVIEW_METHODS,...ADDON_EXPORT_METHODS],previewLimits:this.previewManager().limits(),exportLimits:this.exportManager().limits(),scope:"browser-session",
             stateScope:"tab-session",stateLimits:bench.addon_state_limits()};break;
+        case "exports.prepare":case "exports.cancel":
+          reply.result=this.exportManager().request(request.method,params,
+            {frame:this.frame,source,identifier:this.active,generation:this.generation},receivedAt);break;
         case "state.get":case "state.set":case "state.reset":
           reply.result=this.sessionState(request.method,entry.id,params);break;
         case "models.list":this.params(params,[]);reply.result=await this.models();break;

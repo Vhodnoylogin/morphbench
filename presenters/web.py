@@ -177,6 +177,8 @@ class WebPage:
         return {
             "addonStateMaxBytes": cfg["addonStateMaxBytes"],
             "addonStateMaxDepth": cfg["addonStateMaxDepth"],
+            "addonExportMaxBytes": cfg["addonExportMaxBytes"],
+            "addonExportAuthorizeTimeoutMs": cfg["addonExportAuthorizeTimeoutMs"],
             "addonMaxPreviews": cfg["addonMaxPreviews"],
             "addonPreviewLoadTimeoutMs": cfg["addonPreviewLoadTimeoutMs"],
             "background": [float(x) for x in cfg["background"]],

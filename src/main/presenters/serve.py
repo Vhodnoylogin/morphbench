@@ -241,7 +241,8 @@ class WebServer:
             return
         if not process_alive(pid):
             self.journal.warn(t("serve.parentGone", pid=pid))
-            return
+        # Startup may outlast the launcher. wait_process also returns immediately
+        # for a dead parent, so it must take the same shutdown path below.
 
         def watch() -> None:
             wait_process(pid)

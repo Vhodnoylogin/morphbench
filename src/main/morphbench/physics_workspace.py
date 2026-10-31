@@ -216,9 +216,12 @@ class PhysicsWorkspace:
         source = self._document["text"]
         edits = [(field["start"], field["end"], _number_text(self._edits[field["id"]]))
                  for field in self._document["fields"] if field["id"] in self._edits]
-        for start, end, replacement in sorted(edits, reverse=True):
-            source = source[:start] + replacement + source[end:]
-        return source
+        parts, cursor = [], 0
+        for start, end, replacement in sorted(edits):
+            parts.extend((source[cursor:start], replacement))
+            cursor = end
+        parts.append(source[cursor:])
+        return "".join(parts)
 
     def envelopes(self, frames=None, *, angular_radius=1.0, angular_segments=24):
         """Configured nominal ranges at the supplied rest node frames, never simulated motion.

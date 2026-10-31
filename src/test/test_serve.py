@@ -324,15 +324,36 @@ class TestParentWatch(unittest.TestCase):
             try:
                 server.watch_parent(0)
                 self.assertIsNone(server._watcher)
-                # A dead parent does not fell the server, it only warns.
-                p = self.child(0.1)
-                p.wait(timeout=5)
-                server.watch_parent(p.pid)
-                self.assertIsNone(server._watcher)
                 self.assertEqual(get(server.url.rstrip("/") + "/api/environment")[0], 200)
             finally:
                 server.stop()
                 server.close()
+
+    def test_already_dead_parent_releases_the_port_even_before_serving(self):
+        # Opening a large model can outlast the launcher. The CLI registers its
+        # watcher before run(); death during that startup must not leave an orphan.
+        parent = self.child(0)
+        parent.wait(timeout=5)
+        for started in (False, True):
+            with self.subTest(started=started), tempfile.TemporaryDirectory() as tmp:
+                bench = MorphBench(common.config(tmp))
+                server = WebServer(bench, root=tmp, host="127.0.0.1", port=0)
+                try:
+                    if started:
+                        server.start()
+                    server.watch_parent(parent.pid)
+                    self.assertIsNotNone(server._watcher)
+                    if not started:
+                        server.start()
+                    server._watcher.join(timeout=5)
+                    self.assertFalse(server._watcher.is_alive())
+                    with self.assertRaises(OSError):
+                        get(server.url.rstrip("/") + "/api/environment")
+                    replacement = WebServer(bench, root=tmp, host="127.0.0.1",
+                                            port=server.port)
+                    replacement.close()
+                finally:
+                    server.stop()
 
 
 if __name__ == "__main__":

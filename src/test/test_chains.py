@@ -149,6 +149,35 @@ class TestFacadeChains(unittest.TestCase):
         self.assertEqual(counts["NPC EarL Bone01"], {})
         self.assertIn("TailBone03", counts)                             # from the skeleton, no skin
 
+    def test_counts_keep_ties_unowned_vertices_empty_bones_and_order(self):
+        skin = grid("a_skin", 3, 2, bones={
+            "Second": bone("Second", [1, 2]),
+            "First": bone("First", [0, 1], 0.5),
+            "Tied": bone("Tied", [0], 0.5),
+            "Empty": bone("Empty", []),
+            "Zero": bone("Zero", range(6), 0.0)})
+        fur = grid("b_fur", 2, 2, bones={
+            "First": bone("First", [0]), "Second": bone("Second", [1, 2], 0.2),
+            "Tied": bone("Tied", [3])})
+        empty = grid("c_empty", 0, 0, bones={"OnlyEmpty": bone("OnlyEmpty", [])})
+        unskinned = grid("d_unskinned", 2, 2)
+        rig = self.bench.rig
+        self.bench.attach(model(skin, fur, empty, unskinned), rig=rig)
+        cases = [
+            (None, [("Second", [("a_skin", 2), ("b_fur", 2)]),
+                    ("First", [("a_skin", 1), ("b_fur", 1)]), ("Tied", [("b_fur", 1)]),
+                    ("Empty", []), ("Zero", []), ("OnlyEmpty", []), ("TailBone03", [])]),
+            (["c_empty", "d_unskinned", "b_fur", "a_skin"],
+             [("OnlyEmpty", []), ("First", [("b_fur", 1), ("a_skin", 1)]),
+              ("Second", [("b_fur", 2), ("a_skin", 2)]), ("Tied", [("b_fur", 1)]),
+              ("Empty", []), ("Zero", []), ("TailBone03", [])]),
+        ]
+        for shapes, expected in cases:
+            with self.subTest(shapes=shapes):
+                counts = self.bench.bone_counts(shapes)
+                self.assertEqual([(name, list(owned.items())) for name, owned in counts.items()], expected)
+                self.assertTrue(all(type(value) is int for owned in counts.values() for value in owned.values()))
+
     def test_chains_rows_name_the_break_and_the_engine(self):
         from common import is_plain
         rows = self.bench.chains()

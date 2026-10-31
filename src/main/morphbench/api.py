@@ -493,8 +493,9 @@ class MorphBench(WorkspaceMixin, AddonSessionMixin, AddonStateMixin):
             shape = self.model.shape(name)
             dom = shape.dominant_bone()
             bones = list(shape.bones)
+            counts = np.bincount(dom[dom >= 0], minlength=len(bones))
             for i, bone in enumerate(bones):
-                n = int((dom == i).sum())
+                n = int(counts[i])
                 out.setdefault(bone, {})
                 if n:
                     out[bone][name] = n

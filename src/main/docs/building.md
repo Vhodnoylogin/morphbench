@@ -1,502 +1,105 @@
-# Building morphbench
+# Building and releasing Morphbench
 
-BodySlide builds the body; morphbench checks it — it reads what was built and says whether the
-morphs, the bounding spheres and the collision capsules hold up, outside the
-game, in seconds. This page is for whoever builds the launch window `morphbench.exe` and
-packages the workbench. Split releases reuse a reviewed Runtime and ship Application changes
-separately. The legacy full archive recipe remains available.
+Run commands from the repository root. Maintained production code lives in `src/main/`,
+tests and fixtures in `src/test/`, generated output in ignored `target/` or an explicit
+build folder. Released source belongs on `main`; unfinished Application work remains on
+`experimental/body-slots`. Never include that unfinished work in a Launcher release.
 
-If you only want to use the tool from a working copy, you do not need this page — see
-[quickstart.md](quickstart.md). What the tool is and how it is put together is in
-[../README.md](../README.md).
+## Native host and compatibility
 
-## Source and release boundaries
+Build with `src\main\launcher\build.cmd`. It uses the installed .NET Framework compiler;
+Pillow draws the generated icon. Output is `target/launcher/morphbench.exe`.
+Launcher v2 is assembly version 2.0.0.0 and speaks bootstrap/server protocol 1.
+[The frozen native contract](launcher-protocol.md) separates process/window code from the
+Application-owned discovery, settings and adapters. Existing user flags remain supported.
 
-Run the commands on this page from the checkout root. Root `mb.py` and `release.py`
-delegate to `src/main/`; maintained production files and authored resources live there.
-Tests and reusable fixtures live in `src/test/`. Generated output goes to ignored `target/`
-or an explicit external `--out` directory. Do not commit generated binaries, icons,
-archives, staging trees or reports, including through Git LFS.
+`runtime-lock.json` is an exact **build dependency pin**, not a runtime compatibility rule.
+Application schema 2 declares API/ABI compatibility; a compatible future Runtime can have
+another version and inventory hash without rebuilding Application. Runtime verifies its
+own complete inventory independently. Historical App schema 1 remains exact-pinned.
 
-Released corresponding source and reusable tests belong on `main`; unfinished work
-continues on `experimental/body-slots` based on the latest released main. A source
-reorganization does not enable Physics or Slots or change installed paths and SDK/API
-contracts. Retain historical tags/assets and verify integration and worktrees before
-retiring task branches. Build from a known source commit, retain dependency pins, record
-the output hash and source identity, and publish build output as release assets.
+## Reuse the pinned native package
 
-## End-user package boundary
-
-The owner's standing packaging rule, clarified on 31 October 2026, classifies files
-by their runtime purpose. A user archive contains what is needed to install and use
-Morphbench, required copyright/licence and source-availability notices, and brief user
-instructions. The Python/JavaScript application, entry shim, browser SDK used by installed
-plugins, interpreter and runtime libraries stay. Additional C#/C++ source bundles,
-compilers/toolchains, developer rebuild directions and test fixtures stay on GitHub or
-in an explicitly separate developer/SDK/test product. Link matching source and build
-directions at the exact release commit. Public source visibility alone does not grant
-redistribution rights, and this rule does not waive component licence obligations.
-
-**Transition status, audited 31 October 2026:** the current content selector still includes
-`docs/building.md` and its Russian twin in Application; the frozen Runtime v1 inventory
-also retains historical launcher build inputs and dependency development extras. The
-recipes below describe that existing behaviour, not completed compliance with the new
-boundary. Before the next publication, adjust the new Application/full-package selection,
-check source/notice references and inspect the finished ZIPs. Preserve necessary runtime
-Python/JavaScript and the unchanged SDK contract when removing developer-only material.
-The packaged README also contains source-build directions and moving `main` links;
-separate those from user instructions and add a brief immutable release-source notice.
-The next App/release metadata must also supplement inherited Runtime notice inaccuracies:
-its licence is named `RUNTIME-LICENSE`, and workbench code is in the separate Application.
-
-Do not mutate the pinned Runtime v1 inventory or replace published historical archives
-to perform this cleanup. Changes to that inventory need a new Runtime identity/pin and
-separate qualification. Existing native-source provenance gaps remain documented below;
-copying a generic repository URL or keeping rebuild files does not resolve them.
-
-Canonical owner policy:
-[Release artifacts and metadata](https://github.com/Vhodnoylogin/ai-project-meta/blob/55e5087852e6ac9c5037b3aeccb3812fa617e7eb/infrastructure/admin/knowledge/release-branches.md#release-artifacts-and-metadata).
-
-## Build artefacts
-
-| Artefact | Built from | By | Lands in |
-|---|---|---|---|
-| `morphbench.exe` | `src/main/launcher/morphbench.cs`, its manifest and the generated icon | `src/main/launcher/build.cmd` | `target/launcher/morphbench.exe` |
-| `morphbench.ico` | the recipe in `src/main/launcher/make-icon.py` | `python src/main/launcher/make-icon.py` | `target/launcher/morphbench.ico` |
-| `morphbench-<version>.zip` | production source plus bundled dependencies | `python release.py` | `target/packages/` by default |
-| `morphbench-runtime-<runtime-version>-win64.zip` | Runtime files from a complete existing release folder, copied unchanged | `python release.py --package runtime` | the `--out` folder |
-| `morphbench-application-<version>.zip` | Application sources and assets pinned to a Runtime manifest | `python release.py --package application` | the `--out` folder |
-
-`morphbench.exe`, the generated icon, previews and ZIP archives are build products.
-Their default output directories are covered by `.gitignore`; maintain the recipes, not
-the generated bytes. Existing historical tags and downloadable assets remain intact.
-
-## What the build machine needs
-
-| For | What | Note |
-|---|---|---|
-| `morphbench.exe` | nothing to install | the .NET Framework 4 compiler ships with Windows |
-| drawing the icon | Python with `pillow` | `build.cmd` generates a missing output icon from the maintained recipe |
-| a full release archive | Python 3.12+, `pip`, a network connection | `pip` fetches `numpy` and `pillow`, the network fetches the embeddable Python |
-| a full release archive | the **PyNifly** add-on folder on disk | found automatically among the Blender add-ons, or named with `--pynifly` |
-| split packages | Python 3.12+ and a complete existing release folder | Runtime packaging reuses its files; Application packaging reads a Runtime manifest. Neither step downloads dependencies |
-| the checks | Python 3.12+ with `numpy`; `pillow` and PyNifly optional | suites that need what is missing skip themselves |
-
-Blender itself is never needed, for anything. The workbench never touches `bpy`; it needs the
-add-on's folder, and that folder merely happens to live among Blender's add-ons.
-
-## morphbench.exe
-
-One command, from the checkout root:
-
-```
-src\main\launcher\build.cmd
-```
-
-It compiles `src/main/launcher/morphbench.cs` with the stock .NET Framework 4 compiler
-and writes `target/launcher/morphbench.exe`. There is no SDK to install, no
-project file, no NuGet: `csc.exe` has been part of Windows since .NET Framework 4, and the window
-is deliberately written against nothing newer so that this stays true.
-
-The compiler is looked for at
-`%WINDIR%\Microsoft.NET\Framework64\v4.0.30319\csc.exe`, then at the 32-bit
-`Framework\v4.0.30319\csc.exe`. The exit codes are worth knowing when the build is wired into
-something else:
-
-| Code | Meaning |
-|---|---|
-| 0 | built; the path is printed |
-| 2 | `csc.exe` of .NET Framework 4 not found |
-| 3 | the icon was missing and `make-icon.py` could not draw it |
-| other | the compiler's own exit code |
-
-The switches are few and each one earns its place:
-
-| Switch | Why |
-|---|---|
-| `/target:winexe` | a window, not a console — otherwise a black box flashes up behind it |
-| `/platform:anycpu` | the window starts whatever bitness of Windows it lands on |
-| `/codepage:65001` | the source is UTF-8; without this the compiler reads it in the machine's ANSI codepage |
-| `/win32manifest` | DPI awareness and Common Controls v6, so the window is not blurry and not from 1999 |
-| `/win32icon` | the icon of the **file**: Explorer, the taskbar |
-| `/resource …,morphbench.ico` | the same icon **inside** the assembly: a WinForms window draws its own default one otherwise, so the code reads this resource and sets it |
-| `/r:System.Windows.Forms.dll`, `/r:System.Drawing.dll` | the window itself |
-| `/r:System.Web.Extensions.dll` | reading the JSON the server answers `serve --status` with |
-
-Two things about `build.cmd` itself that look like fussiness and are not. It is ASCII-only, and its
-line endings are CRLF — pinned for every machine by `*.cmd text eol=crlf` in `.gitattributes`.
-`cmd.exe` reads a batch file in the console codepage and keeps its place in the file by byte
-offset; one stray non-ASCII byte, or LF endings, and it starts running fragments of lines. The
-failure is silent and looks like anything but an encoding problem.
-
-**Running a source-built window.** It needs the maintained `mb.py` and `locale/` tree.
-Pass the absolute `<checkout>/src/main` directory as its folder argument, or set
-`MORPHBENCH_HOME` to that directory. For example, from the checkout root in PowerShell:
-
-```powershell
-& .\target\launcher\morphbench.exe (Resolve-Path .\src\main).Path --start
-```
-
-Release packaging places the EXE in `Morphbench/launcher` with the existing entry shim
-and translations; its installed launch path does not change. The window searches an
-explicit folder, `MORPHBENCH_HOME`, its own folder, then the current directory.
-How the texts are organised is in [localisation.md](localisation.md).
-
-## The icon
-
-The maintained source is `src/main/launcher/make-icon.py`. Run:
+Download the exact archive URL in `src/main/runtime-lock.json`, verify its SHA256 and
+extract `root/Morphbench/launcher`. Do not modify its inventoried files. Package it with:
 
 ```text
-python src/main/launcher/make-icon.py --show
+python release.py --package runtime --runtime-from <extracted-launcher> --runtime-version 2 --out <output>
+python release.py --package application --runtime <extracted-launcher>/runtime-manifest.json --version 0.8.6 --out <output>
 ```
 
-It writes `target/launcher/morphbench.ico` with seven layers (16 to 256 pixels), plus
-`target/launcher/morphbench.png` with `--show`. An explicit `--out <path.ico>` selects
-another build location. Below 24 pixels it draws a simplified variant; the separate layers
-are passed to Pillow with `append_images` so they survive in the ICO.
+The builder checks Runtime ID, content hash and Python version against the source pin.
+Both split archives use `root/Morphbench/`; their small shim/translation overlap is
+Application-owned. Application contains no native binaries and accepts compatible API/ABI.
+`--layout flat` remains available for existing flat installations; the normal published
+format is structured. Do not perform in-place cross-layout updates.
 
-The image depicts a grid with one displaced coloured node, reflecting a mesh morph.
-The recipe and parameters are tracked; ICO/PNG output is reproducible and ignored.
-`build.cmd` generates a missing icon and embeds those output bytes in the EXE. A fresh
-source checkout therefore needs Python with Pillow for this step and no downloaded LFS icon.
+## Deliberately create a new Runtime
 
-## Split Runtime and Application packages
-
-The general release rule is one complete working archive. The established Application +
-Launcher/Runtime split is an installation exception: first installation requires both
-packages, Application pins the separately versioned native Runtime, and subsequent
-Application updates preserve that Runtime. Check both finished archives and the assembled
-manual/MO2 installation. Do not create additional base/trial downloads from this exception.
-
-`src/main/runtime-lock.json` pins published `runtime-1-win64`: Python 3.12.8, the original
-source commit, archive URL/SHA-256 and Runtime inventory content hash. The source builder
-checks Runtime identity, Python and content hash against this lock when building Application
-or reusing a Runtime seed. Acquire the locked archive, verify its SHA-256, and use its
-unchanged inventory. A full native rebuild is a separate development format and must never
-be republished under frozen Runtime v1's identity. The lock records a dependency; it does
-not establish complete native corresponding-source provenance.
-
-**Morphbench Launcher v1** supplies Runtime `runtime-1-win64`; its native inventory and
-manifest are reused byte-for-byte. **Application 0.8.5** has its own version and pins that
-Runtime identity/content hash. New split packages use this layout:
+A different EXE, interpreter or native dependency requires a new identity, qualification
+and moderation upload. Never overwrite a released ID or asset. Prepare a fresh full seed
+with the new EXE, `python/`, `vendor/`, licence/notices/dependency statement and `manifest.json`
+stating its actual Python. Keep the old seed unchanged. Commit the source first, then:
 
 ```text
-root/Morphbench/
-  launcher/                  unchanged Runtime plus App-owned entry shim/translations
-  app/                       workbench, browser, docs and updater
-  plugins/                   empty, user-owned
-  application-manifest.json
+python release.py --package runtime --new-runtime --runtime-from <fresh-seed> --runtime-version 2 --source-commit <exact-40-hex-commit> --out <output>
 ```
 
-The `root/` envelope supports optional MO2 Root Builder. Manual installation extracts
-`Morphbench` from inside it. The new ZIP hash differs from the previous flat Runtime ZIP,
-even though all original inventoried Runtime files and its content hash remain unchanged.
-Do not rebuild the EXE or native dependencies for this packaging change.
+`--new-runtime` refuses the frozen v1 ID and the current source lock's identity. It is
+only for a fresh seed with no Runtime manifest. It emits new contract metadata, removes
+known developer-only contents, checks native provenance before asserting upstream identity,
+and checks finished ZIP entries/hashes against the exact inventory plus App-owned overlay.
+After qualification, record the new inventory/archive hashes, Python, archive URL and
+native source commit in `runtime-lock.json`. Commit this pin and build Application from
+that exact committed source. Reused Runtime builds must then match the new lock.
 
-Seed the Runtime package from a complete audited release or an existing verified Runtime stage:
+`--source-commit` defaults to verified Git HEAD. Source and build links in package notices
+refer to that immutable revision. Do not claim a later source revision built an older EXE.
+Do not edit package bytes after qualification; changed bytes are a new candidate.
 
-```
-python release.py --package runtime --runtime-from "<audited-runtime>" --runtime-version 1 --out "<builds>"
-python release.py --package application --runtime "<runtime-stage>/runtime-manifest.json" --version 0.8.5 --out "<builds>"
-```
+## Runtime-only user archives
 
-These produce `morphbench-runtime-1-win64.zip` and `morphbench-application-0.8.5.zip`.
-The staged Runtime manifest path is reported by the first command. Both split commands
-now default to `--layout structured`; they use no compiler, pip, network or native imports.
-Only the archive gets the `root/Morphbench` envelope; inspect its finished contents, not
-just the staging directory, before publication.
+Keep executable/runtime dependencies, interpreted Python/JS, required assets, manifests,
+licence/copyright notices and brief installation/source-availability instructions.
+Packaged README files are short installation instructions, separate from the full source
+guides. `SOURCE.md` identifies exact App source. Extra C#/C++ sources, compilers, build
+recipes, tests, type stubs, caches and standalone embedded icon inputs stay on GitHub.
+Developer-only `building` and `launcher-protocol` guides are not selected into App.
 
-Application contains `app/mb.py`, `app/mb_distribution.py`, `app/mb_paths.py`, `app/update.py`,
-`app/morphbench/`, `app/presenters/`, `app/web/`, `app/locale/`, `app/docs/` and release
-licences/documentation. It also owns exactly `launcher/mb.py` and the two launcher translation
-JSON files. Both packages deliberately repeat those same three files so the unchanged EXE
-can start from its physical MO2 mod source before App discovery. They are outside the
-immutable native Runtime inventory; Application has higher MO2 priority when updating them.
+Required stdlib bytecode, native extensions and wheel licence/SBOM files remain. Do not
+remove imports merely because a filename contains "test". New Runtime pruning is tested
+against actual dependency imports and file operations; a manifest alone proves neither
+minimality nor functionality. A legacy full seed can be prepared with `--package full`;
+its dependencies come from `dependencies.json`. Full builds still require matching Windows
+x64 Python major/minor, a built EXE and the stated external PyNifly folder.
 
-Application excludes native `.exe`, `.dll`, `.pyd`, `.so`, dependency folders, machine settings,
-installed plugins, tests, caches and nested archives. Python/JavaScript remain executable code.
-The manifest defines exact ownership; the updater never infers ownership from folder names.
-Runtime keeps its original notices, licences and rebuild sources, alongside all native files.
+Python, NumPy, Pillow and PyNifly licences/provenance remain in Runtime notices.
+PyNifly Python files use V28.1.0 source `934fbbfbb41b63ed636d44afa957ec98d7fb0803`.
+The new DLL builds that wrapper against Nifly `8a57cdef83aa97a976b4e317aa5cc2a1fa7fd88d`,
+with compiler/static CRT settings in `dependencies.json`. This is a new source-accounted
+build, not a reproduction of Runtime v1's historical DLL. Build and generate matching source:
 
-For existing flat installations, build a compatible Application snapshot explicitly:
-
-```
-python release.py --package application --layout flat --runtime "<runtime-manifest.json>" --version 0.8.5 --out "<separate-flat-builds>"
-```
-
-Use a separate output directory to avoid overwriting the structured ZIP of the same version.
-Cross-layout in-place updates are refused; migration installs both structured packages into
-a fresh folder, then copies user state. The legacy full archive remains flat; requesting
-`--package full --layout structured` is refused.
-
-For the next Nexus publication, use version-free display names **Morphbench Application**
-and **Morphbench Launcher**, with their versions in the separate version fields. Preserve
-historical publication receipts. Both packages are Main Files, Application Primary; allow
-Manual and Mod manager download for both. Add Root Builder as an optional requirement for root deployment through
-MO2. Instructions must distinguish manual extraction, Root Builder source/deployment updates
-and legacy flat installs. See [updating.md](updating.md) and [install-layout.md](install-layout.md).
-
-Native dependency or EXE changes require a new independently reviewed Runtime and an App
-manifest pinning it. An Application-only release reuses the required native bytes. Hashes
-are not signatures or antivirus/Nexus approval; packaging changes can still require review.
-
-## Legacy full release archive
-
-The default is still `--package full`. Existing full-release commands keep their behaviour:
-
-```
-python release.py --version 0.7.0
+```text
+python src/main/build-nifly.py --out <native-build>
 ```
 
-That stages `target/packages/morphbench-0.7.0/` and packs it into
-`target/packages/morphbench-0.7.0.zip`. The staging
-folder is **deleted and rebuilt** on every run, so nothing of your own should be left inside it.
+The recipe fetches exact commits, generates a static CRT project and records the actual
+output hash. Separate `morphbench-nifly-corresponding-source.zip` includes both native
+source inputs, licences, metadata and recipe; it can build without fetching their Git
+repositories. This developer asset stays on GitHub, never inside Runtime. Required
+half/Miniball notices ship with the DLL. Minimality does not waive source obligations.
 
-Before building anything, it is worth asking what would go in:
+## Qualification and publication
 
-```
-python release.py --list
-```
+Run `python src/test/run.py`. Native tests compile the actual C# and exercise failures,
+deadlines, inherited pipes, cancellation, ownership and callback races. Also verify the
+assembled archives using their bundled interpreter: imports, CLI/HTTP, native window,
+NIF/TRI/PNG, v1-to-v2 App migration, repeated updates and preserved settings/plugins.
+Actual MO2/usvfs qualification is a separate observation; synthetic discovery is not it.
 
-This prints every file of ours that matches the content list, a count, and one line per dependency
-saying whether it goes inside and where. It builds nothing.
-
-| Option | Default | What it does |
-|---|---|---|
-| `--version X` | `0.0.0` | the number in the folder name, the archive name and `manifest.json` |
-| `--out <folder>` | `<checkout>/target/packages` | where the staging folder and the archive go |
-| `--pynifly <folder>` | found automatically | take the add-on from here instead of searching |
-| `--python-version X` | `3.12.8` | which embeddable Python to fetch |
-| `--no-python` | — | no embedded Python; the user must have one installed |
-| `--no-vendor` | — | no third-party code at all — the workbench alone |
-| `--stage-only` | — | lay the folder out and do not pack it |
-| `--list` | — | say what would go in and stop |
-
-`--stage-only` is the one to use while working on the release itself: the folder can be inspected,
-run and thrown away without waiting for a zip each time.
-
-`release.py` imports nothing of the workbench — not even its message catalogue. That is on
-purpose: a release has to be buildable on a machine where the dependencies are not installed yet
-and the workbench itself would not start. Its own texts are read with the standard library alone
-from `locale/<language>/release.json`, and the language comes from `MORPHBENCH_LANG`, because
-guessing the machine's language is the catalogue's job and whoever builds a release can simply say.
-
-`release.py` itself never travels inside the archive it builds. It belongs to the repository, not
-to the release.
-
-### CONTENT: what goes into the full archive
-
-The contents of the archive are stated in one place — the `CONTENT` list at the top of
-`src/main/release.py` — and they are stated **by enumeration**. Patterns below use the
-unchanged release namespace; maintained files are read from `src/main/`, the licence
-from the checkout root, and generated launcher inputs from `target/launcher/`:
-
-```
-python release.py --list
-```
-
-| Pattern | What it carries |
-|---|---|
-| `mb.py`, `mb_distribution.py`, `mb_paths.py`, `update.py` | the command line, release verification and local updater |
-| `morphbench.exe` | the launch window — build it *before* the release, it is not built for you |
-| `LICENSE`, `README.md`, `README.ru.md`, `dependencies.json` | the licence, the shop window in both languages, the statement about dependencies |
-| `CHANGELOG.md`, `CHANGELOG.ru.md` | the release history in both languages |
-| `morphbench/*.py`, `presenters/*.py` | the core and the presentation layers |
-| `locale/*/*.json` | every runtime section in every language; the builder-only `release.json` is omitted |
-| `web/*.html`, `web/*.css`, `web/js/*.js` | the viewer page |
-| `docs/*.md` | this documentation, both languages |
-| `launcher/*.cs`, `launcher/*.cmd`, `launcher/*.py`, `launcher/*.manifest`, `launcher/*.ico` | the complete source, build script and resources for the compiled launcher |
-
-The launcher sources stay beside the binary so a mirrored archive still contains the inputs
-needed to rebuild it. The Python runtime code is already source; none of it is compiled away.
-
-Developer instruction files (`CLAUDE.md`, `AGENTS.md`, `SKILL.md`) stay in the source repository.
-They are excluded even when placed inside a directory selected by a content pattern.
-
-Anything not named there cannot reach the archive, however much of it is lying next to us in the
-working copy. Independently maintained mods and add-ons have their own repositories;
-a pinned dependency declares any shared implementation. The inclusion list prevents
-unrelated files or generated output from leaking into the archive. Missing maintained
-content is visible in `--list`.
-
-`SKIP` then drops four things that can match anyway: `__pycache__`, `.pyc`, and the two files a run
-leaves behind, `morphbench.json` and `morphbench.log`. The settings and the log belong to a
-machine, not to a release.
-
-The `release.json` catalogue in each language is also omitted: only `release.py` uses it, and
-the builder stays in the repository. The source catalogue remains available to the builder.
-
-Two consequences to keep in mind when adding files:
-
-* **The patterns are one level deep.** `web/js/*.js` catches a new script in `web/js/`
-  automatically — and the load order for it is declared in `PageAssets.SCRIPTS`, not here — but a
-  new folder, `web/img/` say, needs a new line in `CONTENT` or it silently will not ship. The same
-  holds for a new subpackage under `morphbench/`.
-* **A new language or a new runtime section ships by itself.** `locale/*/*.json` covers both, which is the
-  point of a language being a folder of section files rather than one big file; see
-  [localisation.md](localisation.md).
-
-### What ends up in the staging folder
-
-Beside our own files, three things are written that do not exist in the repository:
-
-| File | Written by | Contents |
-|---|---|---|
-| `vendor/`, `python/`, `vendor/io_scene_nifly/` | the bundling steps | everything third-party, laid out where the workbench expects it |
-| `THIRD-PARTY.md` | `third_party()` | the list of third-party work with licences and source addresses |
-| `manifest.json` | `main()` | name, version, licence, which Python was bundled, which dependencies went in |
-
-## dependencies.json: what is bundled, and why
-
-`dependencies.json` is written by a person. It is a **statement** about dependencies, not a copy of
-them: `release.py` builds the archive by it and writes `THIRD-PARTY.md` by it.
-
-| Name | What it is | Licence | Inside? | Where | Needed for |
-|---|---|---|---|---|---|
-| Python 3.12+ | runtime | PSF-2.0 | yes | `python/` | the whole workbench is written in it |
-| numpy | package | BSD-3-Clause | yes | `vendor/` | all the arithmetic over vertices: morphs, strain, bounds, capsules |
-| pillow | package | MIT-CMU | yes | `vendor/` | writing frames to PNG; everything else works without it, the page included |
-| PyNifly | add-on folder | GPL-3.0 | yes | `vendor/io_scene_nifly` | reading and writing NIF and the TRI/TRIP morph files |
-
-**The licence decides what goes in, not convenience.** PyNifly is GPL-3 and so are we, so it can
-and should travel inside; numpy, pillow and Python are all under licences that permit
-redistribution. A dependency that cannot legally go inside would be marked `bundle: false`, and
-then its entry is obliged to say where the user gets it. Nothing is marked that way today:
-the Runtime/Application pair and the legacy full archive include the required dependencies.
-
-The fields of an entry are documented in the `note` block at the top of the file. Two are worth
-repeating here. `why` says what the workbench needs the thing for, and **an entry without it must
-not be added** — a dependency nobody can justify is a dependency nobody will dare remove. `proof`
-lists files that must exist inside the folder, so that a folder with the right name belonging to
-something else is not picked up by mistake: for PyNifly those are `pyn/pynifly.py`, `NiflyDLL.dll`
-and the two parsers `tri/trifile.py` and `tri/tripfile.py`. Each proof entry must be a file.
-Name the wrong folder with `--pynifly` and the build stops and tells you
-which files were missing, instead of packing a stranger's code.
-
-The `search` list is where the builder's machine is looked at: Blender's add-on and extension
-folders under `%APPDATA%` and `%LOCALAPPDATA%`, then `./vendor/io_scene_nifly` relative to the production root (`src/main/` in a checkout).
-Use `--pynifly` to name an external dependency folder explicitly.
-`%VARIABLE%` is taken from the environment and `*` behaves as in a file name. Candidates are tried
-in reverse name order, so the newest Blender version wins.
-
-PyNifly's `keep` list carries the `pyn/` runtime tree, `NiflyDLL.dll`, and just the two parser
-files `tri/trifile.py` and `tri/tripfile.py`. Nested file entries retain their relative paths;
-the bundler creates their parent folders. Morphbench loads those parser files directly because
-the `tri` package initialiser imports Blender. The Blender-facing `nif/` folder and TRI UI
-modules are not used and do not ship. Third-party source files are copied without edits.
-
-### The packages and the embedded Python
-
-`numpy` and `pillow` are installed by the same `pip` you already have, but into the release folder
-rather than into the system: `pip install --target <stage>/vendor`. Dependency `test`/`tests`
-directories, `__pycache__`, `.pyc` caches, `.pyi` type stubs and NumPy's `_pyinstaller` build
-hooks and generated `f2py.exe`/`numpy-config.exe` build utilities are removed from the
-staged copy. NumPy's `_core/include/` headers, `.lib` static/import libraries and
-`_core/lib/pkgconfig/` build configuration are also removed. Runtime `.pyd` extensions and
-DLLs stay, as do importable APIs such as `numpy.testing`, `numpy.typing` and `numpy.f2py`.
-`.dist-info` stays, including the exact versions and package licence files; `RECORD` lists
-only retained files. The builder's installed dependencies are not changed.
-
-One rule follows from this and is easy to get wrong: **run `release.py` with the same Python
-major/minor version you are bundling, on 64-bit Windows.** The builder checks this before staging.
-`pip --target` picks wheels for the interpreter that is running it, so
-building with 3.13 while bundling embeddable 3.12 lays down compiled extensions the bundled
-interpreter cannot import.
-
-The embeddable build is fetched straight from python.org — an archive with no installer that simply
-unpacks. It ships deliberately blinkered: it does not look around itself, so `vendor/` and the
-workbench folder would be invisible to it. `release.py` rewrites the `python*._pth` file to add
-`..` and `..\vendor` and to enable `import site`. Note that the line has to be **replaced**, not
-added to: the build ships with `import site` commented out, and writing a new line next to the
-commented one leaves the old one in place and the paths are never picked up.
-
-The bundled `python312.zip` standard library is extracted unchanged into `python/python312/`,
-and its `_pth` entry points to that directory. The release contains no nested Python ZIP.
-The standard library's `.pyc` files are required runtime bytecode and stay; they are different
-from disposable dependency caches. This layout permits archive inspection under Nexus's
-nested-archive policy, but does not establish antivirus or moderator clearance.
-
-### THIRD-PARTY.md
-
-The GPL requires that the list of third-party work travel with the binary, and `release.py` writes
-it into a full release from `dependencies.json` and retains it in Runtime packaging: for each
-entry, what it is, what the workbench needs it for, whether it is inside the package and where,
-under which licence, and where its
-sources live. `NiflyDLL.dll` is compiled; a generic source address alone does not identify
-the precise inputs used to build a particular binary.
-
-The audited 0.8.0 bundle's 27 PyNifly files match the author's
-[V28.1.0 release](https://github.com/BadDogSkyrim/PyNifly/releases/tag/V28.1.0).
-Its 26 non-DLL files also match
-[commit 934fbbf](https://github.com/BadDogSkyrim/PyNifly/tree/934fbbfbb41b63ed636d44afa957ec98d7fb0803).
-The upstream project references a separate sibling Nifly library without identifying its
-exact build revision. The audit establishes release-byte provenance, not a reproduced DLL
-build or complete native dependency source provenance.
-
-Only the frame of that document is translated. The entries are copied from `dependencies.json`
-word for word, and that file is in English.
-
-The sources of morphbench itself need no special step: the archive carries the same Python that
-runs. That is what the closing section of `THIRD-PARTY.md` says.
-
-## Running the checks
-
-```
-python src/test/run.py
-```
-
-One suite at a time, by a file-name pattern:
-
-```
-python src/test/run.py test_physics.py
-```
-
-Any check file also runs on its own:
-
-```
-python src/test/test_colliders.py
-```
-
-Only `unittest` from the standard library — there is no outside test framework to install. The
-checks live outside the `morphbench/` package and are not imported by it; they find the module's
-root from their own location.
-
-Three things about a run:
-
-* **The language is pinned.** `run.py` and `common.py` both set `MORPHBENCH_LANG=en`, because
-  several checks compare message texts word for word and would otherwise pass for one person and
-  fail for another. It is `setdefault`, so a run that deliberately asks for another language from
-  outside keeps it.
-* **No check reads a file of a mod build.** The bodies are built in memory out of a few dozen
-  vertices and attached to the facade through `MorphBench.attach`; the settings are created in a
-  temporary folder, so the real `morphbench.json` is never touched. A failure therefore means the
-  core is broken, not that some mesh has changed.
-* **A skip is not a failure.** The suites that have to write a real `.nif` or `.tri` need PyNifly,
-  and without it they skip themselves with a plain reason. `pillow` and the server module behave
-  the same way. Which suite needs what is tabulated in [the source test guide](https://github.com/Vhodnoylogin/morphbench/blob/main/src/test/README.md).
-
-The run ends in one summary line — suites, broken suites, checks, failures, errors, skipped — and
-exits 1 if anything failed or errored, so it can be wired into something else.
-
-The checks are not in `CONTENT`: they stay in the repository and do not ship in the release.
-
-## Rough edges, stated plainly
-
-These are real and they are in the code as described.
-
-* **Nothing here records the finished archive being unpacked and run on a machine with no Python
-  and no Blender.** Self-contained is the design; treat the first archive you cut as something to
-  test, not something to hand out.
-
-## Where to go next
-
-| Page | About |
-|---|---|
-| [../README.md](../README.md) | what the tool is and how it is put together |
-| [quickstart.md](quickstart.md) | the first hour: open a mesh, read the answer, launch from MO2 |
-| [updating.md](updating.md) | install the split packages, update Application, recover an interruption and migrate a legacy release |
-| [cli.md](cli.md) | every command of `mb.py` and what `--json` returns |
-| [page.md](page.md) | the viewer in the browser |
-| [physics.md](physics.md) | what the bench measures: reach spheres and collision capsules |
-| [localisation.md](localisation.md) | how the texts are laid out and how to add a language |
-| [Repository development guidance](https://github.com/Vhodnoylogin/morphbench/blob/main/CLAUDE.md) | contributor and AI instructions, excluded from the end-user archive |
+Publish corresponding source on `main` and output as GitHub/Nexus downloads. Preserve
+historical releases. On Nexus use descriptive version-free file display names and separate
+version fields; Application is Primary, Launcher another Main file, Root Builder optional.
+An upload, quarantine status and moderation clearance are separate facts. A new native
+upload can still be quarantined. Keep routine future App work outside the frozen native
+package to avoid reuploading identical EXE/dependency bytes.

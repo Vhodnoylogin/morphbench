@@ -79,6 +79,22 @@
       ],
       "source": "https://github.com/BadDogSkyrim/PyNifly",
       "license": "GPL-3.0",
+      "nativeBuild": {
+        "wrapperRepository": "https://github.com/BadDogSkyrim/PyNifly",
+        "wrapperCommit": "934fbbfbb41b63ed636d44afa957ec98d7fb0803",
+        "libraryRepository": "https://github.com/BadDogSkyrim/nifly",
+        "libraryCommit": "8a57cdef83aa97a976b4e317aa5cc2a1fa7fd88d",
+        "recipe": "src/main/build-nifly.py",
+        "compilerToolsVersion": "14.44.35207",
+        "compilerVersion": "19.44.35228",
+        "msbuildPlatformAdapter": "v145",
+        "configuration": "Release",
+        "platform": "x64",
+        "runtimeLibrary": "MultiThreaded",
+        "dllSha256": "549da452038cfe301f05bce4d08d5f25e31a17558cea83d448e901c6b595db9e",
+        "note": "A new source-accounted build, not a reproduction of the historical V28.1.0 DLL. The VS2022 compiler 14.44 is selected through installed VS2026 MSBuild; unused MFC and upstream packaging events are disabled.",
+        "notices": "half - IEEE 754-based half-precision floating-point library\nhalf - IEEE 754-based half-precision floating-point library.\n\nCopyright (c) 2012-2025 Christian Rau <rauy@users.sourceforge.net>\n\nPermission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation \nfiles (the \"Software\"), to deal in the Software without restriction, including without limitation the rights to use, copy, \nmodify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the \nSoftware is furnished to do so, subject to the following conditions:\n\nThe above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE \nWARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR \nCOPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, \nARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.\n\nMiniball: Copright (C) 1999-2021, Bernd Gaertner. GNU GPL v3 or later; see RUNTIME-LICENSE.\nNifly and PyNifly: GNU GPL v3; see RUNTIME-LICENSE and corresponding pinned source/build references.\n"
+      },
       "remark": [
         "Blender itself is NOT needed: the workbench never touches bpy, only the add-on folder.",
         "Only the parts named in keep travel: the workbench imports `pyn`",

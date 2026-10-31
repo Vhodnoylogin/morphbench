@@ -1,7 +1,7 @@
 # Morphbench
 
 Верстак для Windows: меши Skyrim NIF/TRI, морфы, шары охвата и капсулы столкновений
-скелета. В версии 0.8.5 доступны Morphs, Colliders, автоматизация CLI/HTTP и браузерные
+скелета. В версии 0.8.6 доступны Morphs, Colliders, автоматизация CLI/HTTP и браузерные
 аддоны; Physics и Body Slots остаются отключены в навигации браузера.
 
 [English](README.md) · [Руководство](src/main/README.ru.md) ·

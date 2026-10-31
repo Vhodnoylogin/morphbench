@@ -9,9 +9,9 @@ executable: a small window with the state of the server, the browse root and but
 it, stop it and open the page. Started from MO2 it brings up `python mb.py serve` as its own
 child, and that child sees the merged `Data`.
 
-Application **0.8.5** uses the separate **Morphbench Launcher v1** (`runtime-1-win64`);
+Application **0.8.6** uses the separate **Morphbench Launcher v2** (`runtime-2-win64`);
 their versions are independent. Both release ZIPs start at `root/Morphbench/`. A merged
-installation contains `launcher/` for the unchanged EXE and native Runtime, `app/` for
+installation contains `launcher/` for the EXE and native Runtime, `app/` for
 Application and `plugins/` for installed add-ons. Run `Morphbench/launcher/morphbench.exe`.
 The archive's `root/` envelope supports optional MO2 Root Builder; manual installation
 extracts `Morphbench` from inside it. See [installation and migration](../docs/install-layout.md).
@@ -29,9 +29,8 @@ in `src/main/launcher/`; EXE, generated ICO and preview output stay in ignored
 `target/launcher/`. Python with Pillow is needed when the icon must be generated. The
 recipe is tracked; generated binary output is not. To launch this EXE against the sources,
 pass the absolute `<checkout>/src/main` folder or set `MORPHBENCH_HOME` to that folder.
-Release packaging keeps the installed `Morphbench/launcher` path. The frozen published
-Launcher v1 is reused byte-for-byte; a new local native build must not replace it under
-the same Runtime identity. See the [build and dependency-pin guide](../docs/building.md).
+Release packaging keeps the installed `Morphbench/launcher` path. Every published Runtime inventory remains immutable; Launcher v2 has a new identity.
+New native builds must not replace it under the same Runtime identity. See the [build and dependency-pin guide](../docs/building.md).
 
 ## May depend on
 
@@ -39,11 +38,11 @@ the same Runtime identity. See the [build and dependency-pin guide](../docs/buil
 line makes too: `serve --status`, `serve`, `serve --stop`, `/api/root`, open the page. Nothing
 else of the workbench is reachable from here — the window is a client like any other.
 
-The unchanged EXE finds `mb.py` beside itself, in an explicit folder argument or through
+The EXE finds `mb.py` beside itself, in an explicit folder argument or through
 `MORPHBENCH_HOME`. In a structured release this is `launcher/mb.py`, an entry shim supplied
 with both packages. It selects Application through an explicit absolute `MORPHBENCH_APP`,
 the sibling `../app`, or one complete game-root installation. Ambiguous candidates are refused.
-Application startup verifies the required Runtime identity, file hashes and exact bundled
+Application startup verifies Runtime API/ABI compatibility, file hashes and exact bundled
 `launcher/python/python.exe`; interpreter overrides must name that same bundled executable.
 
 Source checkouts use `src/main/`; old flat installations retain their installed paths. For sources without
@@ -70,3 +69,9 @@ sees the same merged `Data`. For an old flat installation, use its root `python\
 and set **Start in** to that installation root. Anyone who would rather not
 run an unsigned binary loses nothing but the buttons — so nothing may ever be made to work only
 through this folder.
+
+## Stable native boundary
+
+Launcher v2 queries the Application-owned shim with `--launcher-context --protocol 1`.
+Paths, settings and versioned server adapters are supplied by the updateable shim; the EXE
+does not duplicate game/App discovery. See [the protocol contract](../docs/launcher-protocol.md).

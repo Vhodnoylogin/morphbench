@@ -49,13 +49,13 @@ class TestApplicationUpdates(unittest.TestCase):
         (self.root / dist.RUNTIME_MANIFEST).write_bytes(dist.canonical(self.runtime))
         self.first, self.first_manifest = self.package("0.8.0", {"morphbench/obsolete.py": b"# old"})
 
-    def package(self, version, extra=None, *, runtime=None):
+    def package(self, version, extra=None, *, runtime=None, schema=1):
         files = {"mb.py": b"# entry " + version.encode(), "update.py": b"# updater",
                  "mb_distribution.py": b"# bootstrap", "morphbench/__init__.py": b"# init",
                  "morphbench/api.py": b"# facade", "morphbench/config.py": b"# config",
                  "LICENSE": b"GPL-3.0"}
         files.update(extra or {})
-        manifest = {"schemaVersion": 1, "kind": "application", "name": "morphbench",
+        manifest = {"schemaVersion": schema, "kind": "application", "name": "morphbench",
                     "version": version, "requiresRuntime": runtime or {
                         key: self.runtime[key] for key in ("id", "contentHash")},
                     "files": {name: dist.digest(data) for name, data in files.items()}}
@@ -131,6 +131,94 @@ class TestApplicationUpdates(unittest.TestCase):
         before = snapshot(self.root)
         self.assert_code("runtimeMismatch", lambda: dist.update(self.root, second))
         self.assertEqual(snapshot(self.root), before)
+
+    def advertise_runtime(self, identity="runtime-2-win64"):
+        self.runtime.update(id=identity, applicationApi=1, pythonAbi="cp312-win_amd64")
+        self.runtime.pop("contentHash")
+        self.runtime["contentHash"] = dist.digest(dist.canonical(self.runtime))
+        (self.root / dist.RUNTIME_MANIFEST).write_bytes(dist.canonical(self.runtime))
+
+    def test_contract_application_survives_future_runtime_identity_and_inventory_changes(self):
+        dist.update(self.root, self.first)
+        users = self.users()
+        self.advertise_runtime()
+        contract = {"apiVersion": 1, "pythonAbi": "cp312-win_amd64"}
+        archive, manifest = self.package("0.8.6", runtime=contract, schema=2)
+        dist.update(self.root, archive)
+        # A separately installed compatible Runtime changes both ID and bytes. The
+        # same Application snapshot remains usable without a new Runtime hash pin.
+        (self.root / "morphbench.exe").write_bytes(b"MZ future launcher")
+        self.runtime["files"]["morphbench.exe"] = dist.digest(b"MZ future launcher")
+        self.advertise_runtime("runtime-3-win64")
+        self.assertEqual(dist.runtime_for(self.root, manifest)["id"], "runtime-3-win64")
+        self.assertTrue(dist.update(self.root, archive)["ok"])
+        self.assertEqual({name: dist.file_digest(self.root / name) for name in users}, users)
+        # Compatibility never waives inventory integrity.
+        (self.root / "vendor/io_scene_nifly/NiflyDLL.dll").write_bytes(b"damaged")
+        before = snapshot(self.root)
+        self.assert_code("changedFile", lambda: dist.update(self.root, archive))
+        self.assertEqual(snapshot(self.root), before)
+
+    def test_legacy_application_keeps_exact_binding_even_for_an_advertised_runtime(self):
+        self.advertise_runtime()
+        self.assert_code("runtimeMismatch", lambda: dist.runtime_for(self.root, self.first_manifest))
+
+    def test_missing_runtime_contract_is_not_an_unlimited_legacy_exception(self):
+        archive, _ = self.package("0.8.6", runtime={"apiVersion": 1,
+                                                   "pythonAbi": "cp312-win_amd64"}, schema=2)
+        before = snapshot(self.root)
+        # The synthetic runtime-1 has a different inventory from the released v1.
+        self.assert_code("runtimeMismatch", lambda: dist.update(self.root, archive))
+        self.assertEqual(snapshot(self.root), before)
+        identity, checksum = dist.LEGACY_RUNTIME
+        self.assertEqual(dist.runtime_contract({"id": identity, "contentHash": checksum}),
+                         {"apiVersion": 1, "pythonAbi": "cp312-win_amd64"})
+        for value in ({"id": "runtime-9-win64", "contentHash": checksum},
+                      {"id": identity, "contentHash": "a" * 64}):
+            self.assertIsNone(dist.runtime_contract(value))
+
+    def test_new_standalone_updater_can_migrate_a_schema_one_application(self):
+        dist.update(self.root, self.first)
+        users = self.users()
+        self.advertise_runtime()
+        archive, _ = self.package("0.8.6", runtime={"apiVersion": 1,
+                                                   "pythonAbi": "cp312-win_amd64"}, schema=2)
+        # The installed old updater cannot parse schema 2. The user can invoke the
+        # freshly extracted updater with an explicit target instead of merging files.
+        extracted = self.folder / "new-updater"
+        extracted.mkdir()
+        for name in ("update.py", "mb_distribution.py"):
+            shutil.copyfile(common.ROOT / name, extracted / name)
+        result = subprocess.run([sys.executable, "-B", str(extracted / "update.py"),
+                                 "--target", str(self.root), "--package", str(archive), "--json"],
+                                capture_output=True, text=True, timeout=20)
+        self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
+        self.assertTrue(json.loads(result.stdout)["ok"])
+        self.assertFalse((self.root / "morphbench/obsolete.py").exists())
+        self.assertEqual(dist.read_json(self.root / dist.APP_MANIFEST)["schemaVersion"], 2)
+        self.assertEqual({name: dist.file_digest(self.root / name) for name in users}, users)
+
+    def test_manifest_contracts_reject_unknown_partial_boolean_and_mixed_schemas(self):
+        contract = {"apiVersion": 1, "pythonAbi": "cp312-win_amd64"}
+        for index, bad in enumerate(({}, {"apiVersion": True, "pythonAbi": "cp312-win_amd64"},
+                                     {"apiVersion": 2, "pythonAbi": "cp312-win_amd64"},
+                                     {"apiVersion": 1, "pythonAbi": "cp313-win_amd64"},
+                                     {**contract, "contentHash": "a" * 64},
+                                     {"id": "runtime-2-win64", "contentHash": "a" * 64})):
+            with self.subTest(application=bad):
+                archive, _ = self.package("9." + str(index), runtime=bad, schema=2)
+                self.assert_code("manifest", lambda: dist.read_application(archive))
+        for fields in ({"applicationApi": 1}, {"pythonAbi": "cp312-win_amd64"},
+                       {"applicationApi": True, "pythonAbi": "cp312-win_amd64"},
+                       {"applicationApi": 2, "pythonAbi": "cp312-win_amd64"},
+                       {"applicationApi": 1, "pythonAbi": "cp313-win_amd64"}):
+            with self.subTest(runtime=fields):
+                runtime = {key: value for key, value in self.runtime.items() if key != "contentHash"}
+                runtime.update(fields)
+                runtime["contentHash"] = dist.digest(dist.canonical(runtime))
+                self.assert_code("manifest", lambda: dist.validate_manifest(runtime, "runtime"))
+        wrong_schema = dict(self.first_manifest, schemaVersion=True)
+        self.assert_code("manifest", lambda: dist.validate_manifest(wrong_schema, "application"))
 
     def test_application_archive_forbids_native_binaries_user_state_and_renamed_binaries(self):
         names = ("morphbench.exe", "morphbench/core.pyd", "web/js/native.dll", "python/code.py",
@@ -346,10 +434,12 @@ module.update(root,Path(sys.argv[3]))
 class TestSplitRelease(unittest.TestCase):
     def setUp(self):
         TestApplicationUpdates.setUp(self)
+        TestApplicationUpdates.advertise_runtime(self, "runtime-1-win64")
         # Synthetic dependencies belong to an isolated flat source fixture. They
         # must not inherit the real checkout's published Runtime lock.
         source = self.folder / "flat-build-source"
         source.mkdir()
+        shutil.copyfile(common.ROOT / "dependencies.json", source / "dependencies.json")
         patcher = mock.patch.object(release, "HERE", source)
         patcher.start()
         self.addCleanup(patcher.stop)
@@ -390,11 +480,102 @@ class TestSplitRelease(unittest.TestCase):
                 pass
         with mock.patch.object(release, "HERE", source), contextlib.redirect_stdout(Output()):
             self.assertEqual(release.main(["--package", "application", "--layout", "flat", "--version", "0.8.0",
+                "--source-commit", "a" * 40,
                 "--runtime", str(self.root / dist.RUNTIME_MANIFEST), "--out", str(output)]), 0)
         manifest, contents = dist.read_application(output / "morphbench-application-0.8.0.zip")
         self.assertTrue(all(dist.app_path(name) for name in contents))
-        self.assertEqual(manifest["requiresRuntime"]["contentHash"], self.runtime["contentHash"])
+        self.assertEqual(manifest["schemaVersion"], 2)
+        self.assertEqual(manifest["requiresRuntime"], {"apiVersion": 1, "pythonAbi": "cp312-win_amd64"})
+        self.assertIn("SOURCE.md", contents)
         self.assertTrue(dist.update(self.root, output / "morphbench-application-0.8.0.zip")["ok"])
+
+    def test_new_runtime_is_explicit_minimal_and_never_mutates_the_frozen_identity(self):
+        (self.root / dist.RUNTIME_MANIFEST).unlink()
+        (self.root / "LICENSE").write_bytes(b"GPL fixture")
+        (self.root / "THIRD-PARTY.md").write_text("old inherited notice")
+        (self.root / "dependencies.json").write_text('{"dependencies":[]}')
+        (self.root / "manifest.json").write_text('{"python":"3.12.8"}')
+        extras = {"launcher/morphbench.cs": b"source", "launcher/build.cmd": b"build",
+                  "vendor/numpy/f2py/src/fortranobject.h": b"header",
+                  "vendor/numpy/_core/_multiarray_tests.cp312-win_amd64.pyd": b"test binary",
+                  "vendor/numpy/tests/check.py": b"tests", "vendor/numpy/__init__.pyi": b"stub",
+                  "vendor/io_scene_nifly/pyn/pynifly.md": b"developer guide",
+                  "python/python312/ctypes/macholib/fetch_macholib.bat": b"fetch script"}
+        retained = {"python/python312/json/__init__.pyc": b"runtime bytecode",
+                    "vendor/numpy-1.dist-info/licenses/src/include/LICENSE.txt": b"licence"}
+        for name, data in {**extras, **retained}.items():
+            path = self.root / name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(data)
+        output = self.folder / "new-runtime"
+        for name in ("launcher/mb.py", "locale/en/launcher.json", "locale/ru/launcher.json"):
+            target = release.HERE / name
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes((common.ROOT / name).read_bytes())
+        args = ["--package", "runtime", "--new-runtime", "--runtime-from", str(self.root),
+                "--source-commit", "a" * 40, "--out", str(output)]
+        with contextlib.redirect_stderr(io.StringIO()):
+            with self.assertRaises(SystemExit):
+                release.main(args)  # A changed v1 can never be deliberately recreated.
+            self.assertFalse(output.exists())
+        class Output(io.StringIO):
+            def reconfigure(self, **kwargs):
+                pass
+        dll = self.runtime["files"]["vendor/io_scene_nifly/NiflyDLL.dll"]
+        deps = json.loads((release.HERE / "dependencies.json").read_text())
+        next(dep["nativeBuild"] for dep in deps["dependencies"] if dep["name"] == "PyNifly")["dllSha256"] = dll
+        (release.HERE / "dependencies.json").write_text(json.dumps(deps))
+        with contextlib.redirect_stdout(Output()):
+            self.assertEqual(release.main([*args, "--runtime-version", "2"]), 0)
+        with zipfile.ZipFile(output / "morphbench-runtime-2-win64.zip") as package:
+            prefix = "root/Morphbench/launcher/"
+            manifest = dist.validate_manifest(json.loads(package.read(prefix + dist.RUNTIME_MANIFEST)), "runtime")
+            self.assertEqual(dist.runtime_contract(manifest), {"apiVersion": 1, "pythonAbi": "cp312-win_amd64"})
+            self.assertTrue(set(extras).isdisjoint(manifest["files"]))
+            self.assertTrue(set(retained).issubset(manifest["files"]))
+            for name, checksum in manifest["files"].items():
+                self.assertEqual(dist.digest(package.read(prefix + name)), checksum)
+            notice = package.read(prefix + "RUNTIME-THIRD-PARTY.md").decode("utf-8")
+            self.assertIn("RUNTIME-LICENSE", notice)
+            self.assertIn("/tree/" + "a" * 40, notice)
+            self.assertNotIn("old inherited notice", notice)
+
+    def test_flat_application_carries_the_query_shim_without_a_native_payload(self):
+        source = self.folder / "flat-source"
+        for name in ("mb.py", "update.py", "mb_distribution.py", "mb_paths.py",
+                     "morphbench/__init__.py", "morphbench/api.py", "morphbench/config.py",
+                     "launcher/mb.py"):
+            target = source / name
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes((common.ROOT / name).read_bytes())
+        (source / "LICENSE").write_bytes(b"GPL fixture")
+        (source / "launcher/morphbench.cs").write_text("developer source")
+        (source / "morphbench.exe").write_bytes(b"MZ do not include")
+        (source / "docs").mkdir()
+        (source / "docs/building.md").write_text("build this developer product")
+        output = self.folder / "flat-app"
+        class Output(io.StringIO):
+            def reconfigure(self, **kwargs):
+                pass
+        with mock.patch.object(release, "HERE", source), contextlib.redirect_stdout(Output()):
+            release.main(["--package", "application", "--layout", "flat", "--version", "0.8.6",
+                          "--runtime", str(self.root / dist.RUNTIME_MANIFEST), "--source-commit", "a" * 40,
+                          "--out", str(output)])
+        manifest, contents = dist.read_application(output / "morphbench-application-0.8.6.zip")
+        self.assertEqual(contents["launcher/mb.py"], (common.ROOT / "launcher/mb.py").read_bytes())
+        self.assertNotIn("docs/building.md", contents)
+        self.assertNotIn("launcher/morphbench.cs", contents)
+        self.assertNotIn("morphbench.exe", contents)
+        self.assertNotIn(b"From the sources", contents["README.md"])
+        self.assertIn(("/tree/" + "a" * 40).encode(), contents["SOURCE.md"])
+        self.assertEqual(manifest["schemaVersion"], 2)
+        dist.update(self.root, output / "morphbench-application-0.8.6.zip")
+        result = subprocess.run([sys.executable, "-B", str(self.root / "launcher/mb.py"),
+                                 "--launcher-context", "--protocol", "1"],
+                                env=dict(os.environ, MORPHBENCH_APP=str(self.root)),
+                                capture_output=True, text=True, timeout=20)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(json.loads(result.stdout)["appHome"], str(self.root))
 
     def test_runtime_reuse_copies_exact_bytes_and_does_not_archive_uninventoried_stage_files(self):
         output = self.folder / "runtime-output"

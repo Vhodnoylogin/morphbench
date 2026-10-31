@@ -1,4 +1,4 @@
-"""Pure-Python entry shim for the unchanged Morphbench Launcher v1 executable.
+"""Application-owned entry shim and versioned native-launcher bootstrap.
 
 The EXE continues to start ``launcher/python/python.exe launcher/mb.py ...``.
 This shim selects one explicit/local game application and executes its normal CLI.
@@ -8,6 +8,7 @@ lexical filesystem namespace instead of resolving into individual mod sources.
 from __future__ import annotations
 
 import os
+import json
 from pathlib import Path
 import runpy
 import sys
@@ -94,8 +95,48 @@ def find_application(launcher, *, environ=None, cwd=None, registry_roots=None) -
     return games[0]
 
 
+def launcher_context(launcher, protocol=1, **discovery) -> dict:
+    """Stable stdlib-only handshake; no imports, writes or server side effects.
+
+    Native code owns process/window lifetime. This updateable shim owns installation
+    discovery and adapts the server protocol, so future layouts do not require an EXE.
+    Additional response fields are optional; changing existing meanings needs a new
+    protocol adapter while keeping v1 for already-distributed launchers.
+    """
+    if type(protocol) is not int or protocol != 1:
+        raise ValueError("launcherProtocolUnsupported")
+    app = find_application(launcher, **discovery)
+    try:
+        with (app / "morphbench.json").open(encoding="utf-8-sig") as stream:
+            settings = json.load(stream)
+        if not isinstance(settings, dict):
+            settings = {}
+    except (OSError, ValueError):
+        settings = {}
+    limits = {"launcherCliTimeoutMs": 3600000, "launcherHttpTimeoutMs": 3600000,
+              "launcherStopWaitMs": 3600000, "launcherLogMaxChars": 10000000}
+    selected = {key: settings[key] for key, maximum in limits.items()
+                if type(settings.get(key)) is int and 0 < settings[key] <= maximum}
+    if isinstance(settings.get("language"), str):
+        selected["language"] = settings["language"]
+    return {"protocolVersion": 1, "appHome": str(app), "settingsHome": str(app),
+            "localeHome": str(app / "locale"),
+            "settings": selected,
+            "serverApi": "api/launcher/v1/", "statusArgs": "serve --status --json",
+            "startArgs": "serve --no-browser --json", "environmentArgs": "env --json"}
+
+
 def main() -> None:
     launcher = absolute(__file__).parent
+    if sys.argv[1:2] == ["--launcher-context"]:
+        try:
+            if sys.argv[2:] != ["--protocol", "1"]:
+                raise ValueError("launcherProtocolUnsupported")
+            context = launcher_context(launcher)
+        except (OSError, ValueError) as error:
+            raise SystemExit(str(error)) from error
+        print(json.dumps(context, ensure_ascii=True, allow_nan=False))
+        return
     try:
         app = find_application(launcher)
     except (OSError, ValueError) as error:

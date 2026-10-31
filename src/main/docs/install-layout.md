@@ -1,11 +1,11 @@
 # Portable installation and Root Builder
 
-Application 0.8.5 uses a structured layout with Morphbench Launcher v1.
+Application 0.8.6 uses a structured layout with Morphbench Launcher v2.
 Existing flat 0.8.0 installations remain supported; migrate into a fresh folder.
 
 ```text
 Morphbench/
-  launcher/                  unchanged EXE, Python, vendor and entry shim
+  launcher/                  EXE, Python, vendor and entry shim
     morphbench.exe
     mb.py
     runtime-manifest.json
@@ -14,7 +14,7 @@ Morphbench/
     update.py
     morphbench.json          user settings, not application-owned
   plugins/                   add-ons and their registry/generations
-  application-manifest.json  App ownership and exact Runtime requirement
+  application-manifest.json  App ownership and Runtime API/ABI requirement
 ```
 
 Both split ZIPs start at `root/Morphbench/`. For manual installation, copy `Morphbench`
@@ -33,9 +33,8 @@ does not deploy root files. Manual/external installations need no Root Builder.
 
 Both packages include the same small Python entry shim and launcher translations. This
 deliberate overlap also lets the Launcher run from its physical MO2 mod directory while
-Application is deployed elsewhere. These files are App-owned. The original Runtime
-manifest, identity and every inventoried native Runtime file remain byte-identical.
-The new ZIP envelope has a different archive hash; antivirus approval is not implied.
+Application is deployed elsewhere. These files are App-owned. Each published Runtime inventory is immutable. Launcher v2 is a new native release;
+its identity differs from v1. Antivirus or moderator approval is not implied.
 
 The shim honors an explicit absolute `MORPHBENCH_APP`, then looks for sibling `../app`.
 Otherwise it checks exact game-root ancestors and registered Skyrim installations for
@@ -49,9 +48,10 @@ When using Root Builder 5.1.1, register the **deployed game-root executable** if
 arguments such as `--start` or `--root`. Its redirect from a physical mod-source EXE does
 not reliably forward those arguments. A source EXE can still open the normal launcher UI.
 
-The unchanged EXE receives no new flags: `--start` and `--root` retain their meaning.
+The EXE retains the existing user flags: `--start` and `--root` retain their meaning.
 `MORPHBENCH_APP` is a process environment override for ambiguous installations.
-Startup checks Runtime identity, every Runtime hash and the bundled interpreter.
+Startup checks the Runtime API/ABI contract, every Runtime hash and the bundled interpreter.
+Compatible Runtime versions do not require an Application rebuild.
 
 ## Updates and old installations
 
@@ -83,16 +83,26 @@ default or deliberately retain a custom path. As before, a relative custom path 
 to the process working directory (normally `launcher` when started by the EXE); use an absolute
 path to keep an external registry unambiguous. No installation is automatically moved or reset.
 
-## Source packaging
+## First upgrade from Application 0.8.5 / Launcher v1
 
-Production and packaging source live in `src/main/`. From the checkout root, `python
-release.py` delegates there; generated stages/archives default to ignored `target/packages/`.
-`src/main/runtime-lock.json` pins the existing Launcher v1 Runtime. The source layout
-does not become an installation prefix: installed paths remain those shown above. See
-[building.md](building.md) for the pin, source/build boundary and release requirements.
+Stop the server and close the launcher. Keep a rollback copy. Extract the new Application
+ZIP into a temporary folder. Use its **new** updater with the old bundled Python:
 
-`release.py --package runtime --runtime-from <audited-runtime> --out <build>` and
-`release.py --package application --runtime <runtime-manifest.json> --version <version> --out <build>`
-produce structured split ZIPs by default. Use `--layout flat` for old installations.
-Legacy `--package full` remains flat and rejects an explicit structured request.
-Neither split command rebuilds the EXE or native dependencies.
+```powershell
+& "<old Morphbench>\launcher\python\python.exe" "<extracted App>\root\Morphbench\app\update.py" --target "<old Morphbench>" --package "<new Application ZIP>" --check --json
+& "<old Morphbench>\launcher\python\python.exe" "<extracted App>\root\Morphbench\app\update.py" --target "<old Morphbench>" --package "<new Application ZIP>" --json
+```
+
+The old 0.8.5 updater cannot read schema 2. The new updater can read the old installation
+and removes obsolete inventoried App files transactionally while preserving settings/plugins.
+Update App first; 0.8.6 also works with v1. Then rename the old `launcher` folder as a
+rollback copy and extract the fresh v2 `launcher` folder in its place. Copy only your
+launcher state (`morphbench.launcher.json`) if present. Do not merge old native/developer files
+back into v2. If a custom launcher state filename exists in your older package, retain it
+in the rollback copy until verified. New v2 uses the same existing launcher-state filename.
+
+With separate MO2 mods, preserve user files and replace the persistent package sources,
+then rebuild Root Builder; Application must win the shared shim/translation files. A
+fresh structured folder with both new packages and copied user state is also supported.
+Later compatible Launcher versions and their inventory hashes are accepted without another
+Application release. Normal App-only updates keep using the installed updater.

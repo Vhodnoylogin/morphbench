@@ -38,6 +38,7 @@ game's Data. On the page the same refusal is shown as text in the "Model" sectio
 from __future__ import annotations
 
 import json
+import os
 import copy
 import hashlib
 import tempfile
@@ -69,6 +70,9 @@ _TRUE = ("1", "true", "yes", "on", "\u0434\u0430")
 #: The signature in the Server: header - `ServerLink` tells our own server from another
 #: program on the same port by it.
 SERVER_NAME = "morphbench/1"
+# Compatibility adapters are Application-owned, independent of internal/public routes.
+_LAUNCHER_ROUTES = {"/api/launcher/v1/" + name: "/api/" + name
+                    for name in ("environment", "root", "shutdown")}
 #: The "listen on every interface" addresses: such an address cannot be dialled - Windows
 #: answers WSAEADDRNOTAVAIL - so a server on one of them is reached over loopback.
 _WILDCARD = ("0.0.0.0", "", "::", "*")
@@ -241,7 +245,8 @@ class WebServer:
             return
         if not process_alive(pid):
             self.journal.warn(t("serve.parentGone", pid=pid))
-            return
+            # Startup may outlast the launcher. The same watcher also handles a
+            # parent that died before serve_forever starts, releasing its socket.
 
         def watch() -> None:
             wait_process(pid)
@@ -601,6 +606,10 @@ class _Handler(BaseHTTPRequestHandler):
     # ---- routes -----------------------------------------------------------------------
     def do_GET(self) -> None:  # noqa: N802 - the name is set by http.server
         url = urlsplit(self.path)
+        guarded_shutdown = url.path == "/api/launcher/v1/shutdown"
+        # Frozen native clients use this adapter, independently of workbench routes.
+        # Keep its v1 meanings when internal APIs/layouts evolve.
+        url = url._replace(path=_LAUNCHER_ROUTES.get(url.path, url.path))
         query = Query(url.query)
         owner = self.owner
         try:
@@ -625,6 +634,9 @@ class _Handler(BaseHTTPRequestHandler):
             elif url.path == "/api/addons":
                 self._send_json(owner.api_addons())
             elif url.path == "/api/shutdown":
+                if (guarded_shutdown and "pid" in query.values
+                        and query.get("pid") != str(os.getpid())):
+                    raise RequestError(409, t("serve.ownerMismatch"))
                 self._send_json(owner.api_shutdown())
             elif url.path.startswith(("/addons/", "/addon-assets/")):
                 pinned = url.path.startswith("/addon-assets/")
@@ -711,6 +723,7 @@ class _Handler(BaseHTTPRequestHandler):
         # The parse may not have reached the path (a mangled first line of the request) -
         # then it is not a poll.
         url = urlsplit(getattr(self, "path", "") or "")
+        url = url._replace(path=_LAUNCHER_ROUTES.get(url.path, url.path))
         if url.path in ("/api/environment", "/favicon.ico"):
             return True
         return url.path == "/api/root" and "root=" not in url.query

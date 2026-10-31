@@ -57,5 +57,11 @@
   "launcher.stopped": "stopped: %(url)s",
   "launcher.stopping": "stopping…",
   "launcher.walking": "walking %(root)s…",
-  "launcher.yes": "yes"
+  "launcher.yes": "yes",
+  "launcher.cliFailed": "could not execute Python: %(error)s",
+  "launcher.cliTimedOut": "Python did not finish within %(seconds)s s",
+  "launcher.cliCancelled": "operation cancelled because the launcher is closing",
+  "launcher.cliExited": "Python exited with code %(code)s",
+  "launcher.cliOutputTruncated": "Python output exceeded %(chars)s characters",
+  "launcher.protocolInvalid": "unsupported or invalid launcher protocol: %(error)s"
 }

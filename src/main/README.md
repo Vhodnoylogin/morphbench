@@ -25,10 +25,10 @@ The project was extracted from Skyrim-Mods on 2026-10-02. All 42 retained histor
 the module contents and Git LFS were verified on 2026-10-03. The old local and remote
 `Skyrim-Mods/morphbench` branches were deleted after verification; historical checkouts remain.
 
-Version **0.8.5** includes visual capsule editing, bidirectional source-preserving
+Version **0.8.6** includes visual capsule editing, bidirectional source-preserving
 [PPB tuning editing](docs/ppb.md), the skeleton-only blank-page fix and browser add-ons with
 API v1. It distinguishes [native file visibility](docs/visibility.md) from the viewer's shape selection.
-Version **0.8.5** enables only **Morphs** and **Colliders**; Physics and Body Slots
+Version **0.8.6** enables only **Morphs** and **Colliders**; Physics and Body Slots
 are disabled in browser navigation. Their code and script APIs remain for development.
 See the [editing workspace](docs/workspace.md) and [changelog](CHANGELOG.md).
 
@@ -55,9 +55,9 @@ edited or fitted collision capsules, and edited physics configurations into new 
 ## What it needs
 
 **From a release — no separate Python or Blender installation.** Download
-**Application 0.8.5** and the separate required **Morphbench Launcher v1**.
+**Application 0.8.6** and the separate required **Morphbench Launcher v2**.
 Application contains the workbench's Python, browser assets, translations and documentation;
-Launcher contains the unchanged native Runtime (`runtime-1-win64`). Their versions are independent.
+Launcher contains the separately versioned native Runtime (`runtime-2-win64`). Their versions are independent.
 
 Both archives start at `root/Morphbench/`. Merge their `Morphbench` directories into one
 writable tools folder or the game root. Run `Morphbench/launcher/morphbench.exe`.
@@ -109,6 +109,11 @@ PyNifly is found on its own in the Blender add-ons folder
 elsewhere, the `pynifly` key in `morphbench.json` says where. morphbench has no NIF or TRI parser
 of its own and must not have one: PyNifly's modules are the same ones that write these files, so
 a second reading that could drift away from the first never appears.
+
+Application 0.8.6 accepts Launcher v1 and v2 through a stable Runtime API/ABI contract.
+For the first upgrade from 0.8.5, use the NEW extracted updater before installing v2;
+[transition steps](docs/install-layout.md). Compatible future Launcher versions do not
+require another Application build.
 
 ## Starting it
 
@@ -283,7 +288,7 @@ stays in the source repository and is not included in the end-user archive.
 
 ## Editing workspace
 
-The 0.8.5 viewer enables **Morphs** and **Colliders**, with mode tabs above the view, models
+The 0.8.6 viewer enables **Morphs** and **Colliders**, with mode tabs above the view, models
 on the left and an inspector on the right. Edit supported collision capsules, save a
 replayable workspace and export new files. **Physics** and **Slots** remain disabled in the
 browser. Experimental FSMP XML/CBPC TXT editing remains accessible through `mb.py workspace`
@@ -295,14 +300,14 @@ See [the workspace workflow](docs/workspace.md) for controls, automation and off
 Local preview variants add independent author → definition → variant inheritance. Session recipes preserve variants and edit targets; `mb.py slots --editor` recovers unfinished projects and exports unbound placement presets. Authored JSON and `.bslots` remain authored-only. See [the Slots workflow](docs/slots.md).
 
 Experimental Slots authoring remains available through `mb.py slots` and the local HTTP API;
-the browser tab is disabled in 0.8.5. The backend supports named skeleton-node placements,
+the browser tab is disabled in 0.8.6. The backend supports named skeleton-node placements,
 local transforms/access spheres, author defaults and temporary effective overrides, session
 recipes, Body Slots schema-v1 JSON and `.bslots` exports. It does not edit game saves,
 equipment or inventories. See [docs/slots.md](docs/slots.md) for the offline workflow and limits.
 
 ## Browser add-ons
 
-Application 0.8.5 includes a versioned local browser add-on host.
+Application 0.8.6 includes a versioned local browser add-on host.
 Install a ZIP, enable its inspector tab, and use API v1 to select models, read geometry,
 set existing morphs, control the view and save add-on state for the current browser tab.
 Installed add-ons can be explicitly updated while disabled. [Contract and workflow](docs/addons.md);

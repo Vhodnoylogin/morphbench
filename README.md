@@ -1,7 +1,7 @@
 # Morphbench
 
 A Windows workbench for Skyrim NIF/TRI meshes, morphs, bounds and skeleton collision
-capsules. Version 0.8.5 offers Morphs, Colliders, CLI/HTTP automation and browser add-ons;
+capsules. Version 0.8.6 offers Morphs, Colliders, CLI/HTTP automation and browser add-ons;
 Physics and Body Slots remain disabled in browser navigation.
 
 [Русская версия](README.ru.md) · [User guide](src/main/README.md) ·

@@ -82,19 +82,17 @@ class AddonHost {
     if(content)content.remove();content=el("div",{class:"addon-manager"});this.panel.appendChild(content);
     content.appendChild(el("p",{text:T.addonInstallNote}));
     const error=el("p",{class:"error",role:"status"});content.appendChild(error);
-    const upload=el("input",{type:"file",accept:".zip,application/zip","aria-label":T.addonInstall});
-    upload.addEventListener("change",async()=>{
-      if(!upload.files.length)return;upload.disabled=true;
-      try{await this.json("/api/addons/install",{method:"POST",headers:{"Content-Type":"application/zip"},body:upload.files[0]});await this.refresh();}
-      catch(exc){error.textContent=String(exc.message||exc);upload.disabled=false;upload.value="";}
-    });content.appendChild(upload);
+    const zipInput=(label,path)=>{
+      const input=el("input",{type:"file",accept:".zip,application/zip","aria-label":label});
+      input.addEventListener("change",async()=>{
+        if(!input.files.length)return;input.disabled=true;
+        try{await this.json(path,{method:"POST",headers:{"Content-Type":"application/zip"},body:input.files[0]});await this.refresh();}
+        catch(exc){error.textContent=String(exc.message||exc);input.disabled=false;input.value="";}
+      });return input;
+    };
+    content.appendChild(zipInput(T.addonInstall,"/api/addons/install"));
     content.appendChild(el("p",{text:T.addonUpdateNote}));
-    const update=el("input",{type:"file",accept:".zip,application/zip","aria-label":T.addonUpdate});
-    update.addEventListener("change",async()=>{
-      if(!update.files.length)return;update.disabled=true;
-      try{await this.json("/api/addons/update",{method:"POST",headers:{"Content-Type":"application/zip"},body:update.files[0]});await this.refresh();}
-      catch(exc){error.textContent=String(exc.message||exc);update.disabled=false;update.value="";}
-    });content.appendChild(update);
+    content.appendChild(zipInput(T.addonUpdate,"/api/addons/update"));
     if(!this.entries.length)content.appendChild(el("p",{text:T.addonEmpty}));
     for(const row of this.entries){
       const toggle=el("input",{type:"checkbox","aria-label":row.name||row.id});toggle.checked=row.enabled;

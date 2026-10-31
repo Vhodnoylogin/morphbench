@@ -386,14 +386,16 @@ class WebServer:
                 if not isinstance(body, dict) or set(body) != {"actions"}:
                     raise ValueError(t("workspace.invalid", field="actions"))
                 self.bench.workspace_replay(body["actions"])
+            physics = self.bench.physics_state()
+            ppb = self.bench.ppb_state()
             return {"workspace": self.bench.workspace_state(),
                     "colliders": self.bench.collider_editor_payload(),
-                    "physics": self.bench.physics_state(),
-                    "ppb": self.bench.ppb_state(),
+                    "physics": physics,
+                    "ppb": ppb,
                     "fileVisibility": self.bench.file_visibility(),
-                    "ppbText": self.bench.ppb_export() if self.bench.ppb_state()["document"] else None,
+                    "ppbText": self.bench.ppb_export() if ppb["document"] else None,
                     "envelopes": self.bench.physics_envelopes(),
-                    "text": self.bench.physics_export() if self.bench.physics_state()["document"] else None}
+                    "text": self.bench.physics_export() if physics["document"] else None}
 
     def api_skeleton(self, recipe):
         if (not isinstance(recipe, dict) or recipe.get("format") != "morphbench-workspace"

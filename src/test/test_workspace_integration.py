@@ -189,6 +189,26 @@ class TestWorkspaceHttp(unittest.TestCase):
         self.assertIn("text", result)
         self.assertIsNone(result["text"])
 
+    def test_workspace_response_reuses_each_document_snapshot(self):
+        from test_ppb_document import block
+        for loaded in (False, True):
+            with self.subTest(loaded=loaded):
+                if loaded:
+                    self.bench.physics_replace(parse_document("fsmp", XML))
+                    self.bench.ppb_replace(parse_document("ppb", block()))
+                physics, ppb = self.bench.physics_state(), self.bench.ppb_state()
+                text = self.bench.physics_export() if loaded else None
+                ppb_text = self.bench.ppb_export() if loaded else None
+                with (mock.patch.object(self.bench, "physics_state", wraps=self.bench.physics_state) as physics_state,
+                      mock.patch.object(self.bench, "ppb_state", wraps=self.bench.ppb_state) as ppb_state):
+                    result = self.current()
+                    physics_state.assert_called_once_with()
+                    ppb_state.assert_called_once_with()
+                self.assertEqual(result["physics"], physics)
+                self.assertEqual(result["ppb"], ppb)
+                self.assertEqual(result["text"], text)
+                self.assertEqual(result["ppbText"], ppb_text)
+
     def test_import_is_read_only_then_apply_edits_numeric_state_and_export(self):
         document = self.import_document()
         self.assertIsNone(self.bench.physics_state()["document"])

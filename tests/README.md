@@ -1,5 +1,11 @@
 # Checks
 
+`test_layout_paths.py` checks lexical flat/structured paths, native dependency and plugin
+selection, game-root/registry ambiguity, false VFS attributes and the actual Python entry shim.
+`test_structured_distribution.py` checks Root Builder envelopes, narrow launcher/App ownership,
+cross-layout refusal, malformed metadata, shared leases and two updates preserving Runtime,
+settings and plugins. Actual MO2/usvfs execution is qualified separately.
+
 Русская версия этого файла — [README.ru.md](README.ru.md).
 
 ```

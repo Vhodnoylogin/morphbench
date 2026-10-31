@@ -1,5 +1,7 @@
 """Root Builder envelopes, narrow cross-directory ownership and legacy compatibility."""
 import json
+import contextlib
+import io
 import os
 import sys
 import unittest
@@ -12,6 +14,7 @@ import common
 import mb_distribution as dist
 import test_distribution as fixtures
 from test_distribution import snapshot
+import release
 
 
 class TestStructuredDistribution(unittest.TestCase):
@@ -144,6 +147,35 @@ class TestStructuredDistribution(unittest.TestCase):
         for raw in (b'{}', b'{"layout":"structured-v2"}', b'not json'):
             marker.write_bytes(raw)
             self.helper.assert_code("manifest", lambda: dist.startup(app))
+
+    def test_default_builder_envelopes_share_only_the_explicit_bootstrap_overlay(self):
+        out = self.helper.folder / "build-default"
+        class Output(io.StringIO):
+            def reconfigure(self, **kwargs):
+                pass
+        with contextlib.redirect_stdout(Output()):
+            release.main(["--package", "runtime", "--runtime-from", str(self.helper.root),
+                          "--out", str(out)])
+            release.main(["--package", "application", "--runtime", str(self.native / dist.RUNTIME_MANIFEST),
+                          "--version", "0.8.1", "--out", str(out)])
+        with zipfile.ZipFile(out / "morphbench-runtime-1-win64.zip") as archive:
+            runtime = {name: archive.read(name) for name in archive.namelist()}
+        with zipfile.ZipFile(out / "morphbench-application-0.8.1.zip") as archive:
+            app = {name: archive.read(name) for name in archive.namelist() if not name.endswith("/")}
+            self.assertIn("root/Morphbench/plugins/", archive.namelist())
+        overlay = {"root/Morphbench/launcher/mb.py", "root/Morphbench/launcher/locale/en/launcher.json",
+                   "root/Morphbench/launcher/locale/ru/launcher.json"}
+        self.assertEqual(runtime.keys() & app.keys(), overlay)
+        self.assertTrue(all(runtime[name] == app[name] for name in overlay))
+        self.assertEqual(set(runtime), {"root/Morphbench/launcher/" + name
+                         for name in [*self.runtime["files"], dist.RUNTIME_MANIFEST]} | overlay)
+        manifest, _ = dist.read_application(out / "morphbench-application-0.8.1.zip")
+        self.assertEqual(manifest["layout"], dist.STRUCTURED)
+
+    def test_full_builder_does_not_silently_ignore_structured_flag(self):
+        with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit) as caught:
+            release.main(["--package", "full", "--layout", "structured"])
+        self.assertEqual(caught.exception.code, 2)
 
 
 if __name__ == "__main__":

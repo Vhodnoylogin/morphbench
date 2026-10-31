@@ -24,8 +24,10 @@ into the game folder or put these files under Data.
 
 For MO2 installation, [Kezyma's Root Builder](https://www.nexusmods.com/skyrimspecialedition/mods/31720)
 is **optional**: it deploys `root/` contents into the game root. Install both ZIPs as
-separate enabled mods, preserving their `root/Morphbench` tree. Build through Root Builder
-before launch; configure the executable as `Morphbench/launcher/morphbench.exe` in the
+separate enabled mods, preserving their `root/Morphbench` tree. Put Application below Launcher
+in MO2's left pane (higher priority), so its shared entry shim and translations win when a
+future Application update changes them. Build through Root Builder before launch;
+configure the executable as `Morphbench/launcher/morphbench.exe` in the
 deployed game root. Launch through MO2 to inspect virtual Data. Ordinary Data VFS alone
 does not deploy root files. Manual/external installations need no Root Builder.
 

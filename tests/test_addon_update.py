@@ -166,12 +166,13 @@ class TestAddonUpdate(RegistryCase):
         before = self.registry.state_file.read_bytes()
         script = """
 import os, sys
+sys.path.insert(0, sys.argv[3])  # Source location is explicit in an isolated embedded Python.
 from morphbench.addons import AddonRegistry
 registry = AddonRegistry(sys.argv[1])
 registry._write_state = lambda state: os._exit(23)
 registry.update(sys.argv[2])
 """
-        result = subprocess.run([sys.executable, "-c", script, str(self.folder), str(source)],
+        result = subprocess.run([sys.executable, "-c", script, str(self.folder), str(source), str(common.ROOT)],
                                 capture_output=True, text=True, cwd=common.ROOT, timeout=15)
         self.assertEqual(result.returncode, 23, result.stderr)
         self.assertEqual(self.registry.state_file.read_bytes(), before)

@@ -360,7 +360,7 @@ class TestSplitRelease(unittest.TestCase):
             def reconfigure(self, **kwargs):
                 pass
         with mock.patch.object(release, "HERE", source), contextlib.redirect_stdout(Output()):
-            self.assertEqual(release.main(["--package", "application", "--version", "0.8.0",
+            self.assertEqual(release.main(["--package", "application", "--layout", "flat", "--version", "0.8.0",
                 "--runtime", str(self.root / dist.RUNTIME_MANIFEST), "--out", str(output)]), 0)
         manifest, contents = dist.read_application(output / "morphbench-application-0.8.0.zip")
         self.assertTrue(all(dist.app_path(name) for name in contents))
@@ -372,7 +372,7 @@ class TestSplitRelease(unittest.TestCase):
         class Output(io.StringIO):
             def reconfigure(self, **kwargs):
                 pass
-        args = ["--package", "runtime", "--runtime-from", str(self.root), "--out", str(output)]
+        args = ["--package", "runtime", "--layout", "flat", "--runtime-from", str(self.root), "--out", str(output)]
         with contextlib.redirect_stdout(Output()):
             self.assertEqual(release.main(args), 0)
             stage = output / "morphbench-runtime-1-win64"
@@ -390,7 +390,7 @@ class TestSplitRelease(unittest.TestCase):
         class Output(io.StringIO):
             def reconfigure(self, **kwargs):
                 pass
-        args = ["--package", "runtime", "--runtime-from", str(self.root), "--out", str(output)]
+        args = ["--package", "runtime", "--layout", "flat", "--runtime-from", str(self.root), "--out", str(output)]
         with contextlib.redirect_stdout(Output()), contextlib.redirect_stderr(io.StringIO()):
             release.main(args)
             archive = output / "morphbench-runtime-1-win64.zip"

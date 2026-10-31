@@ -24,8 +24,10 @@ Morphbench/
 
 Для MO2 [Kezyma's Root Builder](https://www.nexusmods.com/skyrimspecialedition/mods/31720)
 **необязателен**: он размещает содержимое `root/` в корне игры. Установите оба ZIP
-как два отдельных включённых мода, сохранив `root/Morphbench`. Перед запуском выполните
-сборку Root Builder. В MO2 укажите `Morphbench/launcher/morphbench.exe` из корня игры.
+как два отдельных включённых мода, сохранив `root/Morphbench`. Application должен стоять
+ниже Launcher в левой панели MO2, с большим приоритетом, чтобы его диспетчер и переводы
+побеждали после будущих обновлений App. Перед запуском выполните сборку Root Builder.
+В MO2 укажите `Morphbench/launcher/morphbench.exe` из корня игры.
 Запуск через MO2 даёт доступ к виртуальной Data. Одна VFS для Data не переносит файлы
 в корень игры. Ручной установке или внешней папке инструментов Root Builder не нужен.
 

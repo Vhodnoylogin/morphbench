@@ -330,12 +330,13 @@ class TestLimitsAndTransactions(RegistryCase):
         before = self.registry.state_file.read_bytes()
         owner = """
 import sys
+sys.path.insert(0, sys.argv[2])  # Embedded _pth deliberately excludes the working directory.
 from morphbench.addons import AddonRegistry
 with AddonRegistry(sys.argv[1])._writer():
     print("locked", flush=True)
     sys.stdin.read(1)
 """
-        process = subprocess.Popen([sys.executable, "-c", owner, str(self.folder)],
+        process = subprocess.Popen([sys.executable, "-c", owner, str(self.folder), str(common.ROOT)],
                                    stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                                    stderr=subprocess.PIPE, text=True, cwd=common.ROOT)
 

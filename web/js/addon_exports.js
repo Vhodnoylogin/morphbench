@@ -4,16 +4,26 @@
 // The parent owns the only Download control. A real click authorizes the current
 // package again; async completion cannot act for a replaced frame or snapshot.
 const ADDON_EXPORT_METHODS=Object.freeze(["exports.prepare","exports.cancel"]);
+// Format/resource ceilings, distinct from the user's deliberately smaller defaults.
+const ADDON_EXPORT_CEILINGS=Object.freeze({maxBytes:33554432,maxTtlMs:3600000});
 
 class AddonExportHost {
-  constructor(host) {this.host=host;this.record=null;this.element=null;this.url=null;this.epoch=0;}
+  constructor(host) {
+    this.host=host;this.record=null;this.element=null;this.url=null;this.epoch=0;
+    this.pendingTimer=null;this.urlTimer=null;this.urlExpiresAt=0;
+  }
   limits() {
     const settings=this.host.app.bench.settings,maxBytes=settings.addonExportMaxBytes;
     const authorizeTimeoutMs=settings.addonExportAuthorizeTimeoutMs;
-    if(!Number.isSafeInteger(maxBytes)||maxBytes<1||!Number.isSafeInteger(authorizeTimeoutMs)
-      ||authorizeTimeoutMs<1||authorizeTimeoutMs>=10000)
+    const pendingTtlMs=settings.addonExportPendingTtlMs,urlTtlMs=settings.addonExportUrlTtlMs;
+    if(!Number.isSafeInteger(maxBytes)||maxBytes<1||maxBytes>ADDON_EXPORT_CEILINGS.maxBytes
+      ||!Number.isSafeInteger(authorizeTimeoutMs)||authorizeTimeoutMs<1||authorizeTimeoutMs>=10000
+      ||[pendingTtlMs,urlTtlMs].some(value=>!Number.isSafeInteger(value)||value<1
+        ||value>ADDON_EXPORT_CEILINGS.maxTtlMs))
       throw this.host.failure("invalidExportConfig",T.addonExportConfig);
-    return {maxBytes,authorizeTimeoutMs,formats:["json","xml"],maxFilenameBytes:255,pendingFiles:1};
+    return {maxBytes,authorizeTimeoutMs,pendingTtlMs,urlTtlMs,
+      maxSupportedBytes:ADDON_EXPORT_CEILINGS.maxBytes,formats:["json","xml"],
+      maxFilenameBytes:255,pendingFiles:1,retainedUrls:1};
   }
   current(scope) {
     return scope.epoch===this.epoch&&this.host.frame===scope.frame
@@ -66,14 +76,34 @@ class AddonExportHost {
     return {filename,format,text,bytes};
   }
   clearPending() {
+    clearTimeout(this.pendingTimer);this.pendingTimer=null;
     if(this.record?.cancel)this.record.cancel();
     this.record=null;
     if(this.element)this.element.remove();this.element=null;
   }
-  releaseURL() {if(this.url){URL.revokeObjectURL(this.url);this.url=null;}}
+  releaseURL(expected=this.url) {
+    if(!expected||this.url!==expected)return;
+    clearTimeout(this.urlTimer);this.urlTimer=null;
+    URL.revokeObjectURL(expected);this.url=null;this.urlExpiresAt=0;
+  }
+  expire(record) {
+    if(this.record!==record)return;
+    if(!this.current(record.scope)){this.clearPending();return;}
+    const data={filename:record.filename,format:record.format,bytes:record.bytes,reason:"pendingExpired"};
+    this.clearPending();
+    const status=el("p",{role:"status",class:"addon-export-expired",text:T.addonExportExpired});
+    this.host.panel.insertBefore(status,this.host.frame);this.element=status;
+    this.host.notify("exports.expired",data);
+  }
+  pending(record) {
+    if(this.record!==record||!this.current(record.scope))return false;
+    if(Date.now()>=record.expiresAt){this.expire(record);return false;}
+    return true;
+  }
   reset() {this.epoch++;this.clearPending();this.releaseURL();}
   request(method,params,scope,receivedAt=Date.now()) {
     const current={...scope,epoch:this.epoch};this.requireCurrent(current);
+    if(this.url&&Date.now()>=this.urlExpiresAt)this.releaseURL();
     if(method==="exports.cancel") {
       this.host.params(params,[]);const cancelled=Boolean(this.record);this.clearPending();return {cancelled};
     }
@@ -81,8 +111,13 @@ class AddonExportHost {
     if(Date.now()-receivedAt>=this.limits().authorizeTimeoutMs)
       throw this.host.failure("exportTimeout",T.addonExportTimeout);
     const value=this.validate(params);this.requireCurrent(current);
+    if(Date.now()-receivedAt>=this.limits().authorizeTimeoutMs)
+      throw this.host.failure("exportTimeout",T.addonExportTimeout);
     // Validation is complete before a previous, valid pending file is discarded.
-    this.clearPending();const record={...value,scope:current,busy:false};this.record=record;
+    this.clearPending();
+    const ttl=this.limits().pendingTtlMs;
+    const record={...value,scope:current,busy:false,expiresAt:Date.now()+ttl};this.record=record;
+    this.pendingTimer=setTimeout(()=>this.expire(record),ttl);
     const group=el("section",{class:"addon-export-controls","aria-label":T.addonExportTitle});
     const status=el("p",{role:"status",text:say(T.addonExportReady,{filename:record.filename,bytes:record.bytes})});
     const download=el("button",{type:"button",text:T.addonExportDownload,on:{click:event=>this.download(record,event)}});
@@ -95,17 +130,19 @@ class AddonExportHost {
     return {prepared:true,filename:record.filename,format:record.format,bytes:record.bytes};
   }
   async download(record,event) {
-    if(!event?.isTrusted||this.record!==record||record.busy||!this.current(record.scope))return;
+    if(!event?.isTrusted||record.busy||!this.pending(record))return;
     record.busy=true;record.download.disabled=true;record.status.textContent=T.addonExportChecking;
     const controller=new AbortController();let timer,cancel;
     const interrupted=new Promise((resolve,reject)=>{cancel=reject;});
     record.cancel=()=>{cancel(this.host.failure("staleGeneration",T.addonDisabled));controller.abort();};
     try {
       const timeout=this.limits().authorizeTimeoutMs;
+      const deadline=Date.now()+timeout;
       timer=setTimeout(()=>{cancel(this.host.failure("exportTimeout",T.addonExportTimeout));controller.abort();},timeout);
       const installed=await Promise.race([this.host.json("/api/addons",{signal:controller.signal}),interrupted]);
       this.requireCurrent(record.scope);
-      if(this.record!==record)return;
+      if(!this.pending(record))return;
+      if(Date.now()>=deadline)throw this.host.failure("exportTimeout",T.addonExportTimeout);
       const entry=installed.addons.find(row=>row.id===record.scope.identifier&&row.enabled&&row.compatible);
       if(!entry)throw this.host.failure("disabled",T.addonDisabled);
       if(entry.generation!==record.scope.generation)throw this.host.failure("staleGeneration",T.addonDisabled);
@@ -113,6 +150,15 @@ class AddonExportHost {
         throw this.host.failure("exportUnavailable",T.addonExportUnavailable);
       this.releaseURL();
       this.url=URL.createObjectURL(new Blob([record.text],{type:"text/plain;charset=utf-8"}));
+      const createdURL=this.url,urlTtl=this.limits().urlTtlMs;
+      this.urlExpiresAt=Date.now()+urlTtl;
+      this.urlTimer=setTimeout(()=>this.releaseURL(createdURL),urlTtl);
+      // A large Blob allocation may itself cross the pending or authorization deadline.
+      if(!this.pending(record)||Date.now()>=deadline) {
+        this.releaseURL(createdURL);
+        if(this.record===record)throw this.host.failure("exportTimeout",T.addonExportTimeout);
+        return;
+      }
       const anchor=el("a",{href:this.url,download:record.filename,hidden:"hidden"});
       this.host.panel.appendChild(anchor);
       try{anchor.click();}finally{anchor.remove();}

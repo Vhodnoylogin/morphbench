@@ -28,6 +28,9 @@ class Element {
  click(){if(this.tag==='a')downloads.push({filename:this.download,blob:urls.get(this.href)});}
 }
 const downloads=[],urls=new Map(),revoked=[];let urlSerial=0,xmlParserHook=null;
+// Product TTLs are long-lived browser timers; they must not keep a Node fixture alive.
+const nativeSetTimeout=global.setTimeout;
+global.setTimeout=(fn,ms,...args)=>{const timer=nativeSetTimeout(fn,ms,...args);if(ms>=1000)timer.unref();return timer;};
 const mainPanel=new Element('aside');
 document.createElement=tag=>new Element(tag);
 document.getElementById=id=>mainPanel;
@@ -227,6 +230,8 @@ console.log(JSON.stringify({info,spoof:spoof??null,wrong,extra,downloads:downloa
         info = result["info"]["result"]
         self.assertTrue({"exports.prepare", "exports.cancel"}.issubset(info["capabilities"]))
         self.assertEqual(info["exportLimits"], {"maxBytes": 1048576, "authorizeTimeoutMs": 100,
+                         "pendingTtlMs": 300000, "urlTtlMs": 60000, "maxSupportedBytes": 33554432,
+                         "retainedUrls": 1,
                                                 "formats": ["json", "xml"], "maxFilenameBytes": 255,
                                                 "pendingFiles": 1})
         self.assertIsNone(result["spoof"])

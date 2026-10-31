@@ -49,5 +49,6 @@
   "page.addonExportLimit": "The prepared file exceeds the configured UTF-8 byte limit.",
   "page.addonExportFormat": "Provide valid JSON or XML without DTD, entity declarations or XML stylesheets.",
   "page.addonExportTimeout": "The add-on authorization check timed out. Try Download again.",
-  "page.addonExportUnavailable": "The browser could not request this download. Try again in a browser that supports file downloads."
+  "page.addonExportUnavailable": "The browser could not request this download. Try again in a browser that supports file downloads.",
+  "page.addonExportExpired": "The prepared export expired. Prepare it again before downloading."
 }

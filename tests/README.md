@@ -145,3 +145,8 @@ passes sequentially: the recovery fixtures flush backups of more than a thousand
 and parallel runs can exhaust their process time budget under filesystem contention.
 
 `test_addon_exports.py` checks inert immutable JSON/XML preparation, UTF-8/name/format limits, trusted host download controls, fresh bounded authorization, generation/frame/snapshot replacement, cancellation and URL disposal. `test_addon_wasm.py` checks the narrow Wasm CSP allowance, pinned assets and raw-module rejection; browser validation separately checks policy enforcement.
+
+`test_addon_large_exports.py` covers default rejection, explicitly configured 20/32 MiB
+UTF-8 boundaries, the hard ceiling, validation/auth/allocation deadlines, finite pending/URL
+TTLs, queued timer/frame replacement, cancellation and exact resource ownership. Browser
+qualification separately downloads a representative 20 MiB geometry JSON and checks its hash.

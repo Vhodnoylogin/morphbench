@@ -2,6 +2,9 @@
 First installation needs both Main files. Both ZIPs contain [b]root/Morphbench[/b]; merge their Morphbench folders for manual use, or install them as separate MO2 mods with optional Root Builder.
 Для первой установки нужны оба Main-файла. В обоих архивах находится [b]root/Morphbench[/b]: объедините папки Morphbench при ручной установке либо установите архивы отдельными модами MO2 с необязательным Root Builder.
 
+[b]Root Builder is an OPTIONAL requirement.[/b] It is needed only if you want MO2 to deploy root/Morphbench into the game root. Manual/external installation does not require Root Builder. The separate [b]Morphbench Launcher v1[/b] download is required for Application.
+[b]Root Builder — ОПЦИОНАЛЬНОЕ требование.[/b] Он нужен только для развёртывания root/Morphbench через MO2 в корень игры. При ручной установке Root Builder не требуется. Отдельный Launcher v1 обязателен для Application.
+
 [center][size=5][color=#D0B17A][b]Inspect the mesh before you start the game[/b][/color][/size][/center]
 
 Open a Skyrim mesh, adjust its named morphs, and inspect the result before starting the game. Morphbench measures surface stretching, mesh bounds and skeleton collision capsules, with an interactive browser viewer and commands for repeatable checks.
@@ -115,6 +118,16 @@ When reporting a problem, include the tool version, the command or steps, the er
 
 
 [center][img width=600 height=100]https://staticdelivery.nexusmods.com/mods/1704/images/194796/194796-1791664990-433961669.png[/img][/center]
+[size=4][color=#D0B17A][b]Create your own plugins[/b][/color][/size]
+Morphbench supports independent [b]browser plugins (add-ons)[/b]. Authors can create a local HTML/JavaScript/CSS package with an addon.json manifest, distribute it as a separate ZIP or Nexus mod, and install it through the viewer's add-on manager. Newly installed packages stay disabled until explicitly enabled; their files and registry live in [b]Morphbench/plugins[/b]. Compatible Application updates preserve them.
+[list]
+[*]Add your own inspector tabs, controls and analysis tools using the documented API v1.[/*]
+[*]Open independent model previews with isolated morph state and cameras, and link their viewing orientation.[/*]
+[*]Prepare JSON/XML downloads and use an embedded WebAssembly calculation kernel inside the plugin sandbox.[/*]
+[/list]
+These are browser add-ons, with no Python imports, native plugin loading, backend hooks or arbitrary filesystem/network access. Check host capabilities before using newer API features. The CLAW add-on is developed and distributed separately; it is not included in either Morphbench package.
+[url=https://github.com/Vhodnoylogin/morphbench/blob/v0.8.5/docs/addons.md]Plugin authoring guide, manifest and SDK examples[/url] | [url=https://github.com/Vhodnoylogin/morphbench/blob/v0.8.5/docs/addon-wasm.md]Embedded WebAssembly guide[/url]
+
 [size=4][color=#D0B17A][b]Инструкция на русском[/b][/color][/size]
 [spoiler]
 Morphbench открывает меши NIF и морфы TRI/TRIP, показывает влияние костей, растяжение поверхности, границы меша и капсулы коллизий скелета. Можно сохранить PNG или автономный HTML и повторить действия через CLI или локальный HTTP API.
@@ -132,6 +145,11 @@ Morphbench открывает меши NIF и морфы TRI/TRIP, показы�
 Код приложения лежит в app, неизменный EXE и Python — в launcher, аддоны — в plugins. Это позволяет обновлять Application без повторной заливки того же EXE и повторного прохождения его карантинной проверки. Нативные файлы Launcher v1 сохранены, но ZIP получил другую структуру и хеш; Nexus всё равно проверяет загрузки.
 Перед обновлением закройте сервер и ланчер. Updater сохраняет настройки и аддоны. Для Root Builder сначала синхронизируйте данные в постоянное хранилище MO2, обновляйте исходный мод Application и заново выполняйте Build. Из плоской установки 0.8.0 переходите в новую папку с явным копированием настроек и полного реестра аддонов; старая структура продолжает работать.
 Аддон CLAW будет отдельным модом и не входит в эти архивы. Вкладки физики и Body Slots остаются выключенными.
+
+[b]Создание собственных плагинов[/b]
+Morphbench поддерживает независимые браузерные плагины (аддоны). Создайте пакет с addon.json и локальными HTML/JavaScript/CSS, распространяйте его отдельным ZIP или модом Nexus и устанавливайте через менеджер аддонов инструмента. После установки плагин нужно явно включить; его файлы и реестр хранятся в Morphbench/plugins и сохраняются при совместимых обновлениях Application.
+API v1 позволяет добавлять свои вкладки и инструменты анализа, открывать независимые превью моделей с собственными морфами и камерами, связывать ракурсы, готовить выгрузку JSON/XML и использовать встроенный WebAssembly. Это браузерное расширение в песочнице, без импорта Python, загрузки нативных DLL и произвольного доступа к сети или файловой системе. Аддон CLAW распространяется отдельно.
+[url=https://github.com/Vhodnoylogin/morphbench/blob/v0.8.5/docs/addons.ru.md]Документация автора плагинов и примеры SDK[/url] | [url=https://github.com/Vhodnoylogin/morphbench/blob/v0.8.5/docs/addon-wasm.ru.md]Руководство по WebAssembly[/url]
 
 [b]Файлы для проверки[/b]
 Для морфов нужен соответствующий TRI/TRIP; для капсул — skeleton.nif и соответствующий skeleton.hkx, который задаёт положение тел ragdoll. Для обычного просмотра подходит NIF без морфов: включите показ мешей без морфов. В HTTP-запросах используйте all=1 и для каталога, и для payload.

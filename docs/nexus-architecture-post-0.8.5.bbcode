@@ -1,0 +1,26 @@
+[b]Morphbench 0.8.5: Launcher, Application and plugins[/b]
+
+Version 0.8.5 uses three folders inside one Morphbench installation:
+[code]Morphbench/launcher/
+Morphbench/app/
+Morphbench/plugins/[/code]
+[list]
+[*][b]Morphbench Launcher v1[/b] contains the EXE, embedded Python and native dependencies. Install it for the first setup and keep it for compatible Application updates. Its version is independent of the application's version.
+[*][b]Application 0.8.5[/b] contains the workbench, browser interface, documentation and updater. This is the Main/Primary download and contains no native binaries.
+[*][b]plugins[/b] stores separately installed browser add-ons and their registry. Compatible Application updates preserve plugins and settings.
+[/list]
+This separation lets us update the application without uploading the same executable and native libraries again for every release, reducing repeated quarantine reviews of unchanged files. Native dependency or security changes will still require a new Launcher version.
+
+[b]Installation[/b]
+For a first installation, download [b]both Main files[/b]. Both ZIPs begin with root/Morphbench.
+
+For manual installation, merge the Morphbench folders from inside root into one writable tools folder or game root, then run Morphbench/launcher/morphbench.exe. Do not copy the literal root folder into the game or install the tool under Data.
+
+For MO2-managed installation, [b]Root Builder is optional[/b]. Install both archives as separate enabled mods, put Application below Launcher in the left pane, build the root deployment, and register the deployed Morphbench/launcher/morphbench.exe. Manual/external installations can also run through MO2 and do not require Root Builder. Launcher v1 itself is required for Application.
+
+Existing flat 0.8.0 installations keep working. To move to the new structure, use a fresh folder and migrate your settings and complete add-on registry; do not overlay the structured packages onto the old flat installation.
+
+[b]Creating plugins[/b]
+Authors can distribute their own HTML/JavaScript/CSS browser add-ons as separate ZIPs or Nexus mods. API v1 supports custom inspector tabs, independent model/morph previews, linked camera orientation, JSON/XML exports and embedded WebAssembly. Install and explicitly enable add-ons through the viewer's add-on manager. The CLAW add-on is being prepared as a separate mod and is not bundled with Morphbench.
+
+[url=https://github.com/Vhodnoylogin/morphbench/releases/tag/v0.8.5]Release and both packages[/url] | [url=https://github.com/Vhodnoylogin/morphbench/blob/v0.8.5/docs/updating.md]Installation and migration guide[/url] | [url=https://github.com/Vhodnoylogin/morphbench/blob/v0.8.5/docs/addons.md]Plugin authoring guide and SDK[/url]

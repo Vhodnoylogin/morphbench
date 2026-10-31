@@ -72,5 +72,17 @@
     "screenshots": "Existing authentic 0.8.0 Morphs/Colliders captures remain representative; no game/model assets are bundled."
   },
   "addonDistribution": "CLAW add-on is a separate Nexus mod and is not bundled in either package.",
-  "historicalPublicationEvidence": "Earlier file versions and vendor-review correspondence remain in Git history and the project journal; this manifest describes 0.8.5."
+  "historicalPublicationEvidence": "Earlier file versions and vendor-review correspondence remain in Git history and the project journal; this manifest describes 0.8.5.",
+  "requirementsMethod": "file-to-file",
+  "optionalRequirementDisclosure": "Root Builder is optional for MO2 root deployment; manual/external installation needs no Root Builder. Launcher v1 is required.",
+  "pluginAuthoring": {
+    "supported": true,
+    "kind": "sandboxed browser HTML/JavaScript/CSS add-ons",
+    "guide": "https://github.com/Vhodnoylogin/morphbench/blob/v0.8.5/docs/addons.md",
+    "distribution": "Separate ZIP or Nexus mod; install and enable through the add-on manager."
+  },
+  "architecturePost": {
+    "url": "https://www.nexusmods.com/skyrimspecialedition/mods/194795?tab=posts&comment_id=178713507",
+    "source": "docs/nexus-architecture-post-0.8.5.bbcode"
+  }
 }

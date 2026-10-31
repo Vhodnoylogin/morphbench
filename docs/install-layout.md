@@ -75,8 +75,9 @@ custom path; they accept flat App snapshots. Cross-layout in-place updates are r
 For migration, retain the old installation and extract both structured ZIPs into a new folder.
 Copy `morphbench.json` into `app`, launcher state into `launcher`, and the entire old add-on
 directory including registry/generations into `plugins`. Clear `addonDirectory` for the new
-default or deliberately retain a custom path. Relative configured paths remain relative to
-the settings directory. No existing installation is automatically moved, deleted or reset.
+default or deliberately retain a custom path. As before, a relative custom path is relative
+to the process working directory (normally `launcher` when started by the EXE); use an absolute
+path to keep an external registry unambiguous. No installation is automatically moved or reset.
 
 ## Source packaging
 

@@ -1,0 +1,158 @@
+# Checks
+
+`test_layout_paths.py` checks lexical flat/structured paths, native dependency and plugin
+selection, game-root/registry ambiguity, false VFS attributes and the actual Python entry shim.
+`test_structured_distribution.py` checks Root Builder envelopes, narrow launcher/App ownership,
+cross-layout refusal, malformed metadata, shared leases and two updates preserving Runtime,
+settings and plugins. Actual MO2/usvfs execution is qualified separately.
+
+Русская версия этого файла — [README.ru.md](README.ru.md).
+
+```
+python tests/run.py                 every suite in turn, one summary line at the end
+python tests/run.py test_tri.py     one suite, by a file name pattern
+python tests/test_layers.py         any file also runs on its own
+```
+
+Only `unittest` from the standard library: no outside test framework. The checks live
+**outside** the `morphbench\` package and are not imported by it; they find the program's root
+from their own location.
+
+The language is pinned: `run.py` and `common.py` both set `MORPHBENCH_LANG=en`, so the checks
+read English texts whatever language the machine speaks. Without that, a check comparing a
+message word for word would pass for one person and fail for another.
+
+No suite reads a file of the mod build: the body is built in memory out of `Shape`, `Bone`,
+`BodyModel`, `Morph`, `MorphSet` (the shared builders are in `common.py`, the closed cube wound
+outwards is in `solids.py`) and attached to the facade through `MorphBench.attach`. The settings
+are created in a temporary folder (`Config(<tmp>/morphbench.json)`), so the real
+`morphbench.json` is never touched; inside the checks `mb.py` is handed a facade with those same
+settings by replacing `mb.MorphBench`. A run under MO2 is imitated by replacing
+`Environment.inside_mo2`, and games from the registry by replacing `Environment.game_roots`:
+not one real build folder anywhere.
+
+| Suite | Needs PyNifly | What it checks |
+|---|---|---|
+| `test_release.py` | no | truthful bundle manifests, version/runtime preflight, preservation of a previous stage on missing dependencies, launcher sources, dependency test/stub cleanup with licences preserved, unpacked stdlib and import paths |
+| `test_distribution.py` | no | application-only ZIP ownership/native-content checks; two updates preserving settings, add-ons and Runtime; modified-file/collision refusals; cross-process shared/exclusive installation leases; real process crashes, rollback and committed-cleanup recovery |
+| `test_launcher_args.py` | no; Windows/.NET compiler | compiles the production launcher helper and round-trips Windows arguments, including trailing backslashes, drive roots, quotes, spaces and following switches |
+| `test_workspace_modes.py` | no; Node for browser mirror | release navigation, disabled experimental links/recipes, keyboard skipping and independent mode overlays; scripted experimental APIs remain available |
+| `test_tri.py` | yes | a real TRIP written by `TripFile` reads back through `MorphSet.from_file` to the precision of the int16 quantum; an FRTRI written by `TriFile` |
+| `test_nif.py` | yes | a tiny NIF made by PyNifly reads back through `BodyModel.from_nif`; `open()` finds the `.tri` lying beside it |
+| `test_morphs.py` | no | an empty morph, one declared but absent, `apply` with a fraction and with vertex numbers past the end of the mesh |
+| `test_strain.py` | no | edge stretch on a two-triangle grid, worked out by hand; the threshold; a shift of the whole shape gives zero |
+| `test_layers.py` | no | how close a shell sits over skin that moves and over skin that does not; `Proximity`; `contactRadius` and `minContact` from the settings |
+| `test_bounds.py` | partly | bounding spheres: the smallest sphere over a point cloud, slider states, facade rows and writing - a shape block laid out by hand and a real NIF from PyNifly must agree on the layout |
+| `test_facade.py` | no | the facade tables match `as_dict()` of the `Analyzer` objects; JSON free of numpy; sliders equal `Morph.apply`; the colouring flags |
+| `test_focus.py` | partly | `sphere_of`, focusing on a bone / a morph / a shape, `framing`, `focus_targets`; one check writes a NIF for `open()` |
+| `test_framing.py` | no | `MorphBench.framing()`: centre and half-extent in camera axes (yaw 0 and 90 by hand), visible shapes only, sliders, focus times `focusPadding`, panning, a shape without triangles does not count, everything hidden - `RuntimeError` |
+| `test_normals.py` | no | `vertex_normals`: a counter-clockwise grid points up, the reverse winding down, a cube outwards, a lone vertex gives (0,0,1), unit length, weighting by area; the facade computes them from the deformed vertices |
+| `test_light.py` | no | the `ViewState` light: mode from the settings, a vector that rides with the camera or stands still in the world, a direction given in the current mode, a zero vector, clamped powers, `light_state` free of numpy; the rasteriser on a cube: front and back equally bright with the light behind the camera and differently bright with a world light, `fill` lifts the shadow, `flat` paints a face in one colour |
+| `test_zoom.py` | no | `zoom_at`: the scene point under the cursor stays put, checked against the rasteriser's own formulas (to 1e-3 px, on a canvas that is not square), the clamp below 0.05, without a frame only the scale changes, the facade works the frame out itself |
+| `test_chains.py` | no | bone chains for swinging physics: the name of a link, the order down the tree, skin split across links, breaks in a chain, handing a chain to an engine |
+| `test_colliders.py` | partly | colliders: a capsule, fitting it to the skin, a set of bodies, editing a file byte by byte and the PPB layer; the header parse must agree with a real NIF; a capsule wrapped in `bhkConvexTransformShape`, written by PyNifly, is read through the wrapper and moved by it |
+| `test_ragdoll.py` | partly | where the game stands the bodies: a `skeleton.hkx` put together byte by byte in both widths of pointer is read back pair for pair, refused with a reason when it is not a skeleton of this kind, and found beside the skeleton with no regard to case; bodies built in memory are fitted, measured and drawn on their ragdoll bones while the bumper and the chain capsules stay on their nodes |
+| `test_physics.py` | no | swinging physics end to end: chains handed to engines, capsules per link, the `smp` and `cbpc` layers; a chain given to nobody stays out of the output while the header still lists everyone. Plus `TestWithheld`: `chains` and `physics` are built and the parser does not take them |
+| `test_catalog.py` | partly | `Catalog` over a tree of empty files: weight suffixes, letter case, format from the header, subfolders, `get` by number / name / substring, the cache and `rescan`; `Environment` under an imitated MO2 and imitated games; the facade's `catalog` / `open_entry` (one check on a real NIF) |
+| `test_cli.py` | partly | `mb.py env --json`, `catalog --json/--all/--find`, `serve --status/--stop`; `render` with `--zoom-at`, `--light`, `--light-dir`, `--light-power` on a real NIF |
+| `test_serve.py` | yes | `presenters.serve`: the server on a background thread on port 0, `/api/environment`, `/api/catalog`, `/api/payload`, the page with its canvas, 400/403/404 answered as JSON, 403 under an imitated MO2, `stop()` frees the port; skipped while the module is missing |
+| `test_serve_root.py` | no | `serve` started with no root at all: the page comes out with an empty list, the root is named afterwards through `/api/root`, and `ServerLink` tells a free port, our own server and someone else's program apart |
+| `test_web.py` | no | the `presenters.web` page built from a bench in memory: `<canvas`, the names, no outside links; skipped while the module is missing |
+| `test_text.py` | no | the table and the summary of the `presenters.text` layer |
+| `test_journal.py` | no | the journal: levels decide what is written, sinks decide where; a dead sink neither stops a live one nor throws outwards - the failure that once cut a client off without an answer |
+| `test_i18n.py` | no | the message catalogue: a key with no text in either the chosen or the base language, substitution by position instead of by name, a locale file missing or malformed, keys that differ between languages, a key left as an English sentence |
+
+PyNifly is looked for exactly the way the program looks for it: the `pynifly` key in the
+settings, otherwise the `io_scene_nifly` addon in the Blender addons folder. Without it the
+suites that have to write a real file are **skipped** with a reason - a skip does not count as
+a failure. A refusal from the PyNifly API itself while creating a file is a skip too, carrying
+the text of the exception: what is under test is the bench's reading, not PyNifly.
+
+## Skeleton and PPB checks
+
+`test_ppb_export.py` verifies generated right/center PPB slot identities, Hand direct/list
+numbering, global-key conflicts, supported child limits, precise float export, unknown layout
+refusals and no partial CLI output on rejection. Its native PyNifly fixtures verify that an
+edited original one-child NIF list remains a list after save/reopen, without reading mod data.
+
+`test_file_visibility.py` verifies native local/inherited flags through generated NIFs and
+malformed/ambiguous graph doubles. `test_visibility_policy.py` verifies independent file and
+viewer policies, conservative unknown handling, visible-surface fit/coverage, CLI/native
+rendering, copied payloads, HTTP actions and actual JS parity/rollback/recipe recovery.
+
+`test_skeleton_open.py` covers exact standalone NIF identity, finite empty bounds, native
+node/capsule framing, failed-load rollback, strict page/API JSON and startup error display.
+`test_ppb_document.py` covers lossless PPB numeric spans, actual slot/child bounds, duplicate
+precedence, BOM and unsupported syntax. `test_ppb_workspace.py` exercises explicit transfers,
+source preservation, atomic document validation, native export isolation, CLI/HTTP replay and
+the actual browser mirror. Synthetic fixtures are used; game/runtime equivalence is not tested.
+`test_ppb_link.py` checks explicit bidirectional source links, active duplicate fields,
+atomic invalid-edit rejection, lifecycle detachment, independent capsules, recipe recovery
+and Python/actual-JS parity.
+
+## Slots mode checks
+
+`test_slot_variants.py` covers three-layer variants, grouped spheres, explicit equal-valued fields, v1/v2 recovery and rejected-batch atomicity, source lifecycle, copied reads, unchanged authored bytes, explicit-only unbound presets and CLI editor roundtrips/output guards. Node executes the actual JS owner/facade and SlotsPanel handlers on synthetic data; this is not visual browser QA.
+
+`test_slots.py` covers atomic placement validation, author/effective isolation, immutable override policy, true node transforms versus deliberately different ragdoll transforms, missing/invalid anchors, one application of uniform scale, access/axis geometry, slots framing, public schema/package layout, strict JSON/file guards and CLI recipe replay. Session checks cover exact checkpoint reopening, explicit overrides equal to changed author defaults, copied reads, selection/mode, malformed batch rejection and bounded replay. When Node is available, it executes the actual browser mirror and compares its effective state, preview, meshes, framing and package bytes with the Python facade; it also exercises the actual panel's recipe upload/download with an unfinished provider and rejected imports. Node is an optional test tool, not a product dependency; the rest uses synthetic in-memory models and frames only.
+
+## Add-on checks
+
+These suites cover the API v1 package/update/session-data contract available since Application
+0.8.0 and the independent previews, prepared exports and embedded WebAssembly support included
+in Application 0.8.5. Offline coverage does not establish visual quality or actual MO2/usvfs execution.
+
+`test_addons.py` checks immutable ZIP installation, strict manifests and paths, bounded
+archives, enabled-state persistence, unsafe installed files, rollback and real subprocess
+writer-lock contention. One installed-symlink case skips when Windows denies symlink
+creation; archive symlink rejection still executes. `test_addon_integration.py` exercises
+the facade, CLI, binary HTTP upload, origin/iframe guards, enabled asset serving, Python
+and actual-JS scene/morph/view parity, detached snapshots, atomic rejection, sender/API
+validation, disabled frames and stale deferred navigation.
+
+`test_addon_update.py` checks explicit same-ID replacement of disabled packages, opaque version
+labels, duplicate-install refusal, missing/enabled targets, repair of disabled damaged packages,
+invalid replacement rollback, extraction/publication/state-replace failures, complete reader
+snapshots around the atomic commit and real subprocess death before commit. It verifies
+retention of old bytes/unselected generations, legacy v1 migration without fallback to stale
+bytes, manifest/generation binding, facade/CLI exclusivity, bounded raw-ZIP HTTP update with
+origin guards, and current versus stale generation asset routes. Package files and state are
+flushed before commit; process-crash checks do not prove every power-loss durability case.
+Writer-lock contention is covered by `test_addons.py`.
+
+`test_addon_state.py` covers detached finite acyclic JSON, byte/depth limits, exact JSON-text
+byte-bound parity despite encoder formatting differences, and invalid data;
+the actual JavaScript host/facade with simulated `sessionStorage` checks per-ID isolation,
+namespace spoof rejection, persistence across host recreation, corrupt JSON, unavailable/quota
+failures, preservation of the previous value on rejected writes and data reset without morph
+changes. A replacement generation cannot authorize an old frame's mutation or deferred model
+navigation. Node is optional; these checks do not establish a browser's session-restore policy,
+durable project storage or visual UI quality. No game or installed mod data is used.
+
+
+`test_preview_payload.py` exercises the non-mutating HTTP loader with real generated NIF/TRIP,
+exact catalogue names, main facade/root/cache/settings preservation, failure isolation,
+origin/MO2 guards and native-lock serialization. Legacy payload selection keeps its behavior.
+`test_preview_surface.py` runs the actual renderer/facade/surface JS with browser resource
+doubles: independent geometry/cameras, real input handlers, no-op notifications, partial
+construction and full disposal. Native skeleton-only, empty and triangle-free sources reject
+before GPU allocation; a triangle mesh without TRI remains supported.
+`test_addon_previews.py` exercises actual manager/RPC/facade JS with platform/surface doubles:
+target-only morphs, atomic invalid batches, orientation linking and revision/source events,
+independent framing, bounded pending capacity, late loads/timeouts, frame/generation changes,
+resource cleanup, main-state restoration and compatibility with legacy single-view methods.
+`test_preview_editor_scope.py` protects per-instance rig/documents/recipe source, including
+PPB copies, failed replay rollback and a negative control against the former global DATA leak.
+
+For embedded-interpreter qualification, use Python from a complete merged Runtime + Application
+installation. Its isolated `_pth` intentionally does not add the current working directory;
+Runtime-only Python cannot import Application modules in subprocess checks. Run full interpreter
+passes sequentially: the recovery fixtures flush backups of more than a thousand real files,
+and parallel runs can exhaust their process time budget under filesystem contention.
+
+`test_addon_exports.py` checks inert immutable JSON/XML preparation, UTF-8/name/format limits, trusted host download controls, fresh bounded authorization, generation/frame/snapshot replacement, cancellation and URL disposal. `test_addon_wasm.py` checks the narrow Wasm CSP allowance, pinned assets and raw-module rejection; browser validation separately checks policy enforcement.
+
+`test_addon_large_exports.py` covers default rejection, explicitly configured 20/32 MiB
+UTF-8 boundaries, the hard ceiling, validation/auth/allocation deadlines, finite pending/URL
+TTLs, queued timer/frame replacement, cancellation and exact resource ownership. Browser
+qualification separately downloads a representative 20 MiB geometry JSON and checks its hash.

@@ -1,0 +1,157 @@
+"use strict";
+
+// ---- the page as a whole ---------------------------------------------------------------------
+const POSITION_METHODS = new Set(["set_slider", "set_sliders", "reset_sliders", "addon_set_morphs", "addon_reset_morphs"]);
+const COLOUR_METHODS = new Set(["colour_by"]);
+
+class App {
+  constructor(data) {
+    this.data = data;
+    this.bench = new BenchMirror(data);
+    // Old links and saved experimental pages must not activate withheld tabs.
+    if (!this.bench.workspace_modes().includes(this.bench.workspace_state().mode)) this.bench.workspace_mode("morphs");
+    this.lastCall = "";
+    this.scale = 1.0;
+    this.canvas = document.getElementById("canvas");
+    this.renderer = new Renderer(this.canvas, data.settings);
+    for (const name of this.bench.shape_names()) this.renderer.upload(this.bench.shape(name));
+    // Capsules go into the buffers once, every chunk of every bone: the sliders do not move
+    // them and they all share one colour, while which of them to draw is decided by
+    // collider_mesh() on every frame.
+    for (const chunk of this.bench.collider_meshes()) this.renderer.uploadColliders(chunk);
+    this.renderer.uploadColliders(this.bench.bumper_mesh());
+    this.refreshSlots();
+    this.refreshPositions();
+    this.refreshColours();
+    this.panel = new Panel(this, document.getElementById("panel"));
+    this.editorPanel = new EditorPanel(this, document.getElementById("panel"));
+    this.workspace = new WorkspaceUI(this);
+    this.bindMouse();
+    new ResizeObserver(() => this.draw()).observe(this.canvas.parentElement);
+    this.panel.refresh();
+    this.editorPanel.refresh();
+    this.workspace.refresh();
+    this.draw();
+    this.updateWorkspaceUrl();
+    this.addons = new AddonHost(this);
+  }
+  // The one door to every action: the name of a facade method and its arguments.
+  invoke(method, ...args) {
+    this.panel.error.textContent = "";
+    let result;
+    try {
+      if (method === "workspace_mode" && !this.bench.workspace_modes().includes(args[0] === "mesh" ? "morphs" : args[0])) throw new Error(T.wsUnavailable);
+      result = this.bench[method](...args);
+      if (method === "workspace_replay" && !this.bench.workspace_modes().includes(this.bench.workspace_state().mode)) this.bench.workspace_mode("morphs");
+    } catch (e) {
+      this.panel.error.textContent = String(e.message || e);
+      return;
+    }
+    this.lastCall = "bench." + method + "(" + args.map((a) => JSON.stringify(a)).join(", ") + ")";
+    if (POSITION_METHODS.has(method)) this.refreshPositions();
+    if (COLOUR_METHODS.has(method)) this.refreshColours();
+    if (method.startsWith("slots_") && !["slots_project","slots_state","slots_effective","slots_preview","slots_meshes","slots_anchors","slots_validate","slots_session","slots_recipe","slots_variants","slots_variant_preset"].includes(method)) {
+      this.refreshSlots();
+    }
+    if ((method.startsWith("collider_") && !["collider_select","collider_edit_state"].includes(method)) || ["ppb_to_collider","ppb_from_collider","ppb_link","ppb_set","workspace_replay"].includes(method)) this.refreshColliders();
+    this.panel.refresh();
+    if(this.editorPanel) this.editorPanel.refresh();
+    if(this.workspace) this.workspace.refresh();
+    if (["workspace_mode", "workspace_tab", "workspace_replay"].includes(method)) this.updateWorkspaceUrl();
+    this.draw();
+    if(this.addons)this.addons.changed(method);
+    return result;
+  }
+  updateWorkspaceUrl() {
+    if (!this.bench.server) return;
+    const url = new URL(window.location.href), state = this.bench.workspace_state();
+    url.searchParams.set("mode", state.mode); url.searchParams.set("tab", state.tab);
+    window.history.replaceState(null, "", url);
+  }
+  refreshSlots() { this.renderer.uploadSlots(this.bench.slots_meshes()); }
+  refreshColliders() {
+    if(!this.renderer) return;
+    for(const name of [...this.renderer.meshes.keys()]) if(name.startsWith("colliders:")||name.startsWith("editable:")) this.renderer.removeMesh(name);
+    for(const chunk of this.bench.collider_meshes()) this.renderer.uploadColliders(chunk);
+    this.renderer.uploadColliders(this.bench.bumper_mesh());
+  }
+  // Positions with the sliders applied, and the normals that follow from them, into the
+  // buffers; the normals are recomputed after every slider move, because the shading is
+  // taken off the deformed body.
+  refreshPositions() { ViewportDrawing.refreshPositions(this.bench, this.renderer); }
+  // The value comes from the facade, the colour is made here - by the same rule the rasteriser uses.
+  refreshColours() { ViewportDrawing.refreshColours(this.bench, this.renderer); }
+  // The canvas size is part of the view state as well: it reaches the core through the same
+  // resize that --size goes through.
+  draw() {
+    if (this.previewStageActive) return;
+    this.renderer.resize();
+    const w = this.canvas.width, h = this.canvas.height, view = this.bench.view;
+    if (w !== view.width || h !== view.height) { this.invoke("resize", w, h); return; }
+    const r = this.renderer.draw(this.bench);
+    if (r) this.scale = r.scale;
+    if(this.editorPanel) this.editorPanel.drawOverlay();
+  }
+  // The cursor point in fractions of half the shorter side of the canvas, measured from the
+  // centre, right and up - out of canvas pixels, allowing for the screen density and for
+  // where the canvas sits on the page.
+  cursorFraction(e) { return ViewportDrawing.cursorFraction(this.canvas, e); }
+  bindMouse() {
+    const c = this.canvas;
+    let drag = null;
+    this.startColliderDrag = (e, cap) => {
+      if(e.button!==0||this.bench.workspace_state().mode!=="colliders"||!cap||!cap.editable) return;
+      if(drag&&drag.pointerId!==e.pointerId)return;
+      e.preventDefault();
+      this.invoke("collider_select",cap.bone,cap.index);
+      drag = {button:0,pointerId:e.pointerId,x:e.clientX,y:e.clientY,collider:{bone:cap.bone,index:cap.index}};
+      c.style.cursor="grabbing";
+      try { c.setPointerCapture(e.pointerId); } catch (_) { /* keep the gesture while over the canvas */ }
+    };
+    c.addEventListener("contextmenu", (e) => e.preventDefault());
+    c.addEventListener("pointerdown", (e) => {
+      if(drag&&drag.pointerId!==e.pointerId)return;
+      if(e.button===0&&this.bench.workspace_state().mode==="colliders") {
+        if(e.altKey) {this.editorPanel.pick(e);return;}
+        if(e.shiftKey) {this.startColliderDrag(e,this.editorPanel.pick(e));return;}
+      }
+      drag = { button: e.button, pointerId:e.pointerId, x: e.clientX, y: e.clientY, collider:null };
+      try { c.setPointerCapture(e.pointerId); } catch (_) { /* a pointer without capture is no great loss */ }
+    });
+    c.addEventListener("pointermove", (e) => {
+      if (!drag||drag.pointerId!==e.pointerId) return;
+      const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+      drag.x = e.clientX; drag.y = e.clientY;
+      if(drag.button===0&&drag.collider) {
+        const state=this.bench.collider_edit_state(),selected=drag.collider;
+        if(this.bench.workspace_state().mode!=="colliders") {drag=null;c.style.cursor="";return;}
+        if(selected) {
+          const basis=this.bench.view.basis(),dpr=window.devicePixelRatio||1;
+          const world=[0,1,2].map((axis)=>(basis.right[axis]*dx-basis.up[axis]*dy)*dpr/this.scale);
+          this.invoke("collider_translate",selected.bone,selected.index,editorLocalDelta(state.bodyMatrices[selected.bone],world));
+        }
+      } else if (drag.button === 0) {
+        const k = this.bench.settings.orbitSensitivity;
+        this.invoke("orbit", rnd(dx * k, 2), rnd(dy * k, 2));
+      } else if (drag.button === 2) {
+        // Screen pixels into model units through the frame scale - and into the core by the
+        // same method the command line calls.
+        const dpr = window.devicePixelRatio || 1;
+        this.invoke("pan_by", rnd(dx * dpr / this.scale, 3), rnd(-dy * dpr / this.scale, 3));
+      }
+    });
+    const stop = (e) => { if(!drag||drag.pointerId!==e.pointerId)return;drag = null;c.style.cursor="";try { c.releasePointerCapture(e.pointerId); } catch (_) {} };
+    c.addEventListener("pointerup", stop);
+    c.addEventListener("pointercancel", stop);
+    c.addEventListener("lostpointercapture", stop);
+    // The wheel zooms towards the point under the cursor: the facade's zoom_at with the new
+    // zoom and the fractions of the frame.
+    c.addEventListener("wheel", (e) => {
+      e.preventDefault();
+      const f = this.cursorFraction(e);
+      const z = rnd(this.bench.view.zoom * Math.exp(-e.deltaY * this.bench.settings.wheelZoomRate), 3);
+      this.invoke("zoom_at", z, rnd(f[0], 3), rnd(f[1], 3));
+    }, { passive: false });
+    c.addEventListener("dblclick", () => { this.invoke("pan", 0, 0); this.invoke("zoom", 1.0); });
+  }
+}

@@ -1,0 +1,252 @@
+"use strict";
+
+// ---- mirror of morphbench/api.py: MorphBench -----------------------------------------------
+// The method names are deliberately the facade's own, underscores and all: every button on the
+// page calls a method from here, and that method answers one for one to a call of the core. The
+// names are the API - making one of them look more like JavaScript would cut that tie.
+class BenchMirror {
+  constructor(data) {
+    // Lazy workspace owners must read this model's source payload. DATA is the
+    // main page only; independent previews construct their own facade here.
+    this._payload = data;
+    this.summary = data.summary;               // null - no mesh open (a page from the server)
+    this.names = data.names;
+    this.settings = data.settings;
+    this.server = data.server || null;         // mesh list and environment - only when served
+    this.shapes = new Map(data.shapes.map((raw) => [raw.name, new Shape(raw)]));
+    this.morphList = data.morphs;
+    this.deltas = {};
+    for (const morph in data.deltas) {
+      this.deltas[morph] = {};
+      for (const shape in data.deltas[morph]) this.deltas[morph][shape] = new Deltas(data.deltas[morph][shape]);
+    }
+    this.strainData = {};
+    for (const morph in data.strain) {
+      this.strainData[morph] = {};
+      for (const shape in data.strain[morph]) this.strainData[morph][shape] = new Strain(data.strain[morph][shape]);
+    }
+    this.targets = data.targets;
+    // Capsules exist only when a skeleton is open: the bodies in pieces, one per bone, and the
+    // bumper apart. They are unpacked and given their normals once - sliders never touch them.
+    const raw = data.colliders || null;
+    this._colliderMeshes = raw
+      ? raw.bodies.map((b) => new ColliderMesh("colliders:" + b.bone, b, b.bone)) : null;
+    this._bumperMesh = raw && raw.bumper ? new ColliderMesh("colliders:bumper", raw.bumper) : null;
+    this.view = new ViewMirror(data.settings, data.presets, data.view);
+    this._fileVisibility = data.fileVisibility || {source:this.summary?this.summary.nif:null,scope:"nif-file",runtimeEvaluated:false,complete:false,shapes:[]};
+    this._sliders = new Map(Object.entries(data.sliders));
+    this.placements = new PlacementMirror(data.settings, data.slots);
+    this._workspaceModes = (data.workspaceModes || ["morphs", "colliders"]).slice();
+  }
+  workspace_modes() { return this._workspaceModes.slice(); }
+
+  slots_mode(mode="slots") { return this.placements.setMode(mode); }
+  slots_replace(metadata,rows) { return this.placements.replace(metadata,rows); }
+  slots_validate(metadata,rows,limits) { return new PlacementMirror(this.settings,null,limits).replace(metadata,rows); }
+  slots_add(name,anchor,attributes) { return this.placements.add(name,anchor,attributes); }
+  slots_select(name) { return this.placements.select(name); }
+  slots_set(name,changes) { return this.placements.set(name,changes,false); }
+  slots_customize(name,changes) { return this.placements.set(name,changes,true); }
+  slots_clear(name) { return this.placements.clear(name); }
+  slots_remove(name) { return this.placements.remove(name); }
+  slots_project() { return this.placements.project(); }
+  slots_metadata(metadata) { return this.placements.setMetadata(metadata); }
+  slots_session() { return this.placements.session(); }
+  slots_restore(session) { return this.placements.restore(session); }
+  slots_recipe() { return this.placements.recipe(); }
+  slots_replay(actions) { return this.placements.replay(actions); }
+  slots_effective() { return this.placements.effective(); }
+  slots_variant_add(name,placement) { return this.placements.variantAdd(name,placement); }
+  slots_variant_select(name) { return this.placements.variantSelect(name); }
+  slots_variant_set(name,changes) { return this.placements.variantSet(name,changes); }
+  slots_variant_clear(name) { return this.placements.variantClear(name); }
+  slots_variant_remove(name) { return this.placements.variantRemove(name); }
+  slots_variants() { return this.placements.variants(); }
+  slots_layer(layer) { return this.placements.setLayer(layer); }
+  slots_variant_preset(name) { return this.placements.variantPreset(name); }
+  slots_anchors() { return this.placements.anchors(); }
+  slots_preview() { return this.placements.preview(); }
+  slots_meshes() { return this.placements.meshes(); }
+  slots_state() { return {mode:this.placements.mode,selected:this.placements.selected,selectedVariant:this.placements.selectedVariant,editLayer:this.placements.editLayer,variants:this.slots_variants(),project:this.slots_project(),effective:this.slots_effective(),preview:this.slots_preview(),anchors:this.slots_anchors(),session:this.slots_session()}; }
+
+  is_open() { return this.summary !== null; }
+  // skeleton and capsules: the core has already worked the geometry out, and it travels in the page
+  has_skeleton() { return this._colliderMeshes !== null; }
+  collider_bones() { return this.has_skeleton() ? this._colliderMeshes.map((m) => m.bone) : []; }
+  // Bones with a body whose vertices sit in at least one visible shape - a mirror of the core's
+  // visible_collider_bones(): hide the head and the head capsule is no longer wanted. A bone
+  // "holds" a shape when it is the main bone of that shape's vertices (heldBones, counted by
+  // the core); with collidersFollowParts off, every bone counts.
+  visible_collider_bones() {
+    const bones = this.collider_bones();
+    if (!this.settings.collidersFollowParts || !this.is_open() || !this.summary.vertices) return bones;
+    const held = new Set();
+    for (const name of this.visible_shapes()) for (const b of this.shape(name).heldBones) held.add(b);
+    return bones.filter((b) => held.has(b));
+  }
+  // every per-bone piece - they go into the buffers once
+  collider_meshes() { return this.has_skeleton() ? this._colliderMeshes.slice() : []; }
+  // the pieces of the visible bones only - a mirror of the core's collider_mesh(), which returns
+  // them glued into one; here it stays a list, so no geometry is glued together every frame
+  collider_mesh() {
+    if (!this.has_skeleton()) return [];
+    const keep = new Set(this.visible_collider_bones());
+    return this._colliderMeshes.filter((m) => keep.has(m.bone));
+  }
+  bumper_mesh() { return this._bumperMesh; }
+  show_colliders(on, bumper) { return this.view.show_colliders(on, bumper); }
+  shape_names() { return Array.from(this.shapes.keys()).sort(); }
+  shape(name) { const s = this.shapes.get(name); if (!s) throw new Error(say(T.errNoShape, { name })); return s; }
+  morphs() { return this.morphList.slice(); }
+  presets() { return this.view.presets; }
+  visible_shapes() { return this.shape_names().filter((name) => this._inspection_exclusion(name)===null); }
+  respect_file_visibility(on=true,show_hidden=false) {
+    if(typeof on!=="boolean"||typeof show_hidden!=="boolean")throw new Error(T.visibilityPolicyInvalid);
+    this.view.respectFileVisibility=on;this.view.showFileHidden=show_hidden;return this.view_state();
+  }
+  _inspection_exclusion(name) {
+    if(!this.view.is_visible(name))return "viewer-hidden";
+    if(!this.view.respectFileVisibility)return null;
+    const row=this._fileVisibility.shapes.find((item)=>item.name===name);
+    if(!row||row.complete!==true||!["visible","hidden"].includes(row.state))return "file-unknown";
+    if(row.state==="hidden"&&!this.view.showFileHidden)return "file-hidden";
+    return null;
+  }
+  file_visibility() {
+    const base=this._fileVisibility,counts={visible:0,hidden:0,unknown:0,viewerVisible:0,inspectionVisible:0};
+    const shapes=this.shape_names().map((name)=>{
+      const original=base.shapes.find((item)=>item.name===name),row=original?JSON.parse(JSON.stringify(original)):
+        {block:-1,localFlags:null,localHidden:null,ancestors:[],ancestryComplete:false,complete:false,inheritedHidden:null,effectiveHidden:null,state:"unknown",issues:["not-read"]};
+      const exclusion=this._inspection_exclusion(name);
+      Object.assign(row,{name,viewerVisible:this.view.is_visible(name),inspectionVisible:exclusion===null,exclusion});
+      counts[row.state]++;counts.viewerVisible+=Number(row.viewerVisible);counts.inspectionVisible+=Number(row.inspectionVisible);return row;
+    });
+    return {source:base.source,scope:"nif-file",runtimeEvaluated:false,respectFileVisibility:this.view.respectFileVisibility,
+      showFileHidden:this.view.showFileHidden,complete:base.source!==null&&shapes.every((row)=>row.complete),counts,shapes};
+  }
+
+  // sliders
+  set_slider(name, value) {
+    if (!this.morphList.includes(name)) throw new Error(say(T.errNoSlider, { name }));
+    value = Number(value);
+    if (value === 0.0) this._sliders.delete(name); else this._sliders.set(name, value);
+    return this.sliders();
+  }
+  set_sliders(values) { for (const k in values) this.set_slider(k, values[k]); return this.sliders(); }
+  sliders() { return Object.fromEntries(this._sliders); }
+  reset_sliders() { this._sliders.clear(); return {}; }
+
+  // geometry: base + the sum of amount × scale × int16 - the same sum Morph.apply does in the core
+  deformed(name) {
+    const s = this.shape(name);
+    s.pos.set(s.base);
+    for (const [morph, amount] of this._sliders) {
+      const d = this.deltas[morph] && this.deltas[morph][name];
+      if (d) d.applyTo(s.pos, amount);
+    }
+    return s.pos;
+  }
+  // vertex normals of a shape with the sliders applied - what smooth shading needs
+  vertex_normals(name) {
+    const s = this.shape(name);
+    return vertexNormals(this.deformed(name), s.tris, s.nrm);
+  }
+  // Centre and half-span of the frame: the extent of the visible shapes with the sliders applied,
+  // measured in camera axes, then the aim and the pan - a mirror of MorphBench.framing(). The
+  // half-span stays in ViewMirror, so zooming to a point knows which frame was on the screen.
+  framing() {
+    const shapes = this.visible_shapes().map((n) => this.shape(n)).filter((s) => s.triCount > 0);
+    const clouds = shapes.map((shape) => this.deformed(shape.name));
+    if(this.has_skeleton()&&(this.view.colliders||!clouds.length)) for(const mesh of this.collider_meshes()) clouds.push(mesh.pos);
+    if(this.placements.mode === "slots") for(const mesh of this.slots_meshes()) clouds.push(new Float32Array(mesh.vertices.flat()));
+    if(!clouds.length&&this.placements.mode!=="slots"&&this.has_skeleton()) {
+      const points=Object.values(this.slots_anchors()).map((matrix)=>matrix.slice(0,3).map((row)=>row[3]));
+      if(points.length) clouds.push(new Float32Array(points.flat()));
+    }
+    if (!clouds.length) throw new Error(T.errAllHidden);
+    const lo = [Infinity, Infinity, Infinity], hi = [-Infinity, -Infinity, -Infinity];
+    for (const p of clouds) {
+      for (let i = 0, n = p.length; i < n; i += 3) {
+        if (p[i] < lo[0]) lo[0] = p[i]; if (p[i] > hi[0]) hi[0] = p[i];
+        if (p[i + 1] < lo[1]) lo[1] = p[i + 1]; if (p[i + 1] > hi[1]) hi[1] = p[i + 1];
+        if (p[i + 2] < lo[2]) lo[2] = p[i + 2]; if (p[i + 2] > hi[2]) hi[2] = p[i + 2];
+      }
+    }
+    const whole = [0.5 * (lo[0] + hi[0]), 0.5 * (lo[1] + hi[1]), 0.5 * (lo[2] + hi[2])];
+    const b = this.view.basis(), r = b.right, u = b.up;
+    let half = 0.0;
+    for (const p of clouds) {
+      for (let i = 0, n = p.length; i < n; i += 3) {
+        const dx = p[i] - whole[0], dy = p[i + 1] - whole[1], dz = p[i + 2] - whole[2];
+        const x = Math.abs(dx * r[0] + dy * r[1] + dz * r[2]);
+        const y = Math.abs(dx * u[0] + dy * u[1] + dz * u[2]);
+        if (x > half) half = x; if (y > half) half = y;
+      }
+    }
+    return this.view.framing(whole, half);
+  }
+
+  // colouring keys: numbers, not colours
+  bone_key(name) { return this.shape(name).boneKey; }
+  morph_key(name, morph) {
+    const s = this.shape(name), out = new Float32Array(s.count);
+    const d = this.deltas[morph] && this.deltas[morph][name];
+    if (d) d.lengthsInto(out);
+    return out;
+  }
+  strain_key(name, morph) {
+    const s = this.shape(name), out = new Float32Array(s.count);
+    const st = this.strainData[morph] && this.strainData[morph][name];
+    if (st) st.valuesInto(out);
+    return out;
+  }
+  vertex_colour_key(name) {
+    const mode = this.view.colouring;
+    if (mode === "shade") return null;
+    if (mode === "bone") return this.bone_key(name);
+    if (!this.morphList.length || !this.view.highlightMorph) return new Float32Array(this.shape(name).count);
+    if (mode === "morph") return this.morph_key(name, this.view.highlightMorph);
+    return this.strain_key(name, this.view.highlightMorph);
+  }
+
+  // the state of the view
+  orbit(dYaw, dPitch) { return this.view.orbit(dYaw, dPitch).as_dict(); }
+  look(yaw, pitch) { return this.view.look(yaw, pitch).as_dict(); }
+  preset(name) { return this.view.preset(name).as_dict(); }
+  preset_name() { return this.view.preset_name(); }
+  zoom(factor) { return this.view.set_zoom(factor).as_dict(); }
+  resize(width, height) { return this.view.resize(width, height).as_dict(); }
+  // Zoom to the point under the cursor: the frame is worked out again right here, so the point
+  // is taken from the frame that is on the screen - the same order the facade keeps.
+  zoom_at(factor, fx, fy) { this.framing(); return this.view.zoom_at(factor, fx, fy).as_dict(); }
+  pan(dx, dy) { return this.view.set_pan(dx, dy).as_dict(); }
+  pan_by(dx, dy) { return this.view.pan_by(dx, dy).as_dict(); }
+  colour_by(mode, morph) { return this.view.colour_by(mode, morph).as_dict(); }
+  only(names) { return this.view.only(names).as_dict(); }
+  show_all() { return this.view.show_all().as_dict(); }
+  // The core keeps "everything is visible" as null, and ViewState knows no shape names - so, as
+  // in the facade, the list of visible shapes is spelled out here, and hide then takes away one
+  // shape instead of all of them.
+  hide(name) { if (this.view.visible === null) this.view.only(this.shape_names()); return this.view.hide(name).as_dict(); }
+  show(name) { return this.view.show(name).as_dict(); }
+  view_state(precise=false) { return this.view.as_dict(precise); }
+
+  // light: part of the state of the view as well
+  light_follow_camera(on) { return this.view.light_follow_camera(on).as_dict(); }
+  light_direction(x, y, z) { return this.view.light_direction(x, y, z).as_dict(); }
+  light_power(ambient, diffuse, fill) { return this.view.light_power(ambient, diffuse, fill).as_dict(); }
+  light_reset() { return this.view.light_reset().as_dict(); }
+  light_vector() { return this.view.light_vector(); }
+
+  // aim: the centres and radii are counted by the core already and sit in focus_targets
+  _target(kind, name) {
+    const hit = this.targets[kind].find((t) => t.name === name);
+    if (!hit) throw new Error(say(T.errNoTarget, { kind, name }));
+    return hit;
+  }
+  focus_bone(name) { const t = this._target("bones", name); return this.view.focus_on(t.centre, t.radius, "bone:" + name).as_dict(); }
+  focus_morph(name) { const t = this._target("morphs", name); return this.view.focus_on(t.centre, t.radius, "morph:" + name).as_dict(); }
+  focus_shape(name) { const t = this._target("shapes", name); return this.view.focus_on(t.centre, t.radius, "shape:" + name).as_dict(); }
+  focus_all() { return this.view.focus_all().as_dict(); }
+  focus_targets() { return this.targets; }
+}

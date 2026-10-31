@@ -1,0 +1,8 @@
+{
+  "ppbExport.precision": "Cannot generate PPB text for %(bone)s without full-precision capsuleGeometry from MorphBench.collider_local; rounded report rows are not export inputs.",
+  "ppbExport.node": "PPB's global capsule bank cannot independently represent %(bone)s. Select the exact right/center source with --find \"%(expected)s\", or use explicit copies in the existing PPB document editor; left mirroring and runtime overrides must be reviewed separately.",
+  "ppbExport.duplicate": "More than one input maps to PPB's global %(slot)s slot (%(bone)s). Select one exact right/center source with --find; a later assignment must not silently replace the first.",
+  "ppbExport.topology": "Cannot generate PPB keys for %(bone)s: unsupported or unknown shape layout %(kind)s. PPB needs a direct capsule or a known flat list of capsule children; use the existing-document editor for an explicit mapping.",
+  "ppbExport.children": "Cannot generate PPB keys for %(bone)s: %(count)s children exceed the reviewed limit of %(maximum)s. Export the NIF separately or select an explicitly supported source.",
+  "ppbExport.number": "Cannot generate PPB text: capsule values must be finite and representable as non-underflowing float32 values, with a positive radius."
+}

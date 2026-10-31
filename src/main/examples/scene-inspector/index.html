@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Scene inspector</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="/web/addon-sdk.js" defer></script>
+  <script src="main.js" defer></script>
+</head>
+<body>
+  <main>
+    <h1 id="title">Scene inspector / Инспектор сцены</h1>
+    <p id="scope"></p>
+    <p id="status" role="status" aria-live="polite">Connecting / Подключение…</p>
+    <p id="error" role="alert" hidden></p>
+    <fieldset id="controls" disabled>
+      <legend id="controls-label">Controls / Управление</legend>
+      <button id="refresh" type="button">Refresh / Обновить</button>
+      <div class="row">
+        <label id="model-label" for="model">Model / Модель</label>
+        <select id="model"></select>
+        <button id="open-model" type="button">Open / Открыть</button>
+      </div>
+      <div class="row">
+        <label id="morph-label" for="morph">Morph / Морф</label>
+        <select id="morph"></select>
+        <label id="value-label" for="value">Value / Значение</label>
+        <input id="value" type="number" value="0" step="any">
+        <button id="apply-morph" type="button">Apply / Применить</button>
+        <button id="reset-morphs" type="button">Reset morphs / Сбросить морфы</button>
+      </div>
+      <div class="row">
+        <label id="preset-label" for="preset">View / Ракурс</label>
+        <select id="preset"></select>
+        <button id="apply-preset" type="button">Apply / Применить</button>
+      </div>
+    </fieldset>
+    <h2 id="scene-label">Scene / Сцена</h2>
+    <pre id="scene"></pre>
+  </main>
+</body>
+</html>

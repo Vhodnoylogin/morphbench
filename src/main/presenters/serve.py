@@ -1,0 +1,736 @@
+"""The presentation layer: the same page, but from a local port and with a choice of model.
+
+A file on disk holds one body, and to look at another the page has to be built again. The
+server lifts that limit: it keeps the facade open, hands out the page on request, and on
+request opens another mesh from the browse list in that same facade. Everything it can do
+is facade calls - `catalog`, `open_entry`, `environment` and the packing done by
+`WebPage`. There is not one computation here, just as in the other layers.
+
+The standard library and nothing above it: `ThreadingHTTPServer` on the port from the
+settings. Requests selecting the main scene share one facade; independent preview payloads
+use a fresh facade. Both take the same lock for the whole operation because the native reader
+is shared. The page the server hands out talks to that server alone -
+by going to another request, `/?name=...`; it makes no request that leaves the machine,
+and neither does the file on disk.
+
+The browse root is optional: the server comes up without one - with an empty list and a
+field for the folder on the page - and the root can be named later, through `/api/root`.
+That is how a launch from inside MO2 passes it on: `ServerLink` on the other side asks
+whether the server is alive and hands it the game's Data.
+
+Routes:
+
+    GET /                                    the page with the open body (or an empty canvas)
+    GET /?name=<path from the root>&root=<folder>  open a mesh by name and return the page
+    GET /?index=N&root=<folder>&all=1        ...by its number in the browse list; all=1 - meshes without morphs too
+    GET /?root=<folder>                      the page with the listing of another folder
+    GET /api/environment                     bench.environment()
+    GET /api/catalog?root=&all=0|1&rescan=0|1    bench.catalog(...)
+    GET /api/payload?index=|name=&root=      open_entry, then WebPage(bench).payload()
+    GET /api/preview-payload?index=|name=&root=  the same payload from an independent facade
+    GET /api/root?root=<folder>              make the folder the server's root; without root - which one it is now
+    GET /api/shutdown                        stop the server: the answer goes out, the loop ends
+
+A refusal in /api/* is JSON {"error": ...} with a code: 400 - the request could not be read
+or no root is set, 404 - no such entry or folder, 403 - under MO2, a folder outside the
+game's Data. On the page the same refusal is shown as text in the "Model" section.
+"""
+from __future__ import annotations
+
+import json
+import copy
+import hashlib
+import tempfile
+import socket
+import threading
+import urllib.error
+import urllib.parse
+import urllib.request
+import webbrowser
+from functools import partial
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
+from urllib.parse import parse_qs, unquote, urlsplit
+
+from morphbench import MorphBench
+from morphbench.environment import process_alive, wait_process
+from morphbench.i18n import t
+from morphbench.journal import Journal, from_config
+
+from .assets import PREFIX, PageAssets
+from .web import WebPage
+
+#: The words a query flag counts as "on". This is protocol, not text: it is read out of a
+#: URL, so it stays latin whatever language the run speaks. The last one is the Russian
+#: "yes", accepted since before the catalogue existed and kept so that a link already
+#: typed by hand goes on working; it is written as an escape to leave no Cyrillic in the
+#: source.
+_TRUE = ("1", "true", "yes", "on", "\u0434\u0430")
+#: The signature in the Server: header - `ServerLink` tells our own server from another
+#: program on the same port by it.
+SERVER_NAME = "morphbench/1"
+#: The "listen on every interface" addresses: such an address cannot be dialled - Windows
+#: answers WSAEADDRNOTAVAIL - so a server on one of them is reached over loopback.
+_WILDCARD = ("0.0.0.0", "", "::", "*")
+
+
+def dial_host(host) -> str:
+    """The address the server is reached at when it listens on `host`."""
+    host = str(host or "").strip()
+    return "127.0.0.1" if host in _WILDCARD else host
+
+
+class RequestError(ValueError):
+    """A request that cannot be carried out: a response code and a text a person can read.
+    This is a refusal, not a failure - hence ValueError: the command line prints it as one
+    line."""
+
+    def __init__(self, status: int, message: str):
+        super().__init__(message)
+        self.status = int(status)
+        self.message = message
+
+
+def _status_of(exc: BaseException) -> int:
+    """The response code for an exception: the facade knows what the request got wrong,
+    and which code that makes is this layer's business."""
+    if isinstance(exc, RequestError):
+        return exc.status
+    if isinstance(exc, PermissionError):
+        return 403
+    if isinstance(exc, (KeyError, FileNotFoundError)):
+        return 404
+    if isinstance(exc, (ValueError, TypeError, RuntimeError)):
+        return 400
+    return 500
+
+
+def _message(exc: BaseException) -> str:
+    """The text of an exception without the KeyError wrapper, which puts it in quotes."""
+    if exc.args and isinstance(exc.args[0], str):
+        return exc.args[0]
+    return str(exc) or exc.__class__.__name__
+
+
+class Query:
+    """A parsed query string: the root, the key of the entry, the flags. Every value is the
+    last of the repeated ones, an empty one counts as absent."""
+
+    def __init__(self, raw: str):
+        self.values = {k: v[-1] for k, v in parse_qs(raw, keep_blank_values=True).items()}
+
+    def get(self, key: str, default=None):
+        value = self.values.get(key)
+        return default if value is None or value == "" else value
+
+    def flag(self, key: str) -> bool:
+        return str(self.get(key, "0")).strip().lower() in _TRUE
+
+    @property
+    def root(self) -> str | None:
+        """The browse folder from the request, or None - the server's root."""
+        return self.get("root")
+
+    @property
+    def key(self):
+        """What to open: the number of the entry (`index`) or its name (`name`); None -
+        nothing."""
+        index = self.get("index")
+        if index is not None:
+            try:
+                return int(index)
+            except ValueError:
+                raise RequestError(400, t("serve.indexNotANumber", value=index))
+        return self.get("name")
+
+
+class _Server(ThreadingHTTPServer):
+    """A second server on the same port has to fail, not sit down quietly beside the first:
+    SO_REUSEADDR, which http.server turns on by default, lets that second bind through on
+    Windows."""
+
+    allow_reuse_address = False
+
+
+class WebServer:
+    """The page server on top of the facade.
+
+    The browse root: the folder named outright, otherwise the default of the environment
+    (under MO2 - the game's Data), otherwise none at all - the server comes up with an empty
+    list, and the folder is named on the page or through `/api/root`. A folder named
+    outright is checked by the facade at once: outside MO2 one that does not exist refuses
+    with FileNotFoundError, under MO2 a foreign one with PermissionError, and whoever
+    started the server sees it. The port is taken straight away so that `url` is right
+    before `run()` - including for port 0, which the system picks.
+    """
+
+    def __init__(self, bench, root=None, host=None, port=None, with_morphs: bool = True,
+                 journal: Journal | None = None):
+        self.bench = bench
+        self.cfg = bench.cfg
+        # The journal is built from the settings: the pipe to whoever started this, and a
+        # file beside it. One of their own is passed in by the checks and by layers that
+        # need the journal in hand.
+        self.journal = journal if journal is not None else from_config(self.cfg, "serve")
+        self.with_morphs = bool(with_morphs)
+        # The server hands out the page's files one by one: an edit to a script shows on a
+        # reload, and the browser's own tools point at the real file with real line numbers.
+        self.assets = PageAssets()
+        self.host = str(host or self.cfg["serveHost"])
+        self.lock = threading.Lock()
+        self.root: Path | None = None
+        if root is None:
+            root = bench.environment()["dataRoot"]
+        if root is not None:
+            self.set_root(root)
+        self.httpd = _Server(
+            (self.host, int(self.cfg["servePort"] if port is None else port)),
+            partial(_Handler, self))
+        self.httpd.daemon_threads = True
+        self.port = int(self.httpd.server_address[1])
+        self._thread: threading.Thread | None = None
+        self._watcher: threading.Thread | None = None
+
+    @property
+    def url(self) -> str:
+        return "http://%s:%d/" % (dial_host(self.host), self.port)
+
+    def set_root(self, root) -> dict:
+        """Make a folder the server's root. The facade checks it and walks it once - the
+        page will ask for the listing anyway."""
+        rows = self.bench.catalog(root, self.with_morphs)
+        self.root = Path(root)
+        return {"root": str(self.root), "meshes": len(rows)}
+
+    # ---- the life of the server -------------------------------------------------------
+    def run(self, open_browser: bool = True) -> None:
+        """Serve until Ctrl+C; open the page in a browser straight away if asked."""
+        if open_browser:
+            webbrowser.open(self.url)
+        try:
+            self.httpd.serve_forever()
+        except KeyboardInterrupt:
+            pass
+        finally:
+            self.close()
+
+    def start(self) -> "WebServer":
+        """Serve on a background thread - for the checks, and for clients that need both a
+        server and their own work beside it."""
+        if self._thread is None:
+            self._thread = threading.Thread(target=self.httpd.serve_forever, daemon=True)
+            self._thread.start()
+        return self
+
+    def watch_parent(self, pid: int) -> None:
+        """Leave together with whoever raised the server.
+
+        The server lives in a process of its own, and the launcher window, closed peacefully,
+        stops it itself. Killed HARD (a crash, "End task", a log-off) it does not get the
+        chance, and an invisible process is left behind: it holds the port, it goes on
+        reading files through MO2's substitution, which for it is already out of date, and
+        MO2 no longer counts it as a running program. Worse, the entry point is idempotent,
+        and the next launch will quietly attach to exactly that one. So the server waits for
+        its parent itself.
+
+        The watch is optional: without a process number there is none and the behaviour is
+        as it was - a server raised from a console waits for nobody's death.
+        """
+        pid = int(pid)
+        if pid <= 0:
+            return
+        if not process_alive(pid):
+            self.journal.warn(t("serve.parentGone", pid=pid))
+            return
+
+        def watch() -> None:
+            wait_process(pid)
+            self.journal.warn(t("serve.leavingWithParent", pid=pid))
+            self.httpd.shutdown()
+            # The port is let go right here. Stopping the loop alone is not enough: the
+            # listening socket would stay open and the server would become a black hole -
+            # the connection is accepted, no answer comes, and the client waits until its
+            # own limit.
+            self.close()
+
+        self._watcher = threading.Thread(target=watch, daemon=True, name="parent-watch")
+        self._watcher.start()
+
+    def stop(self) -> None:
+        if self._thread is not None:
+            self.httpd.shutdown()
+            self._thread.join()
+            self._thread = None
+        self.close()
+
+    def close(self) -> None:
+        self.httpd.server_close()
+        self.journal.close()
+
+    # ---- answers: every one of them facade calls under the lock ------------------------
+    def _root_of(self, query: Query) -> str | None:
+        """The browse folder for a request: the one named in it or the server's root; None -
+        neither of them. To the facade None would mean "the default of the environment", and
+        the server has a default of its own - its root - so the facade never gets None from
+        here."""
+        return query.root if query.root is not None else (
+            None if self.root is None else str(self.root))
+
+    def _root_required(self, query: Query) -> str:
+        root = self._root_of(query)
+        if root is None:
+            raise RequestError(400, t("serve.rootNotGiven"))
+        return root
+
+    def api_environment(self) -> dict:
+        """Without the lock: the environment is read from the registry, not from the facade,
+        and telling this server apart from another program must not wait for a walk of a
+        large folder going on under the lock."""
+        return dict(self.bench.environment(),
+                    root=None if self.root is None else str(self.root))
+
+    def api_catalog(self, query: Query) -> list[dict]:
+        with self.lock:
+            return self.bench.catalog(self._root_required(query),
+                                      with_morphs=not query.flag("all"),
+                                      rescan=query.flag("rescan"))
+
+    def api_payload(self, query: Query) -> dict:
+        with self.lock:
+            key = query.key
+            if key is not None:
+                self.bench.open_entry(key, self._root_required(query), not query.flag("all"))
+            if not self.bench.is_open():
+                raise RequestError(400, t("serve.meshNotOpen"))
+            return WebPage(self.bench).payload()
+
+    def api_preview_payload(self, query: Query) -> dict:
+        """Load a catalogue entry without selecting or editing the server's main scene.
+
+        Reuse the loaded Config, not Config(): a read request must not create or rewrite a
+        settings file. A fresh facade also keeps its catalogue cache, view, slider values
+        and workspace separate. It owns no journal, socket or other server resource to close.
+        Catalogue/root checks remain the facade's, and native reads keep the existing lock.
+        """
+        with self.lock:
+            key = query.key
+            if key is None:
+                raise RequestError(400, t("serve.meshNotOpen"))
+            root = self._root_required(query)
+            preview = MorphBench(self.cfg)
+            # Catalog.get also supports convenient unique partial names for the main
+            # viewer. A preview handle must bind the exact catalogue identity requested,
+            # never silently select a similarly named model from that convenience path.
+            with_morphs = not query.flag("all")
+            if isinstance(key, str) and not any(
+                    row["name"] == key for row in preview.catalog(root, with_morphs)):
+                raise RequestError(404, t("catalog.noEntryName", name=key, near=""))
+            preview.open_entry(key, root, with_morphs)
+            return WebPage(preview).payload()
+
+    def api_root(self, query: Query) -> dict:
+        """The server's root: name a new one, or ask which it is now."""
+        with self.lock:
+            if query.root is not None:
+                return self.set_root(query.root)
+            return {"root": None if self.root is None else str(self.root),
+                    "meshes": None if self.root is None else len(
+                        self.bench.catalog(str(self.root), self.with_morphs))}
+
+    def api_shutdown(self) -> dict:
+        """Stop the server at a client's asking - the launcher window's or `serve --stop`'s.
+
+        The answer has to leave before the serving loop stops, and `shutdown()` waits for
+        that loop and cannot be called from the request's own thread - hence a thread of its
+        own."""
+        threading.Thread(target=self.httpd.shutdown, daemon=True).start()
+        return {"stopping": True, "url": self.url}
+
+    def api_physics_import(self, body):
+        from .physics_document import parse_document
+        if not isinstance(body, dict) or set(body) != {"kind", "text"}:
+            raise ValueError(t("workspace.invalid", field="document"))
+        document = parse_document(body["kind"], body["text"],
+                                  max_chars=int(self.cfg["physicsMaxChars"]),
+                                  max_fields=int(self.cfg["physicsMaxFields"]))
+        return {"document": document}
+
+    def api_addons(self, body=None):
+        with self.lock:
+            if body is not None:
+                if not isinstance(body, dict) or set(body) != {"id", "enabled"}:
+                    raise ValueError(t("err.addonParams"))
+                self.bench.addon_enable(body["id"], body["enabled"])
+            return self.bench.addons()
+
+    def api_addon_install(self, data):
+        with self.lock:
+            return self.bench.addon_install_bytes(data)
+
+    def api_addon_update(self, data):
+        with self.lock:
+            return self.bench.addon_update_bytes(data)
+
+    def addon_asset(self, path, *, generation=None, pinned=False):
+        identifier, separator, name = unquote(path).partition("/")
+        if pinned:
+            generation, separator, name = name.partition("/")
+        if not separator:
+            raise FileNotFoundError(t("err.addonParams"))
+        with self.lock:
+            return self.bench.addon_asset(identifier, name, generation=generation)
+
+    def api_workspace(self, body=None):
+        with self.lock:
+            if body is not None:
+                if not isinstance(body, dict) or set(body) != {"actions"}:
+                    raise ValueError(t("workspace.invalid", field="actions"))
+                self.bench.workspace_replay(body["actions"])
+            return {"workspace": self.bench.workspace_state(),
+                    "colliders": self.bench.collider_editor_payload(),
+                    "physics": self.bench.physics_state(),
+                    "ppb": self.bench.ppb_state(),
+                    "fileVisibility": self.bench.file_visibility(),
+                    "ppbText": self.bench.ppb_export() if self.bench.ppb_state()["document"] else None,
+                    "envelopes": self.bench.physics_envelopes(),
+                    "text": self.bench.physics_export() if self.bench.physics_state()["document"] else None}
+
+    def api_skeleton(self, recipe):
+        if (not isinstance(recipe, dict) or recipe.get("format") != "morphbench-workspace"
+                or recipe.get("version") != 1):
+            raise ValueError(t("workspace.invalid", field="recipe"))
+        with self.lock:
+            if self.bench.rig is None or recipe.get("source") != WebPage.source_identity(self.bench):
+                raise ValueError(t("workspace.stale"))
+            with open(self.bench.rig.path, "rb") as stream:
+                if hashlib.file_digest(stream, "sha256").hexdigest() != self.bench.rig.source_sha256:
+                    raise ValueError(t("workspace.stale"))
+            clone = copy.copy(self.bench)
+            clone.rig, clone.view, clone._placements = copy.deepcopy(self.bench.rig), copy.deepcopy(self.bench.view), copy.deepcopy(self.bench._placements)
+            if hasattr(clone, "_physics_workspace"):
+                clone._physics_workspace = copy.deepcopy(clone._physics_workspace)
+            if hasattr(clone, "_ppb_workspace"):
+                clone._ppb_workspace = copy.deepcopy(clone._ppb_workspace)
+            clone._workspace_tabs = copy.deepcopy(getattr(self.bench, "_workspace_tabs", {}))
+            clone.collider_reset()
+            clone.workspace_replay(recipe.get("actions"))
+        directory = self.cfg["editorTempDirectory"] or None
+        with tempfile.TemporaryDirectory(prefix="morphbench-export-", dir=directory) as temporary:
+            path = Path(temporary) / "skeleton.nif"
+            clone.collider_save(path)
+            return path.read_bytes()
+
+    def page(self, query: Query) -> tuple[str, int]:
+        """The page for a request: the meshes under the root, the named body opened, and
+        whatever did not work - as text on the panel, not as an empty answer. On a failure
+        the listing is taken by the server's root, so that there is something to choose
+        from; without a root the listing is empty, and that is not a failure - the folder is
+        named on the page."""
+        with_morphs = not query.flag("all") if "all" in query.values else self.with_morphs
+        error, status = None, 200
+        with self.lock:
+            # Query options and a rig association belong to the same selection. Keep the
+            # current workspace when a later part of that selection cannot be opened.
+            bench = copy.copy(self.bench)
+            bench.view = copy.deepcopy(self.bench.view)
+            bench._placements = copy.deepcopy(self.bench._placements)
+            bench._workspace_tabs = copy.deepcopy(getattr(self.bench, "_workspace_tabs", {}))
+            root = self._root_of(query)
+            shown_root = root
+            catalog: list[dict] = []
+            try:
+                if root is not None:
+                    catalog = bench.catalog(root, with_morphs)
+                key = query.key
+                if key is not None:
+                    bench.open_entry(key, self._root_required(query), with_morphs)
+                skeleton = query.get("skeleton")
+                if skeleton:
+                    if not bench.env.allows(skeleton):
+                        raise PermissionError(t("workspace.invalid", field="skeleton path"))
+                    bench.open_skeleton(skeleton)
+                if query.get("mode") is not None:
+                    bench.workspace_mode(query.get("mode"))
+                enabled_mode = bench.workspace_state()["mode"] in bench.workspace_modes()
+                if not enabled_mode:
+                    bench.workspace_mode("morphs")
+                if query.get("tab") is not None and enabled_mode:
+                    bench.workspace_tab(query.get("tab"))
+            except Exception as e:  # noqa: BLE001 - any refusal of the facade is shown as text
+                error, status = _message(e), _status_of(e)
+                bench = self.bench
+                catalog = []
+                if self.root is not None:
+                    try:
+                        catalog = bench.catalog(str(self.root), with_morphs)
+                    except Exception:  # noqa: BLE001
+                        catalog = []
+                shown_root = None if self.root is None else str(self.root)
+            page = WebPage(bench, server=True, catalog=catalog, environment=bench.environment(),
+                           root=shown_root, with_morphs=with_morphs, error=error)
+            html = page.html(linked=True)
+            if error is None:
+                self.bench.__dict__.update(bench.__dict__)
+            return html, status
+
+    def __repr__(self) -> str:
+        return "WebServer(%s, root=%s)" % (self.url, self.root or "not set")
+
+
+class ServerLink:
+    """The client side: is a server alive at this address, and is it ours.
+
+    The launch needs it: `mb.py serve` first asks whether a server is up already, and if it
+    is, does not raise a second one but hands it the root and opens the page. From inside
+    MO2 that is the handing over of the path: the process MO2 started sees the game's Data
+    through usvfs and names it to the server.
+    """
+
+    def __init__(self, host: str, port: int, timeout: float = 2.0):
+        self.host = dial_host(host)
+        self.port = int(port)
+        self.timeout = float(timeout)
+        # No proxy: the address is local, and the environment variables could send it out.
+        self._opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+
+    @property
+    def url(self) -> str:
+        return "http://%s:%d/" % (self.host, self.port)
+
+    def _get(self, path: str) -> dict:
+        with self._opener.open(self.url.rstrip("/") + path, timeout=self.timeout) as r:
+            if not str(r.headers.get("Server", "")).startswith(SERVER_NAME):
+                raise RequestError(502, t("serve.notMorphbench", url=self.url))
+            return json.loads(r.read().decode("utf-8"))
+
+    def probe(self) -> str:
+        """`free` - the port is free, `ours` - our server is there, `busy` - another program,
+        `slow` - there is a connection but no answer in the time allowed: who is there
+        cannot be told."""
+        try:
+            with socket.create_connection((self.host, self.port), timeout=self.timeout):
+                pass
+        except OSError:
+            return "free"
+        try:
+            self._get("/api/environment")
+        except urllib.error.URLError as e:
+            return "slow" if isinstance(e.reason, (TimeoutError, socket.timeout)) else "busy"
+        except (TimeoutError, socket.timeout):
+            return "slow"
+        except Exception:  # noqa: BLE001 - any answer that is not ours means another program
+            return "busy"
+        return "ours"
+
+    def environment(self) -> dict:
+        """The environment of the running server: is it under MO2 and what root it has."""
+        return self._get("/api/environment")
+
+    def _call(self, path: str) -> dict:
+        """A request to the server; its refusal is a RequestError with the server's code and
+        text."""
+        try:
+            return self._get(path)
+        except urllib.error.HTTPError as e:
+            try:
+                message = json.loads(e.read().decode("utf-8")).get("error") or str(e)
+            except Exception:  # noqa: BLE001
+                message = str(e)
+            raise RequestError(e.code, message) from None
+
+    def set_root(self, root) -> dict:
+        """Hand the browse root to the server. A refusal of the server is a RequestError
+        with its text."""
+        return self._call("/api/root?" + urllib.parse.urlencode({"root": str(root)}))
+
+    def root(self) -> dict:
+        """The server's root and the number of meshes under it."""
+        return self._call("/api/root")
+
+    def shutdown(self) -> dict:
+        """Ask the server to stop."""
+        return self._call("/api/shutdown")
+
+    def status(self) -> dict:
+        """In one dictionary: is the port free, is the server ours, what it knows about
+        itself. `state` is free, ours or busy; the rest is filled in for ours only."""
+        state = self.probe()
+        out = {"state": state, "url": self.url, "insideMo2": None, "root": None, "meshes": None}
+        if state == "ours":
+            env = self.environment()
+            out["insideMo2"] = env.get("insideMo2")
+            out["dataRoot"] = env.get("dataRoot")
+            try:
+                out.update(self.root())
+            except Exception:  # noqa: BLE001 - the root is not required for the state
+                out["root"] = env.get("root")
+        return out
+
+    def open_page(self, mode=None) -> None:
+        webbrowser.open(self.url + ("?mode=" + urllib.parse.quote(str(mode)) if mode else ""))
+
+
+class _Handler(BaseHTTPRequestHandler):
+    """Reading the path and sending the answer; the content is WebServer's."""
+
+    server_version = SERVER_NAME
+
+    def __init__(self, owner: WebServer, *args, **kwargs):
+        self.owner = owner
+        super().__init__(*args, **kwargs)
+
+    # ---- sending ----------------------------------------------------------------------
+    def _send(self, body: bytes, content_type: str, status: int = 200, headers=None) -> None:
+        self.send_response(status)
+        self.send_header("Content-Type", content_type)
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("X-Content-Type-Options", "nosniff")
+        for key, value in (headers or {}).items():
+            self.send_header(key, value)
+        self.end_headers()
+        self.wfile.write(body)
+
+    def _send_json(self, data, status: int = 200) -> None:
+        body = json.dumps(data, ensure_ascii=False, allow_nan=False).encode("utf-8")
+        self._send(body, "application/json; charset=utf-8", status)
+
+    def _send_html(self, html: str, status: int = 200) -> None:
+        self._send(html.encode("utf-8"), "text/html; charset=utf-8", status)
+
+    # ---- routes -----------------------------------------------------------------------
+    def do_GET(self) -> None:  # noqa: N802 - the name is set by http.server
+        url = urlsplit(self.path)
+        query = Query(url.query)
+        owner = self.owner
+        try:
+            if (url.path == "/" or url.path.startswith("/api/")) and (
+                    self._foreign_origin() or self.headers.get("Sec-Fetch-Dest") == "iframe"):
+                raise RequestError(403, t("workspace.origin"))
+            if url.path == "/":
+                html, status = owner.page(query)
+                self._send_html(html, status)
+            elif url.path == "/api/environment":
+                self._send_json(owner.api_environment())
+            elif url.path == "/api/catalog":
+                self._send_json(owner.api_catalog(query))
+            elif url.path == "/api/payload":
+                self._send_json(owner.api_payload(query))
+            elif url.path == "/api/preview-payload":
+                self._send_json(owner.api_preview_payload(query))
+            elif url.path == "/api/root":
+                self._send_json(owner.api_root(query))
+            elif url.path == "/api/workspace":
+                self._send_json(owner.api_workspace())
+            elif url.path == "/api/addons":
+                self._send_json(owner.api_addons())
+            elif url.path == "/api/shutdown":
+                self._send_json(owner.api_shutdown())
+            elif url.path.startswith(("/addons/", "/addon-assets/")):
+                pinned = url.path.startswith("/addon-assets/")
+                prefix = "/addon-assets/" if pinned else "/addons/"
+                relative = url.path[len(prefix):]
+                body, kind = owner.addon_asset(relative, generation=query.get("generation"),
+                                               pinned=pinned)
+                pieces = unquote(relative).split("/")
+                requested = urlsplit("http://" + self.headers.get("Host", ""))
+                origin = ("http://" + requested.netloc if requested.hostname in
+                          ("localhost", "127.0.0.1", "::1") and requested.port == owner.port
+                          else owner.url.rstrip("/"))
+                package_url = origin + prefix + "/".join(pieces[:2] if pinned else pieces[:1]) + "/"
+                # Browser-only extensions have no direct network, parent DOM, forms,
+                # popups, nested frames or native host imports. Packaged JS may compile
+                # embedded WebAssembly bytes inside the same opaque frame. This narrow
+                # CSP token does not enable JS eval or network loading of modules.
+                self._send(body, kind, headers={"Content-Security-Policy":
+                    "default-src 'none'; script-src " + package_url + " " + origin + "/web/addon-sdk.js 'unsafe-inline' 'wasm-unsafe-eval'; "
+                    "style-src " + package_url + " 'unsafe-inline'; img-src " + package_url + " data:; "
+                    "connect-src 'none'; form-action 'none'; base-uri 'none'; "
+                    "frame-src 'none'; object-src 'none'; sandbox allow-scripts"})
+            elif url.path.startswith(PREFIX):
+                body, kind = owner.assets.blob(url.path[len(PREFIX):])
+                self._send(body, kind)
+            elif url.path == "/favicon.ico":
+                # The page carries its own icon; browsers ask anyway - empty, and quietly.
+                self.send_response(204)
+                self.end_headers()
+            else:
+                raise RequestError(404, t("serve.noSuchPath", path=url.path))
+        except Exception as e:  # noqa: BLE001 - any refusal goes to the client as a code and a text
+            self._send_json({"error": _message(e), **({"code": e.code} if hasattr(e, "code") else {})}, _status_of(e))
+
+    def _foreign_origin(self):
+        origin = self.headers.get("Origin")
+        return bool(origin and urlsplit(origin).netloc != self.headers.get("Host")
+                    or self.headers.get("Sec-Fetch-Site") == "cross-site")
+
+    def do_POST(self) -> None:  # noqa: N802
+        try:
+            path = urlsplit(self.path).path
+            if path not in ("/api/physics/import", "/api/workspace", "/api/workspace/skeleton",
+                            "/api/addons/install", "/api/addons/update", "/api/addons/enabled"):
+                raise RequestError(404, t("serve.noSuchPath", path=path))
+            uploading = path in ("/api/addons/install", "/api/addons/update")
+            if (self._foreign_origin() or self.headers.get_content_type() !=
+                    ("application/zip" if uploading else "application/json")):
+                raise RequestError(403, t("workspace.origin"))
+            length = int(self.headers.get("Content-Length", "0"))
+            limit = (self.owner.cfg["addonLimits"]["maxArchiveBytes"] if uploading
+                     else self.owner.cfg["workspaceRequestLimit"])
+            if length <= 0 or length > int(limit):
+                raise RequestError(413, t("workspace.large"))
+            if uploading:
+                operation = (self.owner.api_addon_update if path == "/api/addons/update"
+                             else self.owner.api_addon_install)
+                self._send_json(operation(self.rfile.read(length)))
+                return
+            def bad_constant(value):
+                raise ValueError(t("workspace.invalid", field=value))
+            try:
+                body = json.loads(self.rfile.read(length).decode("utf-8"), parse_constant=bad_constant)
+            except (UnicodeError, json.JSONDecodeError):
+                raise ValueError(t("workspace.invalid", field="JSON")) from None
+            if path == "/api/physics/import":
+                self._send_json(self.owner.api_physics_import(body))
+            elif path == "/api/addons/enabled":
+                self._send_json(self.owner.api_addons(body))
+            elif path == "/api/workspace":
+                self._send_json(self.owner.api_workspace(body))
+            else:
+                self._send(self.owner.api_skeleton(body), "application/octet-stream")
+        except Exception as exc:  # noqa: BLE001
+            self._send_json({"error": _message(exc), **({"code": exc.code} if hasattr(exc, "code") else {})}, _status_of(exc))
+
+    # ---- the journal ------------------------------------------------------------------
+    def _quiet(self) -> bool:
+        """The status poll: whoever raised the server asks it on every refresh, and in the
+        window that poll would blot out everything else. So it is written a level down
+        rather than thrown away: in the journal file it stays, and that is where it is
+        wanted. Handing over the root (`/api/root?root=...`) is an event, not a poll, and
+        goes at the usual level."""
+        # The parse may not have reached the path (a mangled first line of the request) -
+        # then it is not a poll.
+        url = urlsplit(getattr(self, "path", "") or "")
+        if url.path in ("/api/environment", "/favicon.ico"):
+            return True
+        return url.path == "/api/root" and "root=" not in url.query
+
+    def _write(self, level, text: str) -> None:
+        """A record through the owner's journal. The journal does not throw, and neither
+        must the way to it: this is reached from sending the answer, before the headers, and
+        any refusal here would cut the client off without a single word - exactly the defect
+        the journal was made for."""
+        try:
+            self.owner.journal.log(level, "%s - %s" % (self.address_string(), text))
+        except Exception:                    # noqa: BLE001 - the journal is not the answer's master
+            pass
+
+    def log_request(self, code="-", size="-") -> None:
+        self._write("debug" if self._quiet() else "info",
+                    '"%s" %s %s' % (getattr(self, "requestline", "-"), code, size))
+
+    def log_error(self, fmt, *args) -> None:
+        self._write("error", fmt % args)
+
+    def log_message(self, fmt, *args) -> None:
+        self._write("info", fmt % args)

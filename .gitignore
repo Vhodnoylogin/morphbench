@@ -1,6 +1,7 @@
 ﻿# Продукты сборки и окружения в репозиторий не попадают.
 build/
 dist/
+target/
 .venv/
 models/
 __pycache__/
@@ -31,7 +32,14 @@ morphbench.json
 /morphbench.launcher.json
 /morphbench.diag.json
 /morphbench.diag.png
+/addons/
+/src/main/addons/
+/src/main/morphbench.launcher.json
+/src/main/morphbench.diag.json
+/src/main/morphbench.diag.png
 
 # Preview of the icon - an intermediate product of make-icon.py. The icon itself, the .ico,
 # is versioned through LFS: those are the bytes that travel inside morphbench.exe.
-/launcher/morphbench.png
+/src/main/launcher/morphbench.png
+/src/main/launcher/morphbench.ico
+.morphbench-no-bytecode/

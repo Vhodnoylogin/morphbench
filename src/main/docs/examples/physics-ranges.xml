@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Diagnostic editor example only. Not a game preset: do not install it in Data.
+     Requires a human skeleton with NPC Spine1 [Spn1] and NPC Spine2 [Spn2].
+     Change linearUpperLimit.x from 5 to 15 to see the static range extend. -->
+<system>
+  <generic-constraint bodyA="NPC Spine1 [Spn1]" bodyB="NPC Spine2 [Spn2]">
+    <linearLowerLimit x="-5" y="-5" z="-5"/>
+    <linearUpperLimit x="5" y="5" z="5"/>
+    <angularLowerLimit x="-0.3" y="-0.3" z="-0.3"/>
+    <angularUpperLimit x="0.3" y="0.3" z="0.3"/>
+  </generic-constraint>
+</system>

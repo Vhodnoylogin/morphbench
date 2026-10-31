@@ -1,0 +1,18 @@
+:root { color-scheme: dark; font: 14px/1.45 system-ui, sans-serif; background: #181b20; color: #e2e6ed; }
+body { margin: 0; }
+main { padding: 16px; max-width: 72rem; margin: auto; }
+h1 { font-size: 1.35rem; margin-top: 0; }
+h2 { font-size: 1rem; }
+p { overflow-wrap: anywhere; }
+fieldset { border: 1px solid #454d5a; border-radius: 6px; padding: 12px; }
+.row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 12px; }
+select, input, button { font: inherit; color: inherit; background: #262d37; border: 1px solid #626e7e; border-radius: 4px; padding: 6px 8px; max-width: 100%; }
+select { min-width: 8rem; flex: 1; }
+input { width: 6rem; }
+button { cursor: pointer; }
+button:hover:enabled { background: #364355; }
+:focus-visible { outline: 2px solid #8dc5ff; outline-offset: 2px; }
+:disabled { opacity: .55; cursor: default; }
+pre { white-space: pre-wrap; overflow-wrap: anywhere; border: 1px solid #454d5a; border-radius: 6px; padding: 12px; background: #101318; }
+#scope, #status { color: #b9c4d3; }
+#error { color: #ffb3b3; border-left: 3px solid currentColor; padding-left: 10px; }

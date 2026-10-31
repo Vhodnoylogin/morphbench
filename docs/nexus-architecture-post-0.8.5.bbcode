@@ -5,8 +5,8 @@ Version 0.8.5 uses three folders inside one Morphbench installation:
 Morphbench/app/
 Morphbench/plugins/[/code]
 [list]
-[*][b]Morphbench Launcher v1[/b] contains the EXE, embedded Python and native dependencies. Install it for the first setup and keep it for compatible Application updates. Its version is independent of the application's version.
-[*][b]Application 0.8.5[/b] contains the workbench, browser interface, documentation and updater. This is the Main/Primary download and contains no native binaries.
+[*][b]Morphbench Launcher[/b] contains the EXE, embedded Python and native dependencies. Install it for the first setup and keep it for compatible Application updates. Its version is independent of the application's version.
+[*][b]Application[/b] contains the workbench, browser interface, documentation and updater. This is the Main/Primary download and contains no native binaries.
 [*][b]plugins[/b] stores separately installed browser add-ons and their registry. Compatible Application updates preserve plugins and settings.
 [/list]
 This separation lets us update the application without uploading the same executable and native libraries again for every release, reducing repeated quarantine reviews of unchanged files. Native dependency or security changes will still require a new Launcher version.

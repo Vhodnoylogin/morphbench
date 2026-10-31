@@ -39,5 +39,15 @@
   "page.addonPreviewLimit": "Закройте одно из представлений перед открытием нового.",
   "page.addonPreviewTimeout": "Превышено время загрузки модели для представления.",
   "page.addonPreviewConfig": "Некорректные ограничения представлений в настройках Morphbench.",
-  "page.addonPreviewMesh": "Для этого представления нужен меш с геометрией из треугольников."
+  "page.addonPreviewMesh": "Для этого представления нужен меш с геометрией из треугольников.",
+  "page.addonExportTitle": "Подготовленный экспорт аддона",
+  "page.addonExportReady": "Готов к скачиванию файл %(filename)s (%(bytes)s байт UTF-8). Нажмите «Скачать», чтобы сохранить этот снимок.",
+  "page.addonExportDownload": "Скачать подготовленный файл",
+  "page.addonExportCancel": "Отменить подготовленный экспорт",
+  "page.addonExportChecking": "Проверка активного аддона перед скачиванием…",
+  "page.addonExportConfig": "Некорректные ограничения экспорта в настройках Morphbench.",
+  "page.addonExportLimit": "Подготовленный файл превышает заданный предел байт UTF-8.",
+  "page.addonExportFormat": "Нужен корректный JSON или XML без DTD, объявлений сущностей и таблиц стилей XML.",
+  "page.addonExportTimeout": "Превышено время проверки аддона. Нажмите «Скачать» ещё раз.",
+  "page.addonExportUnavailable": "Браузер не смог запросить скачивание. Повторите в браузере, который поддерживает загрузку файлов."
 }

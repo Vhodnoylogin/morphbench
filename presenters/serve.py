@@ -639,9 +639,11 @@ class _Handler(BaseHTTPRequestHandler):
                           else owner.url.rstrip("/"))
                 package_url = origin + prefix + "/".join(pieces[:2] if pinned else pieces[:1]) + "/"
                 # Browser-only extensions have no direct network, parent DOM, forms,
-                # popups, nested frames or native execution. SDK messages are the door.
+                # popups, nested frames or native host imports. Packaged JS may compile
+                # embedded WebAssembly bytes inside the same opaque frame. This narrow
+                # CSP token does not enable JS eval or network loading of modules.
                 self._send(body, kind, headers={"Content-Security-Policy":
-                    "default-src 'none'; script-src " + package_url + " " + origin + "/web/addon-sdk.js 'unsafe-inline'; "
+                    "default-src 'none'; script-src " + package_url + " " + origin + "/web/addon-sdk.js 'unsafe-inline' 'wasm-unsafe-eval'; "
                     "style-src " + package_url + " 'unsafe-inline'; img-src " + package_url + " data:; "
                     "connect-src 'none'; form-action 'none'; base-uri 'none'; "
                     "frame-src 'none'; object-src 'none'; sandbox allow-scripts"})

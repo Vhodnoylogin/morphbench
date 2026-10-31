@@ -3,7 +3,7 @@
 Russian: [addons.ru.md](addons.ru.md).
 
 This document describes API **v1**. The package-update and session-state extensions shipped in
-**Application 0.8.0**. Independent previews are a further additive extension: the published
+**Application 0.8.0**. Independent previews and prepared file exports are further additive extensions: the published
 Application 0.8.0 baseline does not provide them. Check the connected host's capabilities before
 using them; `apiVersion:1` alone does not establish their availability.
 Install Application with the required **Morphbench Launcher v1**
@@ -470,6 +470,72 @@ The guarantee ends when the tab closes, the origin changes or browser storage is
 an origin includes the port, and the server does not promise port stability. A browser may
 restore a previous tab session, but this is not durable project storage. Export important work
 through an explicit file workflow.
+
+## Prepared file exports
+
+This additive API v1 extension lets an add-on offer an edited JSON or XML preset for download.
+Check `host.info.capabilities` for `exports.prepare` and `exports.cancel`. The sandbox stays
+`sandbox="allow-scripts"`: it is not granted `allow-downloads`, filesystem access or arbitrary
+URL navigation. An SDK request never starts a download on its own.
+
+| Method | Parameters | Result |
+|---|---|---|
+| `exports.prepare` | `{filename:string,format:"json"\|"xml",text:string}` | `{prepared:true,filename,format,bytes}` |
+| `exports.cancel` | `{}` | `{cancelled:boolean}` |
+
+```javascript
+const host = await MorphbenchAddon.connect();
+if (!host.capabilities.includes("exports.prepare")) {
+  throw new Error("This Morphbench host does not support file exports.");
+}
+MorphbenchAddon.on("exports.requested", ({filename, format, bytes}) => {
+  // The browser was asked to download this snapshot; a completed disk save is not observable.
+});
+await MorphbenchAddon.request("exports.prepare", {
+  filename: "edited-preset.v2.json",
+  format: "json",
+  text: JSON.stringify(editedPreset, null, 2) + "\n"
+});
+// The host now presents its own Download and Discard buttons outside the iframe.
+// A person clicks Download to request the browser's ordinary file download.
+```
+
+The host keeps one immutable pending snapshot per active frame. Preparing another valid
+file replaces the previous one; a rejected preparation preserves it. Later edits in the
+add-on do not alter the prepared bytes: prepare again to export those changes. Cancel removes
+the pending control without changing the model, session data or installed add-on. Returning
+to the inspector, changing add-ons or closing the frame clears pending exports.
+
+`host.info.exportLimits` returns `{maxBytes,authorizeTimeoutMs,formats:["json","xml"],
+maxFilenameBytes:255,pendingFiles:1}`. `addonExportMaxBytes` defaults to **1048576** UTF-8 bytes;
+`addonExportAuthorizeTimeoutMs` defaults to **8000 ms** and must be below the SDK's 10-second
+request deadline. Limits must be positive safe integers. Text is valid Unicode and is exported
+byte-for-byte as UTF-8, with no newline, numeric or whitespace normalization. JSON must parse;
+XML must be well formed and cannot contain DTD/entity declarations or XML stylesheets. The
+host never executes or inserts the contents as markup. A filename is one portable leaf with
+the exact lowercase `.json` or `.xml` suffix matching `format`; letters, marks, numbers, spaces,
+dots, `_` and `-` are allowed in its base. Paths, leading dots, repeated dots, trailing spaces,
+control/bidi characters and Windows device names are rejected. The filename byte limit is
+separate from the content limit.
+
+Download requires a real click on the host-owned button. Before creating a Blob, the host
+rechecks the sending frame, enabled/compatible installed package, generation and exact pending
+snapshot, including after asynchronous registry authorization. A timeout, cancellation,
+replacement or late authorization cannot trigger a download for an old snapshot. The Blob is
+inert `text/plain;charset=utf-8` with the supplied download filename; the browser chooses its
+destination and may ask, block or cancel. The host retains at most one object URL and revokes
+it on the next download or frame teardown.
+
+`exports.requested` carries `{filename,format,bytes}` after a browser download request. It is
+not a disk-save acknowledgement. Validation failures use `invalidParams`, oversized content
+uses `limitExceeded`, and invalid settings use `invalidExportConfig`. Authorization uses the
+usual `disabled`/`staleGeneration` codes. Download-time timeout or unavailable browser support
+is shown on the host control (`exportTimeout`/`exportUnavailable`); the pending file can be
+retried deliberately. Add-ons receive no arbitrary output path, server write or native call.
+
+For optional local calculation modules embedded in add-on JavaScript, see
+[WebAssembly inside an add-on](addon-wasm.md). This is a separate browser capability, with no
+new Morphbench RPC or additional iframe privileges.
 
 ## Isolation and lifecycle
 

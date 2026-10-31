@@ -143,3 +143,5 @@ installation. Its isolated `_pth` intentionally does not add the current working
 Runtime-only Python cannot import Application modules in subprocess checks. Run full interpreter
 passes sequentially: the recovery fixtures flush backups of more than a thousand real files,
 and parallel runs can exhaust their process time budget under filesystem contention.
+
+`test_addon_exports.py` checks inert immutable JSON/XML preparation, UTF-8/name/format limits, trusted host download controls, fresh bounded authorization, generation/frame/snapshot replacement, cancellation and URL disposal. `test_addon_wasm.py` checks the narrow Wasm CSP allowance, pinned assets and raw-module rejection; browser validation separately checks policy enforcement.

@@ -61,6 +61,7 @@ class PageAssets:
         "js/editor_panel.js",
         "js/app.js",
         "js/addon_preview_host.js",
+        "js/addon_exports.js",
         "js/addons.js",
         "js/boot.js",
     )

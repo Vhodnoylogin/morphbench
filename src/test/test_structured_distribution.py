@@ -32,17 +32,19 @@ class TestStructuredDistribution(unittest.TestCase):
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_bytes((helper.root / name).read_bytes())
 
-    def package(self, version, extra=None):
+    def package(self, version, extra=None, *, schema=1):
         flat, _ = self.helper.package(version, extra)
         _, contents = dist.read_application(flat)
         files = {"app/" + name: data for name, data in contents.items()}
         files.update({"app/mb_paths.py": b"# paths", "launcher/mb.py": b"# entry shim",
                       "launcher/locale/en/launcher.json": b"{}",
                       "launcher/locale/ru/launcher.json": b"{}"})
-        manifest = {"schemaVersion": 1, "kind": "application", "name": "morphbench",
+        manifest = {"schemaVersion": schema, "kind": "application", "name": "morphbench",
                     "version": version, "layout": dist.STRUCTURED,
                     "requiresRuntime": {key: self.runtime[key] for key in ("id", "contentHash")},
                     "files": {name: dist.digest(data) for name, data in files.items()}}
+        if schema == 2:
+            manifest["requiresRuntime"] = {"apiVersion": 1, "pythonAbi": "cp312-win_amd64"}
         archive = self.helper.folder / ("structured-" + version + ".zip")
         with zipfile.ZipFile(archive, "w", zipfile.ZIP_DEFLATED) as out:
             for name, data in files.items():
@@ -75,13 +77,44 @@ class TestStructuredDistribution(unittest.TestCase):
         self.assertEqual(snapshot(self.native), native_before)
         self.assertEqual(dist.runtime_for(self.root, manifest), self.runtime)
 
+    def test_schema_two_transition_preserves_structured_state_and_future_runtime_support(self):
+        archive, _ = self.package("0.8.5")
+        dist.update(self.root, archive)
+        users = {"app/morphbench.json": b'{"language":"ru"}',
+                 "launcher/morphbench.launcher.json": b'{"root":"keep"}',
+                 "plugins/state.json": b'{"enabled":["keep"]}',
+                 "plugins/generations/keep/kernel.js": b"/* keep */"}
+        for name, data in users.items():
+            target = self.root / name
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes(data)
+        self.runtime.update(applicationApi=1, pythonAbi="cp312-win_amd64", id="runtime-2-win64")
+        self.runtime.pop("contentHash")
+        self.runtime["contentHash"] = dist.digest(dist.canonical(self.runtime))
+        (self.native / dist.RUNTIME_MANIFEST).write_bytes(dist.canonical(self.runtime))
+        native_before = snapshot(self.native)
+        archive, manifest = self.package("0.8.6", schema=2)
+        dist.update(self.root / "app", archive)
+        self.assertEqual(dist.runtime_for(self.root, manifest), self.runtime)
+        self.assertEqual(snapshot(self.native), native_before)
+        self.assertEqual({name: (self.root / name).read_bytes() for name in users}, users)
+        with mock.patch.object(dist.sys, "platform", "win32"), \
+                mock.patch.object(dist.platform, "python_version", return_value="3.12.8"), \
+                mock.patch.object(dist.sys, "executable", str(self.native / "python/python.exe")):
+            lease = dist.startup(self.root / "app")
+            lease.__exit__(None, None, None)
+        with mock.patch.object(dist.sys, "platform", "win32"), \
+                mock.patch.object(dist.platform, "python_version", return_value="3.12.8"), \
+                mock.patch.object(dist.sys, "executable", str(self.native / "different-python.exe")):
+            self.helper.assert_code("interpreterMismatch", lambda: dist.startup(self.root / "app"))
+
     def test_app_cannot_claim_native_plugins_settings_or_other_launch_files(self):
         for name in ("launcher/morphbench.exe", "launcher/vendor/code.py", "plugins/a.js",
                      "app/morphbench.json", "launcher/morphbench.json", "launcher/build.cmd",
-                     "launcher/locale/en/other.json", "app/tests/check.py"):
+                     "launcher/locale/en/other.json", "app/tests/check.py", "app/launcher/mb.py"):
             with self.subTest(name=name):
                 self.assertFalse(dist.app_path(name, dist.STRUCTURED))
-        self.assertFalse(dist.app_path("launcher/mb.py", "flat-v1"))
+        self.assertTrue(dist.app_path("launcher/mb.py", "flat-v1"))
         self.assertFalse(dist.app_path("mb.py", dist.STRUCTURED))
 
     def test_cross_layout_update_refuses_without_changing_either_installation(self):
@@ -149,6 +182,8 @@ class TestStructuredDistribution(unittest.TestCase):
             self.helper.assert_code("manifest", lambda: dist.startup(app))
 
     def test_default_builder_envelopes_share_only_the_explicit_bootstrap_overlay(self):
+        self.helper.advertise_runtime("runtime-1-win64")
+        (self.native / dist.RUNTIME_MANIFEST).write_bytes(dist.canonical(self.runtime))
         out = self.helper.folder / "build-default"
         source = self.helper.folder / "flat-source"
         # Keep synthetic Runtime identity isolated from the real source lock.
@@ -166,7 +201,7 @@ class TestStructuredDistribution(unittest.TestCase):
             release.main(["--package", "runtime", "--runtime-from", str(self.helper.root),
                           "--out", str(out)])
             release.main(["--package", "application", "--runtime", str(self.native / dist.RUNTIME_MANIFEST),
-                          "--version", "0.8.1", "--out", str(out)])
+                          "--version", "0.8.1", "--source-commit", "a" * 40, "--out", str(out)])
         with zipfile.ZipFile(out / "morphbench-runtime-1-win64.zip") as archive:
             runtime = {name: archive.read(name) for name in archive.namelist()}
         with zipfile.ZipFile(out / "morphbench-application-0.8.1.zip") as archive:

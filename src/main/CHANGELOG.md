@@ -25,6 +25,14 @@ go in a major release, and nowhere else.
 - Pin the existing Launcher v1 Runtime as a build dependency. Installed package paths,
   browser feature availability and CLI/SDK/HTTP contracts remain unchanged.
 
+## [0.8.6] — 2026-10-31
+
+- Release Launcher v2 with bounded child execution, concurrent output draining, cancellation and safe window closure.
+- Move installation/settings discovery into the Application-owned bootstrap protocol v1; retain stable versioned server adapters.
+- Replace exact Runtime-byte binding with API v1 / CPython 3.12 Windows x64 ABI compatibility; continue verifying each Runtime inventory independently.
+- Preserve Launcher v1 compatibility; the first upgrade uses the newly extracted updater, then later compatible Launcher updates need no Application rebuild.
+- Keep user archives runtime-only, with brief installation and immutable source notices. Settings and plugins remain user-owned.
+
 ## [0.8.5] — 2026-10-31
 
 - Package new installations as `root/Morphbench/launcher`, `app` and `plugins`.

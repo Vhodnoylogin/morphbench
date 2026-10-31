@@ -2,10 +2,10 @@
 
 Русская версия — [updating.ru.md](updating.ru.md).
 
-Download both **Application 0.8.5** (main file) and **Morphbench Launcher v1**.
-Their versions are independent: the required Runtime identity remains `runtime-1-win64`.
-Its inventoried EXE, Python and native dependencies are unchanged; the new ZIP envelope
-changes the archive hash. No separate Python or Blender installation is needed.
+Download both **Application 0.8.6** (main file) and **Morphbench Launcher v2**.
+Their versions are independent. Application accepts Runtime API 1 / CPython 3.12 Windows
+x64 compatibility and verifies each Runtime inventory separately. Launcher v2 is a new
+native package; compatible future Runtime versions do not require rebuilding Application. No separate Python or Blender installation is needed.
 
 Separating the packages avoids reuploading the same native binaries and repeating their
 quarantine review for each Application update. Each upload remains subject to Nexus checks;
@@ -13,7 +13,7 @@ this is not antivirus approval or a review exemption. Manual and Mod manager dow
 
 ## First installation
 
-Download `morphbench-application-0.8.5.zip` and `morphbench-runtime-1-win64.zip`.
+Download `morphbench-application-0.8.6.zip` and `morphbench-runtime-2-win64.zip`.
 Both archives start at `root/Morphbench/` and merge into:
 
 ```text
@@ -61,7 +61,7 @@ its version, Runtime requirement and result. The target defaults from `update.py
 from the working directory. `Morphbench` and `Morphbench/app` identify the same installation.
 Use `--target "<install>"` only when explicitly selecting another installation.
 
-The updater checks exact Runtime identity/hash, inventories and installed owned files.
+The updater checks Runtime API/ABI compatibility, inventories and installed owned files.
 Modified owned files and concurrent updaters are refused. A running Application holds a
 shared lock; an update needs an exclusive lock. Wait for completion before restarting.
 

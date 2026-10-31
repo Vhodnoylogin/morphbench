@@ -20,6 +20,16 @@ class Output(io.StringIO):
 
 
 class TestRelease(unittest.TestCase):
+    def test_repository_only_document_links_use_the_exact_source_commit(self):
+        contents = {"docs/page.md": b"[build](building.md) [ru](building.ru.md) [use](quickstart.md)",
+                    "web/main.js": b"untouched"}
+        result = release.user_document_links(contents, "a" * 40)
+        self.assertEqual(result["web/main.js"], contents["web/main.js"])
+        self.assertIn(("/blob/" + "a" * 40 + "/src/main/docs/building.md").encode(), result["docs/page.md"])
+        self.assertIn(b"/src/main/docs/building.ru.md)", result["docs/page.md"])
+        self.assertIn(b"[use](quickstart.md)", result["docs/page.md"])
+        self.assertEqual(contents["docs/page.md"].count(b"https://"), 0)
+
     def setUp(self):
         self.box = tempfile.TemporaryDirectory()
         self.addCleanup(self.box.cleanup)
@@ -43,7 +53,7 @@ class TestRelease(unittest.TestCase):
     def run_release(self, *args):
         with contextlib.redirect_stdout(Output()), contextlib.redirect_stderr(io.StringIO()):
             return release.main(["--version", "0.7.0", "--out", str(self.out),
-                                 "--stage-only", *args])
+                                 "--source-commit", "a" * 40, "--stage-only", *args])
 
     def test_no_vendor_manifest_and_notices_match_package(self):
         self.assertEqual(self.run_release("--no-vendor"), 0)
@@ -87,11 +97,14 @@ class TestRelease(unittest.TestCase):
         self.assertEqual(caught.exception.code, 2)
         self.assertFalse(self.out.exists())
 
-    def test_icon_is_part_of_launcher_sources(self):
+    def test_launcher_sources_and_standalone_icon_do_not_ship(self):
         icon = self.home / "launcher" / "morphbench.ico"
         icon.parent.mkdir()
         icon.write_bytes(b"icon")
-        self.assertIn(icon, release.own_files(self.home))
+        for name in ("morphbench.cs", "build.cmd", "morphbench.manifest", "make-icon.py"):
+            (icon.parent / name).write_text("developer build input")
+        selected = release.own_files(self.home)
+        self.assertFalse(any(path.parent == icon.parent for path in selected))
 
     def test_builder_catalogues_stay_in_source_only(self):
         language = self.home / "locale" / "en"
@@ -110,7 +123,9 @@ class TestRelease(unittest.TestCase):
         guide = docs / "quickstart.md"
         guide.write_text("user instructions")
         instructions = [self.home / "CLAUDE.md", self.home / "AGENTS.md", self.home / "SKILL.md",
-                        docs / "CLAUDE.md", docs / "agents.md", docs / "SKILL.md"]
+                        docs / "CLAUDE.md", docs / "agents.md", docs / "SKILL.md",
+                        docs / "building.md", docs / "building.ru.md",
+                        docs / "launcher-protocol.md", docs / "launcher-protocol.ru.md"]
         for path in instructions:
             path.write_text("repository developer instructions")
         selected = set(release.own_files(self.home))
@@ -131,6 +146,15 @@ class TestRelease(unittest.TestCase):
 
 
 class TestRuntimeContents(unittest.TestCase):
+    def test_runtime_omits_unused_f2py_build_configuration_and_keeps_licences(self):
+        contents = {"vendor/numpy/f2py/setup.cfg": b"build configuration",
+                    "vendor/numpy/f2py/_backends/meson.build.template": b"build template",
+                    "vendor/numpy/f2py/__init__.py": b"importable module",
+                    "vendor/numpy-2.dist-info/licenses/setup.cfg": b"required notice"}
+        retained = release.trim_runtime_contents(contents)
+        self.assertEqual(set(retained), {"vendor/numpy/f2py/__init__.py",
+                                       "vendor/numpy-2.dist-info/licenses/setup.cfg"})
+
     def setUp(self):
         self.box = tempfile.TemporaryDirectory()
         self.addCleanup(self.box.cleanup)
@@ -187,9 +211,8 @@ class TestRuntimeContents(unittest.TestCase):
         expected = {
             "numpy/__init__.py", "numpy/testing/__init__.py",
             "numpy/_typing/__init__.py", "numpy/typing/__init__.py",
-            "numpy/f2py/__init__.py", "numpy/f2py/src/fortranobject.h",
+            "numpy/f2py/__init__.py",
             "numpy/_core/_multiarray_umath.cp312-win_amd64.pyd",
-            "numpy/_core/_multiarray_tests.cp312-win_amd64.pyd",
             "numpy.libs/runtime.dll", "numpy-1.dist-info/licenses/LICENSE.txt",
             "numpy-1.dist-info/licenses/numpy/_core/include/numpy/LICENSE.txt",
             "numpy-1.dist-info/RECORD",

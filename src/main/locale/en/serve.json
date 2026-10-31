@@ -14,5 +14,6 @@
   "serve.parentGone": "the process that started the server (%(pid)d) is already gone",
   "serve.portSilent": "something is at %(url)s but did not answer within %(seconds).0f s: if that is our server walking a large folder, try again later",
   "serve.portTaken": "port %(port)d is taken by another program; name a different one with --port",
-  "serve.rootNotGiven": "no browse root: name a folder with the root= key"
+  "serve.rootNotGiven": "no browse root: name a folder with the root= key",
+  "serve.ownerMismatch": "the server belongs to a different process; shutdown refused"
 }

@@ -28,12 +28,18 @@ using System.Globalization;
 using System.IO;
 using System.Net;
 using System.Reflection;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Web.Script.Serialization;
 using System.Windows.Forms;
 using Microsoft.Win32;
+using Microsoft.Win32.SafeHandles;
+
+[assembly: AssemblyVersion("2.0.0.0")]
+[assembly: AssemblyFileVersion("2.0.0.0")]
+[assembly: AssemblyInformationalVersion("Morphbench Launcher v2 (protocol 1)")]
 
 static class Program
 {
@@ -43,22 +49,48 @@ static class Program
         Application.EnableVisualStyles();
         Application.SetCompatibleTextRenderingDefault(false);
         var options = Options.Parse(args);
+        var context = LaunchContext.Discover(options.Home);
+        Texts.Configure(context);
         if (options.Diag)
         {
             // Diagnostics without a window: what python sees from under MO2 - into a file
             // beside the exe. That is how the VFS is checked with nobody at the screen:
             // started through MO2, the answer is in the file.
-            string home = Module.FindHome(options.Home);
-            string python = home == null ? null : Module.FindPython(home);
-            string text = home == null ? Texts.T("launcher.diagNoModule")
-                : python == null ? Texts.T("launcher.diagNoPython")
-                : new Launcher(home, python).Cli("env --json") + "\n---catalog---\n"
-                  + new Launcher(home, python).Cli("render --entry assets/malebodywerewolf_0.nif --size 300x300 --colliders --out morphbench.diag.png --json");
-            File.WriteAllText(Path.Combine(home ?? AppDomain.CurrentDomain.BaseDirectory, "morphbench.diag.json"),
-                              text, new UTF8Encoding(false));
+            string home = context.Home;
+            string text = Diagnostic(context);
+            try
+            {
+                File.WriteAllText(Path.Combine(home ?? AppDomain.CurrentDomain.BaseDirectory, "morphbench.diag.json"),
+                                  text, new UTF8Encoding(false));
+            }
+            catch (Exception error)
+            {
+                Environment.ExitCode = 1;
+                try { Console.Error.WriteLine(error.Message); } catch (Exception) { }
+            }
             return;
         }
-        Application.Run(new MainForm(options));
+        Application.Run(new MainForm(options, context));
+    }
+
+    public static string Diagnostic(LaunchContext context)
+    {
+        var report = new Dictionary<string, object> { { "launcherProtocol", 1 } };
+        var json = new JavaScriptSerializer();
+        try
+        {
+            if (context.Home == null) throw new Exception(Texts.T("launcher.diagNoModule"));
+            if (context.Python == null) throw new Exception(Texts.T("launcher.diagNoPython"));
+            using (var launcher = new Launcher(context))
+            {
+                launcher.Initialize();
+                Texts.Configure(context);
+                report["environment"] = json.DeserializeObject(launcher.Cli(context.EnvironmentArgs));
+                report["status"] = json.DeserializeObject(launcher.Cli(context.StatusArgs));
+            }
+        }
+        catch (Exception error) { report["error"] = error.Message; }
+        return json.Serialize(report);
     }
 }
 
@@ -84,15 +116,21 @@ static class Texts
     //: `%(name)s` - by name, never by position: another language puts the words in another order.
     static readonly Regex Field = new Regex(@"%\((\w+)\)[-+ #0-9.]*[A-Za-z]");
 
-    static Texts()
+    public static void Configure(LaunchContext context)
     {
+        chosen.Clear();
+        fallback.Clear();
         try
         {
-            string home = Home();
-            string folder = Path.Combine(home, "locale");
+            string home = context.SettingsHome ?? context.Home ?? AppDomain.CurrentDomain.BaseDirectory;
+            string folder = context.LocaleHome ?? Path.Combine(home, "locale");
             Read(Path.Combine(folder, Base), fallback);
-            string language = Wanted(home);
+            string language = Wanted(context.Language);
             if (language != Base) Read(Path.Combine(folder, language), chosen);
+            // A damaged/missing Application can still explain itself using the launcher overlay.
+            string overlay = Path.Combine(context.Home ?? AppDomain.CurrentDomain.BaseDirectory, "locale");
+            Read(Path.Combine(overlay, Base), fallback);
+            if (language != Base) Read(Path.Combine(overlay, language), chosen);
         }
         catch (Exception)
         {
@@ -125,14 +163,15 @@ static class Texts
             values[name] = Convert.ToString(namesAndValues[i + 1], CultureInfo.InvariantCulture) ?? "";
         }
         bool whole = true;
+        bool substituted = false;
         string filled = Field.Replace(text, delegate(Match m)
         {
             string value;
-            if (values.TryGetValue(m.Groups[1].Value, out value)) return value;
+            if (values.TryGetValue(m.Groups[1].Value, out value)) { substituted = true; return value; }
             whole = false;
             return m.Value;
         });
-        if (whole) return filled;
+        if (whole && substituted) return filled;
         // A substitution that does not fit the text is the translator's slip, not a reason to
         // lose what the caller meant to say: the values are appended so nothing goes missing.
         var names = new List<string>(values.Keys);
@@ -147,10 +186,10 @@ static class Texts
     }
 
     /// Which language to speak: the variable, then the setting, then the language of Windows.
-    static string Wanted(string home)
+    static string Wanted(string configured)
     {
         string code = Clean(Environment.GetEnvironmentVariable(Env));
-        if (code.Length == 0) code = Clean(FromConfig(Path.Combine(home, "morphbench.json")));
+        if (code.Length == 0) code = Clean(configured);
         if (code.Length == 0 || code == "auto") code = SystemLanguage();
         return code.Length == 0 ? Base : code;
     }
@@ -168,19 +207,6 @@ static class Texts
             return string.IsNullOrEmpty(code) ? Base : code.ToLowerInvariant();
         }
         catch (Exception) { return Base; }
-    }
-
-    static string FromConfig(string path)
-    {
-        try
-        {
-            if (!File.Exists(path)) return "";
-            var d = new JavaScriptSerializer().Deserialize<Dictionary<string, object>>(File.ReadAllText(path));
-            object value;
-            if (d != null && d.TryGetValue("language", out value) && value != null) return value.ToString();
-        }
-        catch (Exception) { }
-        return "";
     }
 
     /// Every text of one language: a folder holding any number of files, one per section,
@@ -210,28 +236,6 @@ static class Texts
             // Caught per file: one malformed file must not lose the texts of all the others.
             catch (Exception) { }
         }
-    }
-
-    /// Where the locale folder is. Beside the exe as a rule - the module and morphbench.exe
-    /// live in one folder - but a window started from elsewhere is told where the module is,
-    /// and the texts have to follow it there.
-    static string Home()
-    {
-        var candidates = new List<string>();
-        candidates.Add(AppDomain.CurrentDomain.BaseDirectory);
-        string named = Environment.GetEnvironmentVariable("MORPHBENCH_HOME");
-        if (!string.IsNullOrEmpty(named)) candidates.Add(named);
-        candidates.Add(Directory.GetCurrentDirectory());
-        foreach (string dir in candidates)
-        {
-            try
-            {
-                string full = Path.GetFullPath(dir);
-                if (Directory.Exists(Path.Combine(full, "locale"))) return full;
-            }
-            catch (Exception) { }
-        }
-        return AppDomain.CurrentDomain.BaseDirectory;
     }
 
     static string Clean(string code)
@@ -282,7 +286,7 @@ static class Module
             try
             {
                 string full = Path.GetFullPath(dir);
-                if (File.Exists(Path.Combine(full, Script))) return full;
+                if (IsFile(Path.Combine(full, Script))) return full;
             }
             catch (Exception) { }
         }
@@ -309,8 +313,12 @@ static class Module
             // The Windows store stub lives in WindowsApps: with no real python behind it, it
             // opens the store instead of running anything.
             if (dir.IndexOf("WindowsApps", StringComparison.OrdinalIgnoreCase) >= 0) continue;
-            string exe = Path.Combine(dir.Trim(), "python.exe");
-            if (IsFile(exe)) return exe;
+            try
+            {
+                string exe = Path.Combine(dir.Trim().Trim('"'), "python.exe");
+                if (IsFile(exe)) return exe;
+            }
+            catch (Exception) { }
         }
         string fromRegistry = PythonFromRegistry();
         if (fromRegistry != null) return fromRegistry;
@@ -324,11 +332,9 @@ static class Module
         if (!IsFile(json)) return null;
         try
         {
-            // The settings are read by the workbench itself; only one key is needed here. The
-            // path is in double quotes with its backslashes escaped - Regex.Unescape gives
-            // them back.
-            var m = Regex.Match(File.ReadAllText(json), "\"python\"\\s*:\\s*\"((?:[^\"\\\\]|\\\\.)*)\"");
-            return m.Success ? Regex.Unescape(m.Groups[1].Value) : null;
+            var data = new JavaScriptSerializer().Deserialize<Dictionary<string, object>>(File.ReadAllText(json));
+            object value;
+            return data != null && data.TryGetValue("python", out value) ? value as string : null;
         }
         catch (Exception) { return null; }
     }
@@ -366,7 +372,11 @@ static class Module
 
     public static bool IsFile(string path)
     {
-        try { return !string.IsNullOrEmpty(path) && File.Exists(path); }
+        try
+        {
+            if (string.IsNullOrEmpty(path)) return false;
+            using (File.Open(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete)) return true;
+        }
         catch (Exception) { return false; }
     }
 
@@ -394,6 +404,317 @@ static class Module
     }
 }
 
+// The native contract stops at the versioned bootstrap response. Application selection,
+// settings and HTTP routing belong to the updateable stdlib shim, never to this executable.
+class LaunchContext
+{
+    public string Home;
+    public string SettingsHome;
+    public string LocaleHome;
+    public string Python;
+    public string Language;
+    public string ServerApi = "api/launcher/v1/";
+    public string StatusArgs = "serve --status --json";
+    public string EnvironmentArgs = "env --json";
+    public string StartArgs = "serve --no-browser --json";
+    public int CliTimeoutMs = 30000;
+    public int HttpTimeoutMs = 30000;
+    public int StopWaitMs = 5000;
+    public int LogMaxChars = 200000;
+
+    public static LaunchContext Discover(string named)
+    {
+        string home = Module.FindHome(named);
+        return new LaunchContext { Home = home, Python = home == null ? null : Module.FindPython(home) };
+    }
+
+    public ProcessStartInfo QueryStart()
+    {
+        string sourceShim = Path.Combine(Home, "launcher", "mb.py");
+        bool source = Module.IsFile(sourceShim) && Module.IsFile(Path.Combine(Home, "morphbench", "__init__.py"));
+        string shim = source ? sourceShim : Path.Combine(Home, Module.Script);
+        var start = new ProcessStartInfo(Python, Module.Quote(shim) + " --launcher-context --protocol 1")
+        {
+            UseShellExecute = false, CreateNoWindow = true, WorkingDirectory = Home,
+            RedirectStandardOutput = true, RedirectStandardError = true,
+            StandardOutputEncoding = Encoding.UTF8, StandardErrorEncoding = Encoding.UTF8,
+        };
+        if (source) start.EnvironmentVariables["MORPHBENCH_APP"] = Home;
+        return start;
+    }
+
+    public void ApplyBootstrap(string output)
+    {
+        try
+        {
+            var payload = new JavaScriptSerializer().Deserialize<Dictionary<string, object>>(output);
+            object protocol;
+            if (payload == null || !payload.TryGetValue("protocolVersion", out protocol)
+                || !(protocol is int) || (int)protocol != 1) throw new FormatException();
+            Absolute(Required(payload, "appHome"));
+            string settingsHome = Absolute(Required(payload, "settingsHome"));
+            string localeHome = Absolute(Required(payload, "localeHome"));
+            string serverApi = Required(payload, "serverApi");
+            Uri relative;
+            if (serverApi.StartsWith("/") || !serverApi.EndsWith("/") || serverApi.Contains("..")
+                || serverApi.Contains("\\") || serverApi.Contains("?") || serverApi.Contains("#")
+                || !Uri.TryCreate(serverApi, UriKind.Relative, out relative)) throw new FormatException();
+            string statusArgs = Required(payload, "statusArgs");
+            string startArgs = Required(payload, "startArgs");
+            object environmentArgs;
+            string diagnosticArgs = payload.TryGetValue("environmentArgs", out environmentArgs) ? environmentArgs as string : null;
+            object rawSettings;
+            if (!payload.TryGetValue("settings", out rawSettings)) throw new FormatException();
+            var settings = rawSettings as Dictionary<string, object>;
+            if (settings == null) throw new FormatException();
+            object language;
+            Language = settings.TryGetValue("language", out language) ? language as string : null;
+            SettingsHome = settingsHome;
+            LocaleHome = localeHome;
+            ServerApi = serverApi;
+            StatusArgs = statusArgs;
+            StartArgs = startArgs;
+            if (!string.IsNullOrEmpty(diagnosticArgs)) EnvironmentArgs = diagnosticArgs;
+            CliTimeoutMs = Positive(settings, "launcherCliTimeoutMs", CliTimeoutMs, 3600000);
+            HttpTimeoutMs = Positive(settings, "launcherHttpTimeoutMs", HttpTimeoutMs, 3600000);
+            StopWaitMs = Positive(settings, "launcherStopWaitMs", StopWaitMs, 3600000);
+            LogMaxChars = Positive(settings, "launcherLogMaxChars", LogMaxChars, 10000000);
+        }
+        catch (Exception error)
+        {
+            throw new Exception(Texts.T("launcher.protocolInvalid", "error", error.Message));
+        }
+    }
+
+    static string Required(Dictionary<string, object> data, string key)
+    {
+        object value;
+        string text = data.TryGetValue(key, out value) ? value as string : null;
+        if (string.IsNullOrEmpty(text)) throw new FormatException(key);
+        return text;
+    }
+
+    static string Absolute(string path)
+    {
+        bool absolute = path.StartsWith(@"\\") || (path.Length >= 3 && path[1] == ':'
+            && (path[2] == '\\' || path[2] == '/'));
+        if (!absolute) throw new FormatException();
+        return Path.GetFullPath(path);
+    }
+
+    static int Positive(Dictionary<string, object> settings, string key, int fallback, int maximum)
+    {
+        object value;
+        if (!settings.TryGetValue(key, out value) || !(value is int)) return fallback;
+        int number = (int)value;
+        return number > 0 && number <= maximum ? number : fallback;
+    }
+}
+
+class ChildResult
+{
+    public string Output = "";
+    public string ErrorOutput = "";
+    public string StartError;
+    public int? ExitCode;
+    public bool TimedOut;
+    public bool Cancelled;
+    public bool Truncated;
+
+    public string Failure(int timeoutMs, int maxChars)
+    {
+        if (Cancelled) return Texts.T("launcher.cliCancelled");
+        if (TimedOut) return Texts.T("launcher.cliTimedOut", "seconds", timeoutMs / 1000.0);
+        if (StartError != null) return Texts.T("launcher.cliFailed", "error", StartError);
+        if (ExitCode != 0) return Texts.T("launcher.cliExited", "code", ExitCode);
+        if (Truncated) return Texts.T("launcher.cliOutputTruncated", "chars", maxChars);
+        return null;
+    }
+}
+
+// Each redirected anonymous pipe has exactly one reader. Peek first, then request only bytes
+// already buffered: no synchronous read can wait for EOF held open by a descendant. Keeping
+// the UTF-8 decoder across polls preserves characters split between child writes.
+sealed class ChildPipe : IDisposable
+{
+    readonly StreamReader reader;
+    readonly SafeFileHandle handle;
+    readonly Decoder decoder;
+    readonly byte[] bytes = new byte[4096];
+    readonly char[] chars;
+    bool first = true;
+    public bool Done;
+    public uint LastReadBytes;
+
+    public ChildPipe(StreamReader reader)
+    {
+        this.reader = reader;
+        handle = ((FileStream)reader.BaseStream).SafeFileHandle;
+        Encoding encoding = reader.CurrentEncoding;
+        decoder = encoding.GetDecoder();
+        chars = new char[encoding.GetMaxCharCount(bytes.Length)];
+    }
+
+    public bool Poll(out string text)
+    {
+        return Poll(out text, (uint)bytes.Length);
+    }
+
+    public uint BufferedBytes
+    {
+        get
+        {
+            uint available;
+            return PeekNamedPipe(handle, IntPtr.Zero, 0, IntPtr.Zero, out available, IntPtr.Zero) ? available : 0;
+        }
+    }
+
+    public bool Poll(out string text, uint maximum)
+    {
+        text = "";
+        LastReadBytes = 0;
+        if (Done) return false;
+        uint available;
+        if (!PeekNamedPipe(handle, IntPtr.Zero, 0, IntPtr.Zero, out available, IntPtr.Zero))
+            return EndOrThrow(Marshal.GetLastWin32Error(), out text);
+        if (available == 0) return false;
+        uint count;
+        if (!ReadFile(handle, bytes, Math.Min(available, Math.Min(maximum, (uint)bytes.Length)), out count, IntPtr.Zero))
+            return EndOrThrow(Marshal.GetLastWin32Error(), out text);
+        if (count == 0) return EndOrThrow(109, out text);
+        LastReadBytes = count;
+        text = Decode((int)count, false);
+        return true;
+    }
+
+    bool EndOrThrow(int error, out string text)
+    {
+        // Broken/disconnected/closing anonymous pipe: buffered bytes have all been consumed.
+        if (error != 109 && error != 232 && error != 233)
+            throw new System.ComponentModel.Win32Exception(error);
+        Done = true;
+        text = Decode(0, true);
+        return true;
+    }
+
+    string Decode(int count, bool flush)
+    {
+        int length = decoder.GetChars(bytes, 0, count, chars, 0, flush);
+        int offset = first && length > 0 && chars[0] == '\uFEFF' ? 1 : 0;
+        if (length > 0) first = false;
+        return new string(chars, offset, length - offset);
+    }
+
+    public void Dispose()
+    {
+        try { reader.Dispose(); } catch (Exception) { }
+    }
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    static extern bool PeekNamedPipe(SafeFileHandle pipe, IntPtr buffer, uint size,
+        IntPtr read, out uint available, IntPtr remaining);
+    [DllImport("kernel32.dll", SetLastError = true)]
+    static extern bool ReadFile(SafeFileHandle file, byte[] buffer, uint count,
+        out uint read, IntPtr overlapped);
+}
+
+class ChildRunner : IDisposable
+{
+    readonly object sync = new object();
+    readonly HashSet<Process> active = new HashSet<Process>();
+    volatile bool closing;
+
+    sealed class Capture : IDisposable
+    {
+        readonly ChildPipe pipe;
+        readonly StringBuilder text = new StringBuilder();
+        readonly int maximum;
+        public bool Truncated;
+        public Capture(StreamReader reader, int maximum) { pipe = new ChildPipe(reader); this.maximum = maximum; }
+        public bool Done { get { return pipe.Done; } }
+        public string Text { get { return text.ToString(); } }
+        public bool Poll()
+        {
+            string chunk;
+            bool progress = pipe.Poll(out chunk);
+            int keep = Math.Min(chunk.Length, Math.Max(0, maximum - text.Length));
+            text.Append(chunk, 0, keep);
+            if (keep < chunk.Length) Truncated = true;
+            return progress;
+        }
+        public void Dispose() { pipe.Dispose(); }
+    }
+
+    public ChildResult Run(ProcessStartInfo start, int timeoutMs, int maxChars)
+    {
+        var result = new ChildResult();
+        Capture output = null, errors = null;
+        using (var process = new Process { StartInfo = start })
+        {
+            try
+            {
+                lock (sync)
+                {
+                    if (closing) { result.Cancelled = true; return result; }
+                    if (!process.Start()) throw new InvalidOperationException();
+                    active.Add(process);
+                }
+                output = new Capture(process.StandardOutput, maxChars);
+                errors = new Capture(process.StandardError, maxChars);
+                var watch = Stopwatch.StartNew();
+                while (true)
+                {
+                    if (closing) { result.Cancelled = true; break; }
+                    int remaining = timeoutMs - (int)watch.ElapsedMilliseconds;
+                    if (remaining <= 0) { result.TimedOut = true; break; }
+                    // One bounded chunk from each pipe keeps a noisy stream from starving its
+                    // neighbour or hiding the deadline. Truncated data is still fully drained.
+                    bool progress = output.Poll() | errors.Poll();
+                    if (process.HasExited && output.Done && errors.Done) break;
+                    if (!progress) Thread.Sleep(Math.Min(remaining, 20));
+                }
+                if (closing) result.Cancelled = true;
+                if (result.Cancelled || result.TimedOut) Kill(process);
+                if (process.HasExited) result.ExitCode = process.ExitCode;
+            }
+            catch (Exception error) { result.StartError = error.Message; Kill(process); }
+            finally
+            {
+                if (output != null)
+                {
+                    result.Output = output.Text;
+                    result.Truncated |= output.Truncated;
+                    output.Dispose();
+                }
+                if (errors != null)
+                {
+                    result.ErrorOutput = errors.Text;
+                    result.Truncated |= errors.Truncated;
+                    errors.Dispose();
+                }
+                lock (sync) active.Remove(process);
+            }
+        }
+        return result;
+    }
+
+    public static void Kill(Process process)
+    {
+        try { if (!process.HasExited) process.Kill(); }
+        catch (Exception) { }
+    }
+
+    public void Dispose()
+    {
+        lock (sync)
+        {
+            if (closing) return;
+            closing = true;
+            foreach (Process process in active) Kill(process);
+        }
+    }
+}
+
 // ---- what the window remembers between runs -------------------------------------------------
 class Remembered
 {
@@ -405,7 +726,7 @@ class Remembered
         path = Path.Combine(home, "morphbench.launcher.json");
         try
         {
-            if (File.Exists(path))
+            if (Module.IsFile(path))
             {
                 var d = new JavaScriptSerializer().Deserialize<Dictionary<string, object>>(File.ReadAllText(path));
                 object r;
@@ -442,34 +763,58 @@ class ServerStatus
 }
 
 // ---- the client of the server: the same calls the command line makes ------------------------
-class Launcher
+class Launcher : IDisposable
 {
     public readonly string Home;
     public readonly string Python;
     public string Url = "";
     public Action<string> Log = delegate { };
-    readonly JavaScriptSerializer js = new JavaScriptSerializer();
+    readonly LaunchContext context;
+    readonly ChildRunner children = new ChildRunner();
+    readonly object sync = new object();
+    readonly HashSet<HttpWebRequest> requests = new HashSet<HttpWebRequest>();
+    volatile bool closing;
     Process owned;                          // the server this window brought up
-    //: How long a server is given to leave on its own before it is killed.
-    const int StopWaitMs = 5000;
-
     public Launcher(string home, string python)
+        : this(new LaunchContext { Home = home, SettingsHome = home, Python = python }) { }
+
+    public Launcher(LaunchContext context)
     {
-        Home = home;
-        Python = python;
+        this.context = context;
+        Home = context.Home;
+        Python = context.Python;
     }
 
-    public bool Owns { get { return owned != null && !owned.HasExited; } }
+    public bool Owns
+    {
+        get
+        {
+            lock (sync)
+            {
+                try { return owned != null && !owned.HasExited; }
+                catch (Exception) { return false; }
+            }
+        }
+    }
+
+    public void Initialize()
+    {
+        var result = children.Run(context.QueryStart(), context.CliTimeoutMs, context.LogMaxChars);
+        string failure = result.Failure(context.CliTimeoutMs, context.LogMaxChars);
+        if (failure != null) throw new Exception(failure + "\r\n" + result.ErrorOutput.Trim());
+        context.ApplyBootstrap(result.Output);
+    }
 
     // -- the command line of the workbench: the only source of the address and the environment --
     public ServerStatus StatusFromCli()
     {
         var st = new ServerStatus();
-        string outp = RunCli("serve --status --json");
-        Log(outp.Trim());                      // everything the workbench knows about the environment, verbatim
+        string outp = "";
         try
         {
-            var d = js.Deserialize<Dictionary<string, object>>(FirstJson(outp));
+            outp = RunCli(context.StatusArgs);
+            SafeLog(outp.Trim());
+            var d = new JavaScriptSerializer().Deserialize<Dictionary<string, object>>(FirstJson(outp));
             st.State = Str(d, "state") ?? "free";
             st.Url = Str(d, "url") ?? "";
             st.InsideMo2 = Bool(d, "insideMo2");
@@ -495,7 +840,7 @@ class Launcher
     // usvfs is what gets handed over.
     public string HandOver(string root)
     {
-        string args = "serve --no-browser";
+        string args = context.StartArgs;
         if (!string.IsNullOrEmpty(root)) args += " --root " + Module.Quote(root);
         return RunCli(args);
     }
@@ -508,16 +853,12 @@ class Launcher
             RedirectStandardOutput = true, RedirectStandardError = true,
             StandardOutputEncoding = Encoding.UTF8, StandardErrorEncoding = Encoding.UTF8,
         };
-        using (var p = Process.Start(start))
-        {
-            // Both pipes are read at once: read one after the other, and a child that has
-            // filled the second one (a long traceback) stops on the write, so the first pipe
-            // never closes - the window would hang exactly when the diagnostics are wanted.
-            var err = p.StandardError.ReadToEndAsync();
-            string o = p.StandardOutput.ReadToEnd();
-            p.WaitForExit();
-            return o + err.Result;
-        }
+        var result = children.Run(start, context.CliTimeoutMs, context.LogMaxChars);
+        if (result.ErrorOutput.Trim().Length > 0) SafeLog(result.ErrorOutput.Trim());
+        string failure = result.Failure(context.CliTimeoutMs, context.LogMaxChars);
+        if (failure != null) throw new Exception(failure + "\r\n" + result.Output.Trim()
+            + (result.ErrorOutput.Length == 0 ? "" : "\r\n" + result.ErrorOutput.Trim()));
+        return result.Output;
     }
 
     // -- the server over HTTP: the same thing ServerLink does --
@@ -530,13 +871,13 @@ class Launcher
         if (string.IsNullOrEmpty(Url)) { st.State = "free"; return st; }
         try
         {
-            var env = Get("api/environment");
+            var env = Get("environment");
             st.State = "ours";
             st.InsideMo2 = Bool(env, "insideMo2");
             st.Root = Str(env, "root");
             try
             {
-                var root = Get("api/root");
+                var root = Get("root");
                 st.Root = Str(root, "root");
                 st.Meshes = Int(root, "meshes");
             }
@@ -561,33 +902,46 @@ class Launcher
 
     public Dictionary<string, object> SetRoot(string root)
     {
-        return Get("api/root?root=" + Uri.EscapeDataString(root));
+        return Get("root?root=" + Uri.EscapeDataString(root));
     }
 
     public void Start(string root)
     {
-        if (Owns) return;
-        string args = Module.Quote(Path.Combine(Home, Module.Script)) + " serve --no-browser --json";
-        // The server leaves with this window BY ITSELF. Closing peacefully stops it anyway, but
-        // a window killed outright has no time for that, and with nothing watching the parent an
-        // invisible server would be left behind: the port taken, the file system MO2 handed it
-        // long out of date, and the next run would quietly connect to exactly that one.
-        args += " --parent " + Process.GetCurrentProcess().Id.ToString(CultureInfo.InvariantCulture);
-        if (!string.IsNullOrEmpty(root)) args += " --root " + Module.Quote(root);
-        var start = new ProcessStartInfo(Python, args)
+        lock (sync)
         {
-            UseShellExecute = false, CreateNoWindow = true, WorkingDirectory = Home,
-            RedirectStandardOutput = true, RedirectStandardError = true,
-            StandardOutputEncoding = Encoding.UTF8, StandardErrorEncoding = Encoding.UTF8,
-        };
-        Log("> " + Python + " " + args);
-        owned = Process.Start(start);
-        owned.EnableRaisingEvents = true;
-        owned.OutputDataReceived += (s, e) => { if (e.Data != null) Log(e.Data); };
-        owned.ErrorDataReceived += (s, e) => { if (e.Data != null) Log(e.Data); };
-        owned.Exited += (s, e) => Log(Texts.T("launcher.serverExited", "code", SafeExitCode(owned)));
-        owned.BeginOutputReadLine();
-        owned.BeginErrorReadLine();
+            if (closing) throw new OperationCanceledException(Texts.T("launcher.cliCancelled"));
+            if (Owns) return;
+            if (owned != null) { owned.Dispose(); owned = null; }
+            string args = Module.Quote(Path.Combine(Home, Module.Script)) + " " + context.StartArgs;
+            // The server leaves with this window BY ITSELF. Closing peacefully stops it anyway, but
+            // a window killed outright has no time for that, and with nothing watching the parent an
+            // invisible server would be left behind: the port taken, the file system MO2 handed it
+            // long out of date, and the next run would quietly connect to exactly that one.
+            args += " --parent " + Process.GetCurrentProcess().Id.ToString(CultureInfo.InvariantCulture);
+            if (!string.IsNullOrEmpty(root)) args += " --root " + Module.Quote(root);
+            var start = new ProcessStartInfo(Python, args)
+            {
+                UseShellExecute = false, CreateNoWindow = true, WorkingDirectory = Home,
+                RedirectStandardOutput = true, RedirectStandardError = true,
+                StandardOutputEncoding = Encoding.UTF8, StandardErrorEncoding = Encoding.UTF8,
+            };
+            SafeLog("> " + Python + " " + args);
+            var process = new Process { StartInfo = start, EnableRaisingEvents = true };
+            process.Exited += (s, e) => SafeLog(Texts.T("launcher.serverExited", "code", SafeExitCode(process)));
+            try
+            {
+                if (!process.Start()) throw new InvalidOperationException();
+                owned = process;
+                ReadServerOutput(process);
+            }
+            catch (Exception)
+            {
+                ChildRunner.Kill(process);
+                process.Dispose();
+                owned = null;
+                throw;
+            }
+        }
     }
 
     static string SafeExitCode(Process p)
@@ -595,24 +949,134 @@ class Launcher
         try { return p.ExitCode.ToString(); } catch (Exception) { return "?"; }
     }
 
+    void ReadServerOutput(Process process)
+    {
+        // Capture streams before the worker starts, while Start still owns the lifecycle lock.
+        var output = new ChildPipe(process.StandardOutput);
+        var errors = new ChildPipe(process.StandardError);
+        new Thread(delegate()
+        {
+            try
+            {
+                var outputLine = new StringBuilder();
+                var errorLine = new StringBuilder();
+                while (!closing)
+                {
+                    if (process.HasExited)
+                    {
+                        // Snapshot the remaining buffered bytes once. A descendant that keeps
+                        // writing may not extend the lifetime of an exited server's readers.
+                        DrainServerSnapshot(output, outputLine);
+                        DrainServerSnapshot(errors, errorLine);
+                        break;
+                    }
+                    string chunk;
+                    bool progress = output.Poll(out chunk);
+                    ServerLogChunk(outputLine, chunk);
+                    progress |= errors.Poll(out chunk);
+                    ServerLogChunk(errorLine, chunk);
+                    if (output.Done && errors.Done) break;
+                    if (!progress) Thread.Sleep(20);
+                }
+                if (outputLine.Length > 0) SafeLog(outputLine.ToString().TrimEnd('\r'));
+                if (errorLine.Length > 0) SafeLog(errorLine.ToString().TrimEnd('\r'));
+            }
+            catch (Exception) { } // Closing may dispose the process between polls.
+            finally { output.Dispose(); errors.Dispose(); }
+        }) { IsBackground = true }.Start();
+    }
+
+    void DrainServerSnapshot(ChildPipe pipe, StringBuilder line)
+    {
+        uint remaining = pipe.BufferedBytes;
+        // Poll once even at zero to flush an incomplete final UTF-8 character on EOF.
+        do
+        {
+            string chunk;
+            pipe.Poll(out chunk, Math.Max(remaining, 1));
+            ServerLogChunk(line, chunk);
+            if (pipe.LastReadBytes == 0 || remaining <= pipe.LastReadBytes) break;
+            remaining -= pipe.LastReadBytes;
+        } while (!closing);
+    }
+
+    void ServerLogChunk(StringBuilder line, string chunk)
+    {
+        foreach (char value in chunk)
+        {
+            if (value == '\n' || line.Length >= context.LogMaxChars)
+            {
+                SafeLog(line.ToString().TrimEnd('\r'));
+                line.Length = 0;
+            }
+            if (value != '\n') line.Append(value);
+        }
+    }
+
     public void Stop()
     {
+        Process process;
+        lock (sync) { process = owned; }
+        Stop(process, false);
+        lock (sync) { if (owned == process) owned = null; }
+    }
+
+    void Stop(Process process, bool disposing)
+    {
+        string shutdown = "shutdown";
+        if (disposing)
+        {
+            try
+            {
+                if (process == null || process.HasExited) { if (process != null) process.Dispose(); return; }
+                // Start is idempotent: a server may have appeared after the last status.
+                // Only the process we actually spawned may honor a close-time shutdown.
+                shutdown += "?pid=" + process.Id.ToString(CultureInfo.InvariantCulture);
+            }
+            catch (Exception) { if (process != null) process.Dispose(); return; }
+        }
+        var watch = Stopwatch.StartNew();
         try
         {
-            Get("api/shutdown");
+            Get(shutdown, context.StopWaitMs, disposing);
         }
         catch (Exception e)
         {
-            Log(Texts.T("launcher.stopFailed", "error", e.Message));
+            SafeLog(Texts.T("launcher.stopFailed", "error", e.Message));
         }
-        var p = owned;
-        if (p == null) return;
-        if (!p.WaitForExit(StopWaitMs))
+        if (process == null) return;
+        try
         {
-            Log(Texts.T("launcher.killed", "seconds", StopWaitMs / 1000));
-            try { p.Kill(); } catch (Exception) { }
+            int remaining = Math.Max(0, context.StopWaitMs - (int)watch.ElapsedMilliseconds);
+            if (!process.WaitForExit(remaining))
+            {
+                SafeLog(Texts.T("launcher.killed", "seconds", context.StopWaitMs / 1000.0));
+                ChildRunner.Kill(process);
+            }
         }
-        owned = null;
+        catch (Exception) { ChildRunner.Kill(process); }
+        finally { process.Dispose(); }
+    }
+
+    void SafeLog(string text)
+    {
+        try { Log(text); } catch (Exception) { }
+    }
+
+    public void Dispose()
+    {
+        Process process;
+        lock (sync)
+        {
+            if (closing) return;
+            closing = true;
+            process = owned;
+            owned = null;
+            foreach (HttpWebRequest request in requests) request.Abort();
+        }
+        children.Dispose();
+        // An attached server belongs to its original launcher; only our child leaves here.
+        if (process != null) Stop(process, true);
     }
 
     public void OpenPage()
@@ -623,33 +1087,71 @@ class Launcher
 
     Dictionary<string, object> Get(string path)
     {
-        var req = (HttpWebRequest)WebRequest.Create(Url + path);
-        req.Timeout = 30000;                   // walking a large folder can take seconds
+        return Get(path, context.HttpTimeoutMs, false);
+    }
+
+    Dictionary<string, object> Get(string path, int timeout, bool disposing)
+    {
+        var req = (HttpWebRequest)WebRequest.Create(Url + context.ServerApi + path);
+        req.Timeout = timeout;
+        req.ReadWriteTimeout = timeout;
         req.Proxy = null;                      // the address is local, a proxy from the environment is no use
+        lock (sync)
+        {
+            if (closing && !disposing) throw new OperationCanceledException(Texts.T("launcher.cliCancelled"));
+            requests.Add(req);
+        }
+        // Timeout alone stops waiting for headers; ReadWriteTimeout is per read. The same
+        // deadline must also stop a peer that keeps a response body/pipe alive indefinitely.
+        int expired = 0;
+        var deadline = new System.Threading.Timer(delegate(object ignored)
+        {
+            Interlocked.Exchange(ref expired, 1);
+            try { req.Abort(); } catch (Exception) { }
+        }, null, timeout, Timeout.Infinite);
         try
         {
             using (var resp = (HttpWebResponse)req.GetResponse())
             {
                 string server = resp.Headers["Server"] ?? "";
                 if (!server.StartsWith("morphbench/")) throw new Exception(Texts.T("launcher.notMorphbench", "url", Url));
-                return js.Deserialize<Dictionary<string, object>>(ReadAll(resp));
+                return new JavaScriptSerializer().Deserialize<Dictionary<string, object>>(ReadAll(resp));
             }
         }
         catch (WebException e)
         {
+            if (Interlocked.CompareExchange(ref expired, 0, 0) != 0)
+            {
+                if (e.Response != null) e.Response.Close();
+                throw new WebException(e.Message, e, WebExceptionStatus.Timeout, null);
+            }
             var resp = e.Response as HttpWebResponse;
             if (resp == null) throw;
-            // A refusal by the server, in its own words: {"error": ...}
-            string text = ReadAll(resp);
-            string message = text;
-            try
+            using (resp)
             {
-                var d = js.Deserialize<Dictionary<string, object>>(text);
-                object err;
-                if (d != null && d.TryGetValue("error", out err) && err != null) message = err.ToString();
+                // A refusal by the server, in its own words: {"error": ...}
+                string text = ReadAll(resp);
+                string message = text;
+                try
+                {
+                    var d = new JavaScriptSerializer().Deserialize<Dictionary<string, object>>(text);
+                    object err;
+                    if (d != null && d.TryGetValue("error", out err) && err != null) message = err.ToString();
+                }
+                catch (Exception) { }
+                throw new Exception(message);
             }
-            catch (Exception) { }
-            throw new Exception(message);
+        }
+        catch (Exception error)
+        {
+            if (Interlocked.CompareExchange(ref expired, 0, 0) != 0)
+                throw new WebException(error.Message, error, WebExceptionStatus.Timeout, null);
+            throw;
+        }
+        finally
+        {
+            deadline.Dispose();
+            lock (sync) requests.Remove(req);
         }
     }
 
@@ -687,14 +1189,47 @@ class Launcher
     }
 }
 
+// Every completion, including process output, goes through this one lifetime gate. Checking
+// before BeginInvoke alone is insufficient: closing can destroy the handle between the two.
+class UiDispatcher
+{
+    readonly Control control;
+    readonly int uiThread = Thread.CurrentThread.ManagedThreadId;
+    volatile bool closing;
+    public UiDispatcher(Control control) { this.control = control; }
+    public bool Closing { get { return closing; } }
+    public void Close() { closing = true; }
+    public bool Post(Action action)
+    {
+        if (closing || control.IsDisposed || control.Disposing || !control.IsHandleCreated) return false;
+        try
+        {
+            Action guarded = delegate
+            {
+                if (!closing && !control.IsDisposed && !control.Disposing) action();
+            };
+            if (Thread.CurrentThread.ManagedThreadId == uiThread) guarded();
+            else control.BeginInvoke(guarded);
+            return true;
+        }
+        catch (InvalidOperationException) { return false; }
+    }
+}
+
 // ---- the window -----------------------------------------------------------------------------
 class MainForm : Form
 {
     readonly Options options;
+    readonly LaunchContext context;
+    readonly UiDispatcher ui;
+    readonly object logSync = new object();
+    readonly StringBuilder pendingLog = new StringBuilder();
+    bool logQueued;
     Launcher launcher;
     Remembered remembered;
     ServerStatus status = new ServerStatus();
     bool probing;
+    bool ready;
     bool warnedForeign;                     // the warning about a server outside MO2 - once
     int waitTicks;                          // how many more seconds to wait for our own server
     //: What the parts of the environment line are strung together with. Punctuation, not a
@@ -703,6 +1238,7 @@ class MainForm : Form
 
     readonly Label stateLabel = new Label();
     readonly Label envLabel = new Label();
+    readonly Label rootLabel = new Label();
     readonly TextBox rootBox = new TextBox();
     readonly Button browseButton = new Button();
     readonly Button applyButton = new Button();
@@ -713,10 +1249,14 @@ class MainForm : Form
     readonly TextBox logBox = new TextBox();
     readonly System.Windows.Forms.Timer timer = new System.Windows.Forms.Timer();
 
-    public MainForm(Options options)
+    public MainForm(Options options) : this(options, LaunchContext.Discover(options.Home)) { }
+
+    public MainForm(Options options, LaunchContext context)
     {
         this.options = options;
-        Text = Texts.T("launcher.experimentalTitle");
+        this.context = context;
+        ui = new UiDispatcher(this);
+        Text = "morphbench";
         // The title icon is set explicitly: /win32icon gives an icon to the FILE (explorer, the
         // taskbar), and a WinForms window without this draws its own default one. The same .ico
         // is taken, embedded as a resource - it holds every size, and Windows picks the 16 point
@@ -772,7 +1312,10 @@ class MainForm : Form
         rootRow.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
         rootRow.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
         rootRow.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-        var rootLabel = new Label { Text = Texts.T("launcher.rootLabel"), AutoSize = true, Anchor = AnchorStyles.Left, Margin = new Padding(0, 6, 6, 0) };
+        rootLabel.Text = Texts.T("launcher.rootLabel");
+        rootLabel.AutoSize = true;
+        rootLabel.Anchor = AnchorStyles.Left;
+        rootLabel.Margin = new Padding(0, 6, 6, 0);
         rootBox.Anchor = AnchorStyles.Left | AnchorStyles.Right;
         browseButton.Text = Texts.T("launcher.browseButton");
         browseButton.AutoSize = true;
@@ -824,33 +1367,63 @@ class MainForm : Form
     // -- the life of the window --
     void OnLoad(object sender, EventArgs e)
     {
-        string home = Module.FindHome(options.Home);
+        string home = context.Home;
         if (home == null)
         {
             Fail(Texts.T("launcher.noModule", "script", Module.Script));
             return;
         }
-        string python = Module.FindPython(home);
+        string python = context.Python;
         if (python == null)
         {
             Fail(Texts.T("launcher.noPython"));
             return;
         }
-        launcher = new Launcher(home, python) { Log = Append };
+        launcher = new Launcher(context) { Log = Append };
         remembered = new Remembered(home);
-        Append(Texts.T("launcher.module", "path", home));
-        Append(Texts.T("launcher.python", "path", python));
         stateLabel.Text = Texts.T("launcher.asking");
         SetButtons(false);
         ThreadPool.QueueUserWorkItem(_ =>
         {
-            var st = launcher.StatusFromCli();
-            BeginInvoke((Action)(() => AfterFirstStatus(st)));
+            string failure = null;
+            try { launcher.Initialize(); }
+            catch (Exception error) { failure = error.Message; }
+            ui.Post(() => AfterContext(failure));
+        });
+    }
+
+    void AfterContext(string failure)
+    {
+        if (failure != null)
+        {
+            Append(Texts.T("launcher.module", "path", context.Home));
+            Append(Texts.T("launcher.python", "path", context.Python));
+            Fail(failure);
+            return;
+        }
+        Texts.Configure(context);
+        Append(Texts.T("launcher.module", "path", context.Home));
+        Append(Texts.T("launcher.python", "path", context.Python));
+        rootLabel.Text = Texts.T("launcher.rootLabel");
+        browseButton.Text = Texts.T("launcher.browseButton");
+        applyButton.Text = Texts.T("launcher.apply");
+        startButton.Text = Texts.T("launcher.start");
+        stopButton.Text = Texts.T("launcher.stop");
+        pageButton.Text = Texts.T("launcher.openPage");
+        refreshButton.Text = Texts.T("launcher.refresh");
+        stateLabel.Text = Texts.T("launcher.asking");
+        ThreadPool.QueueUserWorkItem(_ =>
+        {
+            ServerStatus st;
+            try { st = launcher.StatusFromCli(); }
+            catch (Exception error) { st = new ServerStatus { Error = Texts.T("launcher.statusNoAnswer", "error", error.Message) }; }
+            ui.Post(() => AfterFirstStatus(st));
         });
     }
 
     void AfterFirstStatus(ServerStatus st)
     {
+        ready = true;
         status = st;
         if (st.Error != null) Append(st.Error);
         // Under MO2 the root is the game Data this process sees; outside MO2 it is the root of
@@ -865,9 +1438,10 @@ class MainForm : Form
     void OnClosing(object sender, FormClosingEventArgs e)
     {
         timer.Stop();
+        ui.Close();
         // The server this window brought up leaves with it: otherwise an invisible process
         // would be left under MO2, and MO2 would wait for it.
-        if (launcher != null && launcher.Owns) launcher.Stop();
+        if (launcher != null) launcher.Dispose();
     }
 
     void Fail(string message)
@@ -881,7 +1455,7 @@ class MainForm : Form
     // -- actions: every one of them a call to the server, the same call the command line makes --
     void StartServer()
     {
-        if (launcher == null) return;
+        if (launcher == null || ui.Closing || !ready) return;
         if (status.Up)
         {
             HandOver();
@@ -929,12 +1503,12 @@ class MainForm : Form
             string outp;
             try { outp = launcher.HandOver(root); }
             catch (Exception e) { outp = Texts.T("launcher.handOverFailed", "error", e.Message); }
-            BeginInvoke((Action)(() =>
+            ui.Post(() =>
             {
                 Append(outp.Trim().Length > 0 ? outp.Trim() : Texts.T("launcher.alreadyUp", "url", status.Url));
                 if (open) OpenPage();
                 Refresh(true);
-            }));
+            });
         });
     }
 
@@ -945,8 +1519,10 @@ class MainForm : Form
         SetButtons(false);
         ThreadPool.QueueUserWorkItem(_ =>
         {
-            launcher.Stop();
-            BeginInvoke((Action)(() => { Append(Texts.T("launcher.stopped", "url", status.Url)); Refresh(true); }));
+            string error = null;
+            try { launcher.Stop(); }
+            catch (Exception failure) { error = Texts.T("launcher.stopFailed", "error", failure.Message); }
+            ui.Post(() => { Append(error ?? Texts.T("launcher.stopped", "url", status.Url)); Refresh(true); });
         });
     }
 
@@ -992,14 +1568,14 @@ class MainForm : Form
             {
                 message = Texts.T("launcher.serverRefused", "error", e.Message);
             }
-            BeginInvoke((Action)(() => { Append(message); Refresh(true); }));
+            ui.Post(() => { Append(message); Refresh(true); });
         });
     }
 
     // -- the state: asked for in the background, shown in the window --
     void Refresh(bool now)
     {
-        if (launcher == null || probing) return;
+        if (launcher == null || probing || ui.Closing || !ready) return;
         probing = true;
         var previous = status;
         ThreadPool.QueueUserWorkItem(_ =>
@@ -1007,7 +1583,7 @@ class MainForm : Form
             ServerStatus st;
             try { st = launcher.Probe(previous); }
             catch (Exception e) { st = new ServerStatus { State = "busy", Error = e.Message, Url = launcher.Url }; }
-            BeginInvoke((Action)(() =>
+            ui.Post(() =>
             {
                 probing = false;
                 bool cameUp = st.Up && !previous.Up;
@@ -1015,7 +1591,7 @@ class MainForm : Form
                 Show(st);
                 if (st.Up) timer.Stop();
                 if (cameUp && pendingOpen) { pendingOpen = false; OpenPage(); }
-            }));
+            });
         });
     }
 
@@ -1077,13 +1653,36 @@ class MainForm : Form
 
     void SetButtons(bool on)
     {
-        startButton.Enabled = stopButton.Enabled = pageButton.Enabled = applyButton.Enabled = on;
+        startButton.Enabled = stopButton.Enabled = pageButton.Enabled = applyButton.Enabled = refreshButton.Enabled = on;
     }
 
     void Append(string line)
     {
-        if (InvokeRequired) { BeginInvoke((Action<string>)Append, line); return; }
-        if (logBox.TextLength > 200000) logBox.Clear();
-        logBox.AppendText(line + Environment.NewLine);
+        if (ui.Closing) return;
+        lock (logSync)
+        {
+            int maximum = context.LogMaxChars;
+            string text = line ?? "";
+            if (text.Length > maximum) text = text.Substring(text.Length - maximum);
+            pendingLog.Append(text).Append(Environment.NewLine);
+            if (pendingLog.Length > maximum) pendingLog.Remove(0, pendingLog.Length - maximum);
+            if (logQueued) return;
+            logQueued = true;
+        }
+        if (!ui.Post(FlushLog))
+            lock (logSync) { pendingLog.Length = 0; logQueued = false; }
+    }
+
+    void FlushLog()
+    {
+        string text;
+        lock (logSync)
+        {
+            text = pendingLog.ToString();
+            pendingLog.Length = 0;
+            logQueued = false;
+        }
+        if (logBox.TextLength + text.Length > context.LogMaxChars) logBox.Clear();
+        logBox.AppendText(text);
     }
 }

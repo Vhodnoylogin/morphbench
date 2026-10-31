@@ -1,5 +1,11 @@
 # Checks
 
+Launcher v2 checks compile the actual production C# with synthetic children: failures,
+deadlines, both pipes, cancellation, guarded UI callbacks, pid-pinned ownership, HTTP body
+deadlines and the stdlib bootstrap. Distribution checks cover schema-2 API/ABI compatibility,
+legacy exact pins, transactional migration and independent inventory/interpreter validation.
+These offline checks do not establish actual MO2/usvfs or game behavior.
+
 `test_layout_paths.py` checks lexical flat/structured paths, native dependency and plugin
 selection, game-root/registry ambiguity, false VFS attributes and the actual Python entry shim.
 `test_structured_distribution.py` checks Root Builder envelopes, narrow launcher/App ownership,

@@ -1,9 +1,9 @@
 # Morphbench
 
-This development branch retains the experimental Body Slots entry and branding from `v0.8.0-slots.1`, now based on released 0.8.5 source. It is not a new release.
+This development branch retains the experimental Body Slots entry and branding from `v0.8.0-slots.1`, now based on released 0.8.6 source. It is not a new release.
 
 A Windows workbench for Skyrim NIF/TRI meshes, morphs, bounds and skeleton collision
-capsules. Version 0.8.5 offers Morphs, Colliders, CLI/HTTP automation and browser add-ons;
+capsules. Version 0.8.6 offers Morphs, Colliders, CLI/HTTP automation and browser add-ons;
 Physics and Body Slots remain disabled in browser navigation.
 
 [Русская версия](README.ru.md) · [User guide](src/main/README.md) ·

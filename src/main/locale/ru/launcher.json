@@ -57,5 +57,11 @@
   "launcher.stopped": "остановлен: %(url)s",
   "launcher.stopping": "останавливаю…",
   "launcher.walking": "обход %(root)s…",
-  "launcher.yes": "да"
+  "launcher.yes": "да",
+  "launcher.cliFailed": "не удалось запустить Python: %(error)s",
+  "launcher.cliTimedOut": "Python не завершился за %(seconds)s с",
+  "launcher.cliCancelled": "операция отменена при закрытии ланчера",
+  "launcher.cliExited": "Python завершился с кодом %(code)s",
+  "launcher.cliOutputTruncated": "вывод Python превысил %(chars)s символов",
+  "launcher.protocolInvalid": "неподдерживаемый или некорректный протокол ланчера: %(error)s"
 }

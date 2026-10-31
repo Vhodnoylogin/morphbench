@@ -1,6 +1,6 @@
 """Release infrastructure, using only the standard library.
 
-The native runtime is immutable. Application ZIPs are complete, bounded snapshots
+Each native runtime inventory is immutable. Application ZIPs are complete, bounded snapshots
 whose inventory can name only application files. Settings, add-ons and native code
 are outside that namespace. A shared process lease prevents installation while any
 packaged mb.py process runs; the updater takes the exclusive lease.
@@ -40,9 +40,15 @@ MAX_JOURNAL = 3 * MAX_MANIFEST  # Old/new inventory union plus the new manifest.
 APP_ROOT_FILES = frozenset(("mb.py", "mb_distribution.py", "update.py", "LICENSE",
                            "mb_paths.py",
                            "README.md", "README.ru.md", "CHANGELOG.md", "CHANGELOG.ru.md",
-                           "dependencies.json", "THIRD-PARTY.md"))
+                            "dependencies.json", "THIRD-PARTY.md", "SOURCE.md"))
 NATIVE_SUFFIXES = frozenset((".exe", ".dll", ".pyd", ".so", ".dylib", ".lib", ".a",
                              ".o", ".obj", ".pdb", ".pyc", ".pyi", ".zip", ".7z"))
+APPLICATION_API = 1
+PYTHON_ABI = "cp312-win_amd64"
+# Only this frozen pre-contract release has an implicit compatibility contract.
+# New Runtime releases advertise compatibility independently of their byte inventory.
+LEGACY_RUNTIME = ("runtime-1-win64",
+                  "aad6812c97658f2f6b6fa3b21e750cf3833d5bdcc1b95724b453eba11df74f9a")
 _RESERVED = re.compile(r"^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])(?:\.|$)", re.I)
 
 
@@ -100,6 +106,8 @@ def flat_app_path(name: str) -> bool:
         return False
     if name in APP_ROOT_FILES:
         return True
+    if name == "launcher/mb.py":
+        return True
     return bool((len(parts) == 2 and parts[0] in ("morphbench", "presenters") and name.endswith(".py"))
                 or (len(parts) == 3 and parts[0] == "locale" and name.endswith(".json")
                     and parts[-1] != "release.json")
@@ -119,7 +127,8 @@ def application_layout(manifest: dict) -> str:
 def app_path(name: str, layout: str | None = None) -> bool:
     """Separate allowlists; neither namespace owns settings, plugins or native code."""
     relative(name)
-    structured = (name.startswith("app/") and flat_app_path(name[4:])) or name in (
+    structured = (name.startswith("app/") and name != "app/launcher/mb.py"
+                  and flat_app_path(name[4:])) or name in (
         "launcher/mb.py", "launcher/locale/en/launcher.json", "launcher/locale/ru/launcher.json")
     if layout == STRUCTURED:
         return structured
@@ -224,8 +233,25 @@ def _inventory(files, kind: str, layout=None) -> dict:
     return files
 
 
+def _api_contract(value) -> bool:
+    return (isinstance(value, dict) and set(value) == {"apiVersion", "pythonAbi"}
+            and type(value["apiVersion"]) is int and value["apiVersion"] == APPLICATION_API
+            and value["pythonAbi"] == PYTHON_ABI)
+
+
+def runtime_contract(runtime: dict) -> dict | None:
+    """Return advertised compatibility, or the single recognized legacy contract."""
+    if "applicationApi" in runtime and "pythonAbi" in runtime:
+        return {"apiVersion": runtime["applicationApi"], "pythonAbi": runtime["pythonAbi"]}
+    if (runtime.get("id"), runtime.get("contentHash")) == LEGACY_RUNTIME:
+        return {"apiVersion": APPLICATION_API, "pythonAbi": PYTHON_ABI}
+    return None
+
+
 def validate_manifest(value: dict, kind: str) -> dict:
-    if (value.get("schemaVersion") != 1 or value.get("name") != "morphbench"
+    schema = value.get("schemaVersion")
+    if (type(schema) is not int or schema not in ((1, 2) if kind == "application" else (1,))
+            or value.get("name") != "morphbench"
             or value.get("kind") != kind):
         raise PackageError("manifest")
     layout = application_layout(value) if kind == "application" else None
@@ -233,6 +259,10 @@ def validate_manifest(value: dict, kind: str) -> dict:
         raise PackageError("manifest")
     _inventory(value.get("files"), kind, layout)
     if kind == "runtime":
+        if (any(key in value for key in ("applicationApi", "pythonAbi"))
+                and not _api_contract({"apiVersion": value.get("applicationApi"),
+                                       "pythonAbi": value.get("pythonAbi")})):
+            raise PackageError("manifest")
         if (not re.fullmatch(r"runtime-[A-Za-z0-9._-]+-win64", str(value.get("id", "")))
                 or value.get("platform") != "win-amd64"
                 or not re.fullmatch(r"3\.12\.[0-9]+", str(value.get("python", "")))
@@ -245,10 +275,14 @@ def validate_manifest(value: dict, kind: str) -> dict:
                     "vendor/io_scene_nifly/tri/tripfile.py"}
     else:
         runtime = value.get("requiresRuntime")
+        if schema == 2:
+            compatible = _api_contract(runtime)
+        else:
+            compatible = (isinstance(runtime, dict) and set(runtime) == {"id", "contentHash"}
+                          and isinstance(runtime["id"], str)
+                          and re.fullmatch("[0-9a-f]{64}", str(runtime["contentHash"])))
         if (not re.fullmatch(r"[0-9][A-Za-z0-9._-]*", str(value.get("version", "")))
-                or not isinstance(runtime, dict) or set(runtime) != {"id", "contentHash"}
-                or not isinstance(runtime["id"], str)
-                or not re.fullmatch("[0-9a-f]{64}", str(runtime["contentHash"]))):
+                or not compatible):
             raise PackageError("manifest")
         required = {"mb.py", "mb_distribution.py", "update.py", "morphbench/__init__.py",
                     "morphbench/api.py", "morphbench/config.py", "LICENSE"}
@@ -307,9 +341,10 @@ def runtime_for(root: Path, app: dict, *, verify=True, launch=False) -> dict:
     except FileNotFoundError as error:
         raise PackageError("runtimeMissing") from error
     requirement = app["requiresRuntime"]
-    if any(requirement[key] != runtime[key] for key in ("id", "contentHash")):
-        raise PackageError("runtimeMismatch", required=requirement, installed={
-            key: runtime[key] for key in ("id", "contentHash")})
+    installed = ({key: runtime[key] for key in ("id", "contentHash")}
+                 if app["schemaVersion"] == 1 else runtime_contract(runtime))
+    if requirement != installed:
+        raise PackageError("runtimeMismatch", required=requirement, installed=installed)
     if verify:
         verify_files(base, runtime)
     return runtime

@@ -90,6 +90,11 @@ DEFAULTS = {
     # The page with the list of meshes: address and port of the local server.
     "serveHost": "127.0.0.1",
     "servePort": 8767,
+    # Native launcher bootstrap fallbacks match these values before App is located.
+    "launcherCliTimeoutMs": 30000,
+    "launcherHttpTimeoutMs": 30000,
+    "launcherStopWaitMs": 5000,
+    "launcherLogMaxChars": 200000,
     # The server journal. What gets written is decided by the level of the record (debug,
     # info, warn, error), where it goes - by the sinks: the pipe back to whoever started the
     # server (the launcher window or a console) and a file next to these settings. Their

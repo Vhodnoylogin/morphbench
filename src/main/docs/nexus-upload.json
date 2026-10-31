@@ -73,7 +73,7 @@
   },
   "addonDistribution": "CLAW add-on is a separate Nexus mod and is not bundled in either package.",
   "historicalPublicationEvidence": "Top-level 0.8.5 metadata is retained as historical provenance; currentPublication is the verified 0.8.6 / Launcher v2 delivery.",
-  "requirementsMethod": "file-to-file",
+  "requirementsMethod": "legacy",
   "optionalRequirementDisclosure": "Root Builder is optional for MO2 root deployment; manual/external installation needs no Root Builder. Launcher v1 is required.",
   "pluginAuthoring": {
     "supported": true,
@@ -152,8 +152,8 @@
       }
     }
   },
-  "pendingContentUpdate": {
-    "status": "offline draft; not published",
+  "contentUpdate": {
+    "status": "published and verified through public file cards, per-version changelog popups and public requirements",
     "descriptionFile": "src/main/docs/nexus-description.bbcode",
     "application": {
       "fileId": 829889,
@@ -190,22 +190,45 @@
       }
     ],
     "requirements": {
-      "fileDependencies": "Preserve the existing Application/Launcher file-to-file requirements and optional Root Builder requirement.",
+      "method": "legacy",
+      "nexusRequirements": [
+        {
+          "modId": 31720,
+          "name": "Kezyma's Root Builder for Mod Organizer",
+          "optional": true,
+          "note": "Optional. Only for installing root/Morphbench packages through MO2 and deploying them to the game root. Manual installation and existing flat tool folders do not require Root Builder."
+        }
+      ],
       "offSiteRequirements": [
         {
-          "name": "Morphbench Launcher / Application compatibility and upgrade guide",
+          "name": "Morphbench Launcher / Application compatibility",
           "url": "https://github.com/Vhodnoylogin/morphbench/blob/v0.8.6/src/main/docs/install-layout.md",
-          "notes": "Application 0.8.6 supports Launcher v1 and v2. Future Launchers must support Runtime API 1 and CPython 3.12 Windows x64. This link documents compatibility and migration; Launcher itself is available in Main files."
+          "notes": "Install both Main files. Application 0.8.6 supports Launcher v1/v2 (Runtime API 1, CPython 3.12 Windows x64). Compatibility and upgrade instructions."
         }
       ]
     },
     "publicationNotes": [
-      "Recheck the live content before applying the draft; preserve owner edits and historical changelogs.",
-      "Add changelog entries once in Nexus's native version sections, separately for 0.8.6 and v2. The documented changelog API appends rather than replacing.",
-      "Keep technical compatibility text in Requirements / Off-site requirements, not in file descriptions.",
-      "Keep package roles, the quarantine-review rationale and installation steps in the main description.",
-      "Do not reupload or replace any archive as part of this text update."
+      "Text-only update; existing archive identities and release tags are unchanged.",
+      "Native changelog entries were appended once and verified through each file version link.",
+      "Owner explicitly selected legacy requirements to enable Off-site requirements.",
+      "Previous per-file dependency definitions retained but inactive in legacy mode.",
+      "Launcher v2 remains quarantined; no new review request was sent in this task."
     ],
-    "summary": "Inspect Skyrim NIF meshes and TRI morphs, edit skeleton collision capsules, and export your changes. Includes a browser viewer, command-line tools, a local HTTP API and support for add-ons."
+    "summary": "Inspect Skyrim NIF meshes and TRI morphs, edit skeleton collision capsules, and export your changes. Includes a browser viewer, command-line tools, a local HTTP API and support for add-ons.",
+    "appliedAt": "2026-10-31",
+    "sourceCommit": "2de6e17",
+    "descriptionSha256": "6f479513c52529e4dfb0968d2d28f44217d7fa818aacb4eb196a7aba51e940af",
+    "verification": {
+      "fileDescriptions": true,
+      "nativeVersionChangelogs": [
+        "0.8.6",
+        "v2"
+      ],
+      "mainDescription": true,
+      "offSiteRequirements": true,
+      "optionalRootBuilder": true,
+      "imageDividers": 7,
+      "archiveReupload": false
+    }
   }
 }

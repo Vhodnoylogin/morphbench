@@ -85,6 +85,61 @@
     "url": "https://www.nexusmods.com/skyrimspecialedition/mods/194795?tab=posts&comment_id=178713507",
     "source": "docs/nexus-architecture-post-0.8.5.bbcode"
   },
+  "pendingContentUpdate": {
+    "status": "offline draft; not published",
+    "descriptionFile": "src/main/docs/nexus-description.bbcode",
+    "application": {
+      "fileId": 829889,
+      "name": "Morphbench Application",
+      "version": "0.8.6",
+      "description": "The Morphbench workbench: morph previews, collider editing and add-ons."
+    },
+    "launcher": {
+      "fileId": 829890,
+      "name": "Morphbench Launcher",
+      "version": "v2",
+      "description": "Starts Morphbench. Includes Python and the libraries needed to run it."
+    },
+    "changelogs": [
+      {
+        "version": "0.8.6",
+        "entries": [
+          "Application updates can reuse compatible Launcher versions without rebuilding the workbench.",
+          "Application and settings discovery now live in the updateable Application package.",
+          "Launcher v1 remains supported. When upgrading from Application 0.8.5, use the updater extracted from the new package before replacing Launcher.",
+          "User downloads exclude developer build material. Required licences and source links remain included.",
+          "Application updates preserve settings and installed add-ons."
+        ]
+      },
+      {
+        "version": "v2",
+        "entries": [
+          "Improved startup error reporting and handling of failed background commands.",
+          "Added time limits and cancellation for background operations.",
+          "Fixed output-pipe handling that could leave operations waiting after a child process exited.",
+          "Made window closure and background-server cleanup more reliable. Closing Launcher leaves an independently started server running.",
+          "Kept application discovery and future interface adaptation in the Application package so ordinary workbench updates can reuse Launcher."
+        ]
+      }
+    ],
+    "requirements": {
+      "fileDependencies": "Preserve the existing Application/Launcher file-to-file requirements and optional Root Builder requirement.",
+      "offSiteRequirements": [
+        {
+          "name": "Morphbench Launcher / Application compatibility and upgrade guide",
+          "url": "https://github.com/Vhodnoylogin/morphbench/blob/v0.8.6/src/main/docs/install-layout.md",
+          "notes": "Application 0.8.6 supports Launcher v1 and v2. Future Launchers must support Runtime API 1 and CPython 3.12 Windows x64. This link documents compatibility and migration; Launcher itself is available in Main files."
+        }
+      ]
+    },
+    "publicationNotes": [
+      "Recheck the live content before applying the draft; preserve owner edits and historical changelogs.",
+      "Add changelog entries once in Nexus's native version sections, separately for 0.8.6 and v2. The documented changelog API appends rather than replacing.",
+      "Keep technical compatibility text in Requirements / Off-site requirements, not in file descriptions.",
+      "Keep package roles, the quarantine-review rationale and installation steps in the main description.",
+      "Do not reupload or replace any archive as part of this text update."
+    ]
+  },
   "currentPublication": {
     "applicationVersion": "0.8.6",
     "launcherVersion": "v2",

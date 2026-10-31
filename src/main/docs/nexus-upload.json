@@ -1,0 +1,109 @@
+{
+  "version": "0.8.5",
+  "launcherVersion": "v1",
+  "runtimeId": "runtime-1-win64",
+  "modId": 194795,
+  "page": "https://www.nexusmods.com/skyrimspecialedition/mods/194795",
+  "title": "Morphbench - Mesh Morph and Collider Workbench",
+  "author": "Vhodnoylogin",
+  "summary": "Windows x64 NIF/TRI workbench: morphs, bounds and editable skeleton capsules, NIF/PPB exports, CLI/HTTP and browser add-ons. Application 0.8.5 + Launcher v1 use Morphbench/launcher, app and plugins. Install manually or through MO2 with optional Root Builder.",
+  "descriptionFile": "src/main/docs/nexus-description.bbcode",
+  "sourceTag": "https://github.com/Vhodnoylogin/morphbench/tree/v0.8.5",
+  "githubRelease": "https://github.com/Vhodnoylogin/morphbench/releases/tag/v0.8.5",
+  "archivePrefix": "root/Morphbench/",
+  "layout": [
+    "launcher",
+    "app",
+    "plugins"
+  ],
+  "mainFiles": [
+    {
+      "nexusFileId": 829572,
+      "name": "Morphbench Application 0.8.5",
+      "version": "0.8.5",
+      "primary": true,
+      "filename": "morphbench-application-0.8.5.zip",
+      "bytes": 617678,
+      "sha256": "c24ab0f44431b4bff0d3ed5f708ede4a30523f724bed96c5d42e894383b10f19",
+      "nativeBinaries": false,
+      "filesIncludingManifest": 153,
+      "allowModManagerDownload": true,
+      "requiresLauncher": "v1"
+    },
+    {
+      "nexusFileId": 829573,
+      "name": "Morphbench Launcher v1",
+      "version": "v1",
+      "primary": false,
+      "filename": "morphbench-runtime-1-win64.zip",
+      "bytes": 29809251,
+      "sha256": "bb0dd7ac499aa2764fb7c954780b01fb26c503402b7999216da810df061b5624",
+      "inventoriedRuntimeFilesUnchanged": 1018,
+      "filesIncludingManifestAndOverlay": 1022,
+      "allowModManagerDownload": true,
+      "exeSha256": "cda1b18bdc2610a53daffcbbd3df333f1d78baf3a23313b9921efe96fa38b5fa"
+    }
+  ],
+  "optionalNexusMods": [
+    {
+      "modId": 31720,
+      "name": "Kezyma's Root Builder",
+      "optional": true,
+      "purpose": "Only for MO2-managed deployment of root/Morphbench to the game root. Manual/external installation does not require it."
+    }
+  ],
+  "installation": {
+    "manual": "Merge Morphbench folders from inside root; run Morphbench/launcher/morphbench.exe.",
+    "mo2": "Separate enabled Launcher/Application mods, Application higher priority, optional Root Builder deployment; register the game-root executable.",
+    "migration": "Retain flat 0.8.0 installation; migrate settings and complete add-on registry into a new structured folder.",
+    "updates": "Close server/launcher; update App-owned files with exact Runtime check, preserving settings/plugins/native Runtime."
+  },
+  "archivedSupersededFiles": [
+    829155,
+    829124
+  ],
+  "permissions": {
+    "license": "GPL-3.0",
+    "source": "https://github.com/Vhodnoylogin/morphbench"
+  },
+  "media": {
+    "visibleImages": 6,
+    "thumbnail": "Morphbench - conceptual cover (AI-generated illustration)",
+    "screenshots": "Existing authentic 0.8.0 Morphs/Colliders captures remain representative; no game/model assets are bundled."
+  },
+  "addonDistribution": "CLAW add-on is a separate Nexus mod and is not bundled in either package.",
+  "historicalPublicationEvidence": "Earlier file versions and vendor-review correspondence remain in Git history and the project journal; this manifest describes 0.8.5.",
+  "requirementsMethod": "file-to-file",
+  "optionalRequirementDisclosure": "Root Builder is optional for MO2 root deployment; manual/external installation needs no Root Builder. Launcher v1 is required.",
+  "pluginAuthoring": {
+    "supported": true,
+    "kind": "sandboxed browser HTML/JavaScript/CSS add-ons",
+    "guide": "https://github.com/Vhodnoylogin/morphbench/blob/v0.8.5/docs/addons.md",
+    "distribution": "Separate ZIP or Nexus mod; install and enable through the add-on manager."
+  },
+  "architecturePost": {
+    "url": "https://www.nexusmods.com/skyrimspecialedition/mods/194795?tab=posts&comment_id=178713507",
+    "source": "docs/nexus-architecture-post-0.8.5.bbcode"
+  },
+  "nextPublication": {
+    "status": "draft-not-uploaded",
+    "sourceBranch": "main",
+    "sourceCommit": null,
+    "sourceLayout": "src/main production source; src/test reusable checks and fixtures; ignored target output",
+    "mainFiles": [
+      {
+        "name": "Morphbench Application",
+        "version": null,
+        "primary": true
+      },
+      {
+        "name": "Morphbench Launcher",
+        "version": "v1",
+        "primary": false,
+        "runtimeLock": "src/main/runtime-lock.json",
+        "reuseFrozenRuntime": true
+      }
+    ],
+    "note": "Use descriptive version-free Nexus display names and separate version fields. Record the exact source commit, archive hashes and actual installation/publication evidence before release. Existing file IDs, hashes, names and publication/post records above describe the historical 0.8.5 publication and are not rewritten by this draft."
+  }
+}

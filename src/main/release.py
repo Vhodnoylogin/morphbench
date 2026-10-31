@@ -1,0 +1,640 @@
+# -*- coding: utf-8 -*-
+"""Building the release: one self-contained archive of the workbench.
+
+This script never travels inside the archive it builds: it belongs to the repository, not
+to the release. It is also the only place where the contents of the archive are stated, and
+they are stated by listing what goes in, never by listing what stays out. That is why a
+neighbouring module of the repository - the MO2 bridge plugin living in the same working
+copy, say - cannot end up in the archive: it is simply not on the list.
+
+What goes inside the package is declared in `dependencies.json` by the `bundle` field,
+and the LICENCE decides it there, not convenience. The same file produces `THIRD-PARTY.md`,
+the list of third-party work with its licences and where its sources live, which the GPL
+obliges us to hand over together with the binary.
+
+Bare Python on purpose: nothing of the workbench is imported here, so that a release can be
+built on a machine where the dependencies are not installed yet and the workbench itself
+would not even start. The texts this script prints are read straight from the locale folder
+by the small reader below, for exactly the same reason.
+
+The usage text the user sees is not in this docstring: it lives under the key
+`release.usage` in `locale/<language>/release.json`, like every other string printed here.
+"""
+from __future__ import annotations
+
+import argparse
+import csv
+import glob
+import json
+import os
+import re
+import shutil
+import subprocess
+import sys
+import tempfile
+import urllib.request
+import zipfile
+from pathlib import Path
+
+import mb_distribution as distribution
+
+HERE = Path(__file__).resolve().parent
+_VAR = re.compile(r"%([^%]+)%")
+
+
+def repository(home: Path) -> Path:
+    """Recognize a source checkout without changing installed/flat fixture paths."""
+    return home.parents[1] if home.name == "main" and home.parent.name == "src" else home
+
+
+def input_path(home: Path, name: str) -> Path:
+    if repository(home) != home:
+        if name == "LICENSE":
+            return repository(home) / name
+        if name in ("morphbench.exe", "launcher/morphbench.ico"):
+            return repository(home) / "target/launcher" / Path(name).name
+    return home / name
+
+
+def payload_path(path: Path, home: Path) -> str:
+    """Map maintained sources/build inputs to the unchanged release namespace."""
+    if path == input_path(home, "LICENSE"):
+        return "LICENSE"
+    for name in ("morphbench.exe", "launcher/morphbench.ico"):
+        if path == input_path(home, name):
+            return name
+    return path.relative_to(home).as_posix()
+
+
+def default_output(home: Path) -> Path:
+    return repository(home) / "target/packages"
+
+
+def check_runtime_pin(home: Path, runtime: dict) -> None:
+    """Published Runtime is a pinned build dependency, not machine discovery."""
+    lock = home / "runtime-lock.json"
+    if repository(home) != home and lock.is_file():
+        pin = json.loads(lock.read_text(encoding="utf-8"))
+        if any(runtime.get(key) != pin[key] for key in ("id", "contentHash", "python")):
+            raise distribution.PackageError("immutableRuntime", path=str(lock))
+
+
+# ---- texts -------------------------------------------------------------------------------
+# The catalogue in `morphbench/i18n.py` is deliberately not used here. Importing it means
+# importing the workbench, and this script has to run on a machine where the workbench
+# cannot start at all - no numpy, no PyNifly, nothing installed yet. So the texts are read
+# with the standard library alone, from the same locale folder and the same kind of flat
+# JSON file every other section uses; only one file is read, `release.json`.
+#
+# The language comes from MORPHBENCH_LANG. Guessing the language of the machine is the
+# catalogue's job and costs far more code than this script is worth - whoever builds a
+# release can say which language they want. Reading happens at import, which is before
+# argparse puts its help together out of these texts.
+def _texts() -> dict[str, str]:
+    out: dict[str, str] = {}
+    for language in ("en", os.environ.get("MORPHBENCH_LANG", "").strip().lower()):
+        if not language:
+            continue
+        path = HERE / "locale" / language / "release.json"
+        if not path.is_file():
+            continue
+        try:
+            data = json.loads(path.read_text(encoding="utf-8-sig"))
+        except (OSError, ValueError):
+            continue            # a broken translation must not stop a build
+        out.update({k: str(v) for k, v in data.items() if not k.startswith("#")})
+    return out
+
+
+TEXTS = _texts()
+
+
+def t(key: str, **values) -> str:
+    """The text for a key with named values put in; an unknown key is shown as itself."""
+    text = TEXTS.get(key, key)
+    return text % values if values else text
+
+
+#: What belongs to the release. A list of what goes in, not of what stays out: anything not
+#: named here will not reach the archive, however much of it lies next to us in the working copy.
+CONTENT = [
+    "mb.py",
+    "mb_distribution.py",
+    "mb_paths.py",
+    "update.py",
+    "morphbench.exe",
+    "LICENSE",
+    "README.md",
+    "README.ru.md",
+    "CHANGELOG.md",
+    "CHANGELOG.ru.md",
+    "dependencies.json",
+    "morphbench/*.py",
+    "presenters/*.py",
+    "locale/*/*.json",
+    "web/*.html",
+    "web/*.css",
+    "web/js/*.js",
+    "web/addon-sdk.js",
+    "docs/*.md",
+    # The source of the one compiled thing in the archive. GPL-3 lets the source be offered
+    # from the same place as the binary rather than inside it, but "the same place" has to be
+    # somewhere the recipient can actually reach, and an archive gets mirrored to places that
+    # carry no link back. Forty kilobytes settle the question for good, mirrors included.
+    "launcher/*.cs",
+    "launcher/*.cmd",
+    "launcher/*.py",
+    "launcher/*.manifest",
+    "launcher/*.ico",
+]
+#: What we leave out even when it matched a pattern above.
+SKIP = ("__pycache__", ".pyc", "morphbench.json", "morphbench.log")
+# The builder reads these catalogues from source, but release.py itself does not ship.
+BUILD_CATALOGUE = "release.json"
+# Guidance for repository contributors/agents is not part of the end-user package,
+# even if a later instruction file lands under a broadly included documentation path.
+SOURCE_ONLY_INSTRUCTIONS = frozenset(("agents.md", "claude.md", "skill.md"))
+
+
+def load_manifest(path: Path) -> list[dict]:
+    return json.loads(path.read_text(encoding="utf-8-sig")).get("dependencies", [])
+
+
+def expand(pattern: str, home: Path) -> str:
+    text = _VAR.sub(lambda m: os.environ.get(m.group(1), m.group(0)), pattern)
+    if text.startswith("./") or text.startswith(".\\"):
+        text = str(home / text[2:])
+    return text
+
+
+def own_files(home: Path) -> list[Path]:
+    """The workbench's own files, by the CONTENT list, in order of name."""
+    out = []
+    for pattern in CONTENT:
+        special = pattern in ("LICENSE", "morphbench.exe")
+        for found in sorted(glob.glob(str(input_path(home, pattern) if special else home / pattern))):
+            p = Path(found)
+            if (p.is_file() and p.name.lower() not in SOURCE_ONLY_INSTRUCTIONS
+                    and not any(s in str(p) for s in SKIP)
+                    and not (p.parent.parent == home / "locale"
+                             and p.name == BUILD_CATALOGUE)):
+                out.append(p)
+    icon = input_path(home, "launcher/morphbench.ico")
+    if icon.is_file() and icon not in out:
+        out.append(icon)
+    return out
+
+
+def find_folder(dep: dict, home: Path, named: str | None) -> Path | None:
+    """The folder of a dependency on the builder's machine: either the one named by an
+    argument, or one found by the search patterns and then identified by the files inside -
+    so that a folder of the same name belonging to something else is not taken."""
+    proof = [str(p) for p in dep.get("proof", [])]
+
+    def fits(folder: Path) -> bool:
+        return folder.is_dir() and all((folder / p).is_file() for p in proof)
+
+    if named:
+        folder = Path(named)
+        if not fits(folder):
+            raise SystemExit(t("release.notTheFolder", folder=folder,
+                               files=", ".join(proof), name=dep.get("name")))
+        return folder
+    for pattern in [str(p) for p in dep.get("search", [])]:
+        for candidate in sorted(glob.glob(expand(pattern, home)), reverse=True):
+            if fits(Path(candidate)):
+                return Path(candidate)
+    return None
+
+
+# ---- laying the dependencies in ------------------------------------------------------------
+def vendor_folder(dep: dict, home: Path, stage: Path, named: str | None) -> str:
+    folder = find_folder(dep, home, named)
+    if folder is None:
+        raise SystemExit(t("release.noFolder", name=dep["name"],
+                           source=dep.get("source", "")))
+    target = stage / str(dep.get("into") or ("vendor/" + dep["name"]))
+    junk = shutil.ignore_patterns("__pycache__", "*.pyc", "*.pyi", "test", "tests", "docs")
+    # `keep` names what we actually use, and it is an allow-list for the same reason CONTENT
+    # is: a later version of somebody else's add-on can grow a new folder, and a deny-list
+    # would carry it in without anyone noticing. Absent `keep`, the whole folder travels.
+    keep = [str(k) for k in dep.get("keep", [])]
+    if keep:
+        target.mkdir(parents=True, exist_ok=True)
+        for name in keep:
+            src = folder / name
+            if not src.exists():
+                raise SystemExit(t("release.noPart", part=name, name=dep["name"],
+                                   folder=str(folder)))
+            if src.is_dir():
+                shutil.copytree(src, target / name, dirs_exist_ok=True, ignore=junk)
+            else:
+                dst = target / name
+                dst.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(src, dst)
+        return "%s <- %s (%s)" % (target.relative_to(stage), folder, ", ".join(keep))
+    shutil.copytree(folder, target, dirs_exist_ok=True, ignore=junk)
+    return "%s <- %s" % (target.relative_to(stage), folder)
+
+
+def trim_packages(into: Path) -> None:
+    """Keep runtime modules and licences, without dependency test suites or type stubs.
+
+    This changes only the staged distribution, never the builder's installed packages.
+    numpy.testing, typing and f2py remain: they are importable APIs, unlike test suites.
+    Native headers, static/import libraries and pkg-config files are only build inputs;
+    runtime extensions and the licence copies in .dist-info are retained.
+    The wheel RECORD is narrowed to the retained files; hashes of those files stay intact.
+    """
+    into = into.resolve()
+    for folder in sorted(into.rglob("*"), key=lambda p: len(p.parts), reverse=True):
+        if folder.is_dir() and folder.name in ("test", "tests", "__pycache__"):
+            if not folder.resolve().is_relative_to(into):
+                raise ValueError(folder)
+            shutil.rmtree(folder)
+    hooks = into / "numpy" / "_pyinstaller"
+    if hooks.is_dir():
+        if not hooks.resolve().is_relative_to(into):
+            raise ValueError(hooks)
+        shutil.rmtree(hooks)
+    for pattern in ("*.pyi", "*.pyc"):
+        for stub in into.rglob(pattern):
+            stub.unlink()
+    numpy = into / "numpy"
+    for relative in ("_core/include", "_core/lib/pkgconfig"):
+        folder = numpy / relative
+        if folder.is_dir():
+            if not folder.resolve().is_relative_to(into):
+                raise ValueError(folder)
+            shutil.rmtree(folder)
+    for library in numpy.rglob("*.lib"):
+        library.unlink()
+    # pip generates these build/configuration launchers with the builder's Python path.
+    # Morphbench uses NumPy as a library and never launches either utility.
+    for name in ("f2py.exe", "numpy-config.exe"):
+        launcher = into / "bin" / name
+        if launcher.is_file():
+            launcher.unlink()
+    for record in into.glob("*.dist-info/RECORD"):
+        with record.open(encoding="utf-8", newline="") as stream:
+            rows = [row for row in csv.reader(stream) if row and (into / row[0]).is_file()]
+        with record.open("w", encoding="utf-8", newline="") as stream:
+            csv.writer(stream).writerows(rows)
+
+
+def vendor_packages(deps: list[dict], stage: Path) -> list[str]:
+    """Python packages - by the same pip, but into the release folder, not into the system."""
+    names = [str(d.get("pip") or d["name"]) for d in deps]
+    if not names:
+        return []
+    into = stage / str(deps[0].get("into") or "vendor")
+    into.mkdir(parents=True, exist_ok=True)
+    code = subprocess.call([sys.executable, "-m", "pip", "install", "--upgrade",
+                            "--target", str(into)] + names)
+    if code != 0:
+        raise SystemExit(t("release.pipFailed", names=", ".join(names), code=code))
+    # Wheel metadata includes licence files and the exact installed versions. It belongs
+    # with the distribution even when pip itself is not shipped.
+    trim_packages(into)
+    return ["%s <- pip" % (into.relative_to(stage) / n) for n in names]
+
+
+def vendor_python(dep: dict, stage: Path, version: str) -> str:
+    """The embeddable build of Python from python.org: an archive with no installer, it just
+    unpacks into a folder. With it the release is self-contained - the user installs nothing."""
+    url = str(dep.get("embeddable", "")) % {"version": version}
+    into = stage / str(dep.get("into") or "python")
+    into.mkdir(parents=True, exist_ok=True)
+    tmp = into / "embed.zip"
+    print("  " + t("release.downloading", url=url))
+    with urllib.request.urlopen(url, timeout=180) as r, open(tmp, "wb") as f:
+        shutil.copyfileobj(r, f)
+    with zipfile.ZipFile(tmp) as z:
+        z.extractall(into)
+    tmp.unlink()
+    # Nexus rejects nested archives. The official stdlib ZIP contains runtime bytecode,
+    # not disposable caches: unpack it unchanged and point _pth at the directory instead.
+    libraries = {}
+    for library in into.glob("python*.zip"):
+        target = into / library.stem
+        with zipfile.ZipFile(library) as archive:
+            archive.extractall(target)
+        libraries[library.name] = target.name
+        library.unlink()
+    # The embeddable build does not look around itself by default: let it see vendor\ and
+    # the workbench folder, or numpy and PyNifly stay invisible to it.
+    for pth in into.glob("python*._pth"):
+        # The build ships with the `site` line commented out; writing another one next to it
+        # is not enough - that very line has to go, or the old one stays and the paths are
+        # never picked up.
+        keep = [l.rstrip() for l in pth.read_text(encoding="utf-8").splitlines()
+                if l.strip().lstrip("#").strip() not in ("import site", "..", "..\\vendor")]
+        keep = [libraries.get(line.strip(), line) for line in keep]
+        pth.write_text("\n".join(keep + ["..", "..\\vendor", "import site"]) + "\n",
+                       encoding="utf-8")
+    return "%s <- %s" % (into.relative_to(stage), url)
+
+
+def third_party(deps: list[dict], stage: Path, version: str) -> None:
+    """The list of third-party work inside the package: what it is, what it is for, under
+    which licence and where its sources are. The GPL requires this to travel with the binary.
+
+    Only the frame of the document is ours to translate; the entries are copied from
+    `dependencies.json` exactly as written there, and that file is in English.
+    """
+    lines = ["# " + t("release.tpTitle", version=version), "",
+             t("release.tpIntro"), ""]
+    for dep in deps:
+        inside = (t("release.tpInside", into=dep["into"]) if dep.get("bundle")
+                  else t("release.tpOutside"))
+        lines += ["## %s — %s" % (dep["name"], dep.get("license", t("release.tpNoLicense"))),
+                  "", t("release.tpWhy", why=dep.get("why", "")), "", "%s" % inside,
+                  t("release.tpSource", source=dep.get("source", t("release.tpNoSource"))), ""]
+    lines += ["## " + t("release.tpOwnTitle"), "", t("release.tpOwnBody"), ""]
+    (stage / "THIRD-PARTY.md").write_text("\n".join(lines), encoding="utf-8")
+
+
+def application_files(home: Path) -> list[Path]:
+    """The application namespace is shared with the installer, never a deny-list."""
+    return [path for path in own_files(home)
+            if distribution.flat_app_path(payload_path(path, home))]
+
+
+def _inventory(stage: Path) -> dict:
+    return {path.relative_to(stage).as_posix(): distribution.file_digest(path)
+            for path in sorted(stage.rglob("*")) if path.is_file()}
+
+
+def _publish_split(stage: Path, out: Path, name: str, manifest: dict, stage_only: bool,
+                   layout="flat") -> None:
+    marker = (distribution.RUNTIME_MANIFEST if manifest["kind"] == "runtime"
+              else distribution.APP_MANIFEST)
+    distribution.validate_manifest(manifest, manifest["kind"])
+    (stage / marker).write_bytes(distribution.canonical(manifest))
+    target = out / name
+    if (target.is_symlink() or target.resolve().parent != out
+            or HERE.resolve().is_relative_to(target)):
+        raise distribution.PackageError("unsafePath", path=str(target))
+    if target.exists():
+        distribution.checked_root(target)
+    # A runtime label must never silently acquire different bytes in the same output.
+    if target.exists() and manifest["kind"] == "runtime":
+        existing = distribution.read_json(target / marker)
+        if existing != manifest:
+            raise distribution.PackageError("immutableRuntime", path=str(target))
+        distribution.verify_files(target, manifest)
+    elif target.exists():
+        shutil.rmtree(target)
+    if not target.exists():
+        os.replace(stage, target)
+    overlay = {}
+    if layout == "structured" and manifest["kind"] == "runtime":
+        # The unchanged EXE requires mb.py beside itself BEFORE Python can locate
+        # App elsewhere. This explicit App-owned overlay is repeated in both ZIPs
+        # byte-for-byte; it is not part of the immutable native Runtime inventory.
+        overlay["mb.py"] = (HERE / "launcher/mb.py").read_bytes()
+        for language in ("en", "ru"):
+            path = "locale/" + language + "/launcher.json"
+            overlay[path] = (HERE / path).read_bytes()
+        for path, data in overlay.items():
+            destination = distribution.safe_path(target, path)
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            destination.write_bytes(data)
+    if not stage_only:
+        # Use the inventory even when reusing an existing Runtime stage. A local log,
+        # cache or user file added beside it must never leak into the archive.
+        archive = str(out / (name + ".zip"))
+        with zipfile.ZipFile(archive, "w", zipfile.ZIP_DEFLATED) as package:
+            prefix = ("root/Morphbench/" + ("launcher/" if manifest["kind"] == "runtime" else "")
+                      if layout == "structured" else name + "/")
+            for path in sorted([*manifest["files"], marker, *overlay]):
+                package.write(distribution.safe_path(target, path), prefix + path)
+            if layout == "structured" and manifest["kind"] == "application":
+                # User/plugin-owned, intentionally absent from the App inventory.
+                package.writestr("root/Morphbench/plugins/", b"")
+        if manifest["kind"] == "application":
+            distribution.read_application(Path(archive))  # Inspect the actual finished ZIP too.
+        print(t("release.archive", path=archive, size=Path(archive).stat().st_size / 1048576.0))
+    print(t("release.staged", path=target))
+
+
+def split_release(args, parser) -> int:
+    """No compiler, pip, network or native import in either split packaging operation.
+
+    Runtime is seeded from an audited complete distribution, or copied from an
+    already pinned Runtime. Future application builds need only its manifest.
+    """
+    if args.no_vendor or args.no_python or args.pynifly:
+        parser.error(t("release.splitFlags"))
+    out = (Path(args.out) if args.out else default_output(HERE)).resolve()
+    layout = getattr(args, "layout", "flat")
+    if args.package == "application":
+        if not args.runtime:
+            parser.error(t("release.needRuntime"))
+        runtime = distribution.validate_manifest(distribution.read_json(Path(args.runtime)), "runtime")
+        check_runtime_pin(HERE, runtime)
+        files = application_files(HERE)
+        if args.list:
+            for path in files:
+                print(payload_path(path, HERE))
+            return 0
+        contents = {payload_path(path, HERE): path.read_bytes() for path in files}
+        if layout == "structured":
+            contents = {"app/" + name: data for name, data in contents.items()}
+            contents["launcher/mb.py"] = (HERE / "launcher/mb.py").read_bytes()
+            for language in ("en", "ru"):
+                path = "locale/" + language + "/launcher.json"
+                contents["launcher/" + path] = (HERE / path).read_bytes()
+        for name, data in contents.items():
+            distribution.check_application_file(name, data)
+        if len(contents) > distribution.MAX_FILES or sum(map(len, contents.values())) > distribution.MAX_TOTAL:
+            raise distribution.PackageError("archive")
+        manifest = {"schemaVersion": 1, "kind": "application", "name": "morphbench",
+                    "version": args.version, "license": "GPL-3.0",
+                    "requiresRuntime": {key: runtime[key] for key in ("id", "contentHash")},
+                    "files": {name: distribution.digest(data) for name, data in contents.items()}}
+        if layout == "structured":
+            manifest["layout"] = distribution.STRUCTURED
+        distribution.validate_manifest(manifest, "application")
+        name = "morphbench-application-" + args.version
+    else:
+        if not args.runtime_from:
+            parser.error(t("release.needRuntimeSeed"))
+        seed = distribution.checked_root(Path(args.runtime_from))
+        marker = seed / distribution.RUNTIME_MANIFEST
+        if marker.exists():
+            manifest = distribution.validate_manifest(distribution.read_json(marker), "runtime")
+            if manifest["id"] != "runtime-" + args.runtime_version + "-win64":
+                raise distribution.PackageError("immutableRuntime", path=str(seed))
+            distribution.verify_files(seed, manifest)
+            contents = {name: distribution.safe_path(seed, name).read_bytes() for name in manifest["files"]}
+        else:
+            # Consume only named runtime partitions of the complete audited release.
+            names = ["morphbench.exe"]
+            for folder in ("python", "vendor", "launcher"):
+                tree = distribution.safe_path(seed, folder)
+                if not tree.is_dir():
+                    raise distribution.PackageError("runtimeMissing", path=folder)
+                for path in sorted(tree.rglob("*")):
+                    if distribution._linked(path):
+                        raise distribution.PackageError("unsafePath", path=str(path))
+                    if path.is_file():
+                        relative = path.relative_to(seed).as_posix()
+                        if (any(part in ("tests", "test", "__pycache__") for part in path.relative_to(tree).parts)
+                                or path.suffix == ".pyi"
+                                or (folder != "python" and path.suffix == ".pyc")):
+                            raise distribution.PackageError("runtimeJunk", path=relative)
+                        names.append(relative)
+            contents = {name: distribution.safe_path(seed, name).read_bytes() for name in names}
+            for source, target in (("LICENSE", "RUNTIME-LICENSE"),
+                                   ("THIRD-PARTY.md", "RUNTIME-THIRD-PARTY.md"),
+                                   ("dependencies.json", "runtime-dependencies.json")):
+                contents[target] = distribution.safe_path(seed, source).read_bytes()
+            # Existing full archives state the actual interpreter, avoiding a guessed ABI.
+            seed_manifest = distribution.read_json(distribution.safe_path(seed, "manifest.json"))
+            manifest = {"schemaVersion": 1, "kind": "runtime", "name": "morphbench",
+                        "id": "runtime-" + args.runtime_version + "-win64", "platform": "win-amd64",
+                        "python": seed_manifest.get("python"), "license": "GPL-3.0",
+                        "files": {name: distribution.digest(data) for name, data in contents.items()}}
+            manifest["contentHash"] = distribution.digest(distribution.canonical(manifest))
+            distribution.validate_manifest(manifest, "runtime")
+        check_runtime_pin(HERE, manifest)
+        name = "morphbench-" + manifest["id"]
+        if args.list:
+            for path in sorted(contents):
+                print(path)
+            return 0
+    out.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix=".morphbench-package-", dir=out) as temporary:
+        stage = Path(temporary) / name
+        stage.mkdir()
+        for path, data in contents.items():
+            target = stage / path
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes(data)
+        _publish_split(stage, out, name, manifest, args.stage_only, layout)
+    return 0
+
+
+def main(argv=None) -> int:
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    ap = argparse.ArgumentParser(prog="release.py", description=t("release.usage"),
+                                 formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("--version", default="0.0.0", help=t("release.optVersion"))
+    ap.add_argument("--out", default=None, help=t("release.optOut"))
+    ap.add_argument("--pynifly", default=None, help=t("release.optPynifly"))
+    ap.add_argument("--python-version", default="3.12.8", help=t("release.optPythonVersion"))
+    ap.add_argument("--no-python", action="store_true", help=t("release.optNoPython"))
+    ap.add_argument("--no-vendor", action="store_true", help=t("release.optNoVendor"))
+    ap.add_argument("--stage-only", action="store_true", help=t("release.optStageOnly"))
+    ap.add_argument("--list", action="store_true", help=t("release.optList"))
+    ap.add_argument("--package", choices=("full", "runtime", "application"), default="full",
+                    help=t("release.optPackage"))
+    ap.add_argument("--runtime-from", help=t("release.optRuntimeFrom"))
+    ap.add_argument("--runtime", help=t("release.optRuntimeManifest"))
+    ap.add_argument("--runtime-version", default="1", help=t("release.optRuntimeVersion"))
+    ap.add_argument("--layout", choices=("structured", "flat"), default=None,
+                    help=t("release.optLayout"))
+    args = ap.parse_args(argv)
+    args.layout = args.layout or ("flat" if args.package == "full" else "structured")
+    if args.package == "full" and args.layout != "flat":
+        ap.error(t("release.fullLayout"))
+
+    # Versions are labels, never paths. Validate before any staging folder is removed.
+    if not re.fullmatch(r"[0-9][A-Za-z0-9._-]*", args.version):
+        ap.error(t("release.badVersion", version=args.version))
+    if not re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+", args.python_version):
+        ap.error(t("release.badVersion", version=args.python_version))
+    if not re.fullmatch(r"[0-9][A-Za-z0-9._-]*", args.runtime_version):
+        ap.error(t("release.badVersion", version=args.runtime_version))
+    if args.package != "full":
+        try:
+            return split_release(args, ap)
+        except (distribution.PackageError, OSError) as error:
+            ap.error(distribution.message(error, HERE) if isinstance(error, distribution.PackageError)
+                     else str(error))
+    if args.runtime or args.runtime_from or args.runtime_version != "1":
+        ap.error(t("release.splitFlags"))
+
+    home = HERE
+    deps = load_manifest(home / "dependencies.json")
+    files = own_files(home)
+    if args.list:
+        for f in files:
+            print("  %s" % payload_path(f, home))
+        print("\n" + t("release.ownCount", count=len(files)))
+        for dep in deps:
+            print("  %-10s %s" % (dep["name"], t("release.listInside", into=dep.get("into"))
+                                  if dep.get("bundle") else t("release.listOutside")))
+        return 0
+
+    runtime = [d for d in deps if d.get("bundle") and d.get("kind") == "runtime"]
+    bundles_python = bool(runtime and not args.no_vendor and not args.no_python)
+    if bundles_python:
+        version = tuple(int(n) for n in args.python_version.split("."))
+        if version[:2] != sys.version_info[:2] or sys.platform != "win32" or sys.maxsize <= 2**32:
+            ap.error(t("release.runtimeMismatch", version=args.python_version))
+    # A missing launcher used to silently produce an archive that could not be started.
+    if not input_path(home, "morphbench.exe").is_file():
+        ap.error(t("release.noLauncher"))
+    # Discover the required external folder before discarding a previous stage.
+    if not args.no_vendor:
+        for dep in deps:
+            if dep.get("bundle") and dep.get("kind") == "folder":
+                folder = find_folder(dep, home, args.pynifly)
+                if folder is None:
+                    ap.error(t("release.noFolder", name=dep["name"], source=dep.get("source", "")))
+                for name in dep.get("keep", []):
+                    if not (folder / name).exists():
+                        ap.error(t("release.noPart", part=name, name=dep["name"], folder=folder))
+
+    out = Path(args.out) if args.out else default_output(home)
+    out = out.resolve()
+    stage = out / ("morphbench-%s" % args.version)
+    if (stage.is_symlink() or stage.resolve().parent != out
+            or home.resolve().is_relative_to(stage.resolve())):
+        ap.error(t("release.badStage", path=stage))
+    if stage.exists():
+        shutil.rmtree(stage)
+    stage.mkdir(parents=True)
+
+    for f in files:
+        target = stage / payload_path(f, home)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(f, target)
+    print(t("release.copied", count=len(files)))
+
+    laid = []
+    if not args.no_vendor:
+        packages = [d for d in deps if d.get("bundle") and d.get("kind") == "python-package"]
+        laid += vendor_packages(packages, stage)
+        for dep in deps:
+            if dep.get("bundle") and dep.get("kind") == "folder":
+                laid.append(vendor_folder(dep, home, stage, args.pynifly))
+        if bundles_python:
+            laid.append(vendor_python(runtime[0], stage, args.python_version))
+    for line in laid:
+        print("  %s" % line)
+
+    actual_deps = [dict(d, bundle=bool(d.get("bundle") and not args.no_vendor
+                                      and (d.get("kind") != "runtime" or bundles_python)))
+                   for d in deps]
+    third_party(actual_deps, stage, args.version)
+    (stage / "manifest.json").write_text(json.dumps(
+        {"name": "morphbench", "version": args.version, "license": "GPL-3.0",
+         "python": args.python_version if bundles_python else None,
+         "bundled": [d["name"] for d in actual_deps if d.get("bundle")]},
+        ensure_ascii=False, indent=2), encoding="utf-8")
+
+    if args.stage_only:
+        print(t("release.staged", path=stage))
+        return 0
+    archive = shutil.make_archive(str(out / ("morphbench-%s" % args.version)), "zip",
+                                  root_dir=str(out), base_dir=stage.name)
+    size = Path(archive).stat().st_size
+    print(t("release.archive", path=archive, size=size / 1048576.0))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

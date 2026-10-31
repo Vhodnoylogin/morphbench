@@ -2,9 +2,19 @@
 
 Repository: https://github.com/Vhodnoylogin/morphbench
 Default branch: main
-Project directory: repository root
-Python package: morphbench/
+Production source: src/main/
+Python package: src/main/morphbench/
+Tests and reusable fixtures: src/test/
+Generated output: ignored target/ or an explicitly configured external directory
 
-Read README.md and CLAUDE.md before editing. Entry points, build scripts, documentation and tests start at the repository root; morphbench/ contains the importable Python core. Preserve the relative paths used by build and deployment scripts. Other mods live in separate repositories; do not copy their implementation here. Treat Skyrim-Mods branches as legacy sources. Before committing or pushing, check git remote -v and identify this repository explicitly. Do not commit credentials, build outputs, external model weights, or local caches.
+Read README.md, CLAUDE.md and src/main/CLAUDE.md before editing, then the affected module's README and docstring. Root mb.py and release.py are thin source-checkout delegates; maintained code, build/packaging scripts and shipped documentation live in src/main/. Run checks with python src/test/run.py from the checkout root. Preserve release installation paths root/Morphbench/{launcher,app,plugins}, shipped docs/ links and the /web/* HTTP routes when changing source paths.
 
-Prefer the documented HTTP API for automation of the running tool and the MO2 bridge for launching it under MO2. Use the UI for operations absent from the API or visual checks. Available Morphbench HTTP routes and examples are documented in docs/http.md; do not assume additional routes exist. Use mb.py for file-based batch calculations.
+Keep released corresponding source, source resources and reusable tests on main. Continue unfinished work on the single active development branch experimental/body-slots, based on the latest released main. Do not enable unfinished Physics or Body Slots in a release. Retire obsolete task branches only after a fresh origin check, integration/unique-commit verification and inspection of every linked worktree; preserve unpublished changes, required branches, historical tags and release assets. Coordinate worktrees still in use rather than deleting their directories.
+
+Track maintained source and authored resources. Generated icons, DLL/EXE/PEX/ESP files, generated NIF/TRI variants, archives, staging trees and reports belong in ignored target/ or an explicit external output directory, including when Git LFS could store them. Keep authoritative binary inputs only with provenance, licence and role under the appropriate source-resource hierarchy. Keep credentials, local settings, raw captures and live saves outside Git. Before saving, record the result and next step in English in the task report or goal.
+
+Build a release from a known source commit with pinned dependencies, record its archive hash and source identity, and publish downloadable output as release assets. src/main/runtime-lock.json pins the original Launcher v1 Runtime archive, source commit, Python and inventory hash. Source Application and reused-Runtime builds must match this pin. A full native rebuild is a separate development format; do not republish it under frozen v1 identity. Validate actual archive contents and every supported installation choice. The normal release is one complete working archive. Morphbench's Application + Launcher/Runtime split is a documented installation exception: first installation requires both packages, Application pins the separately versioned Runtime, and later Application updates preserve those native files. Verify both archives and the assembled installation; this is not permission to create additional base/trial packages. Nexus display names are descriptive and version-free for the next publication; use the separate version field. Preserve historical publication receipts and owner-authored posts.
+
+Other mods and independently released add-ons live in separate repositories. Declare shared code through an explicit pinned dependency rather than copying it here. Treat Skyrim-Mods branches as legacy sources. Before committing or pushing, check git remote -v and explicitly identify Vhodnoylogin/morphbench.
+
+Prefer the documented HTTP API for automation of the running tool and the MO2 bridge for launching it under MO2. Use the UI for operations absent from the API or visual checks. Available Morphbench HTTP routes and examples are documented in src/main/docs/http.md; do not assume additional routes exist. Use mb.py for file-based batch calculations.

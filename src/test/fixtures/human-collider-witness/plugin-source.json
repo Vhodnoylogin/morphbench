@@ -1,0 +1,62 @@
+{
+  "schemaVersion": 1,
+  "purpose": "Readable source for the nonrelease human collider witness ESP; vanilla record data is read from the owner's external Skyrim.esm, never embedded here.",
+  "provenance": {
+    "recipeRecoveredFrom": "test_MorphbenchHumanColliders.esp at morphbench commit 853316d302fd11a795f0599000d94caf9d803d18",
+    "method": "Matched vanilla templates by their subrecords; retained only explicit field edits, event ordering and reference transforms. No encoded binary payload.",
+    "vanillaDataLicense": "Proprietary Bethesda game data; owner-supplied external input, no redistribution permission asserted."
+  },
+  "templates": {
+    "race": {"kind": "RACE", "formId": "00013746", "editorId": "NordRace"},
+    "armor": {"kind": "ARMO", "formId": "00000D64", "editorId": "SkinNaked"},
+    "addon": {"kind": "ARMA", "formId": "00000D67", "editorId": "NakedTorso"},
+    "actor": {"kind": "NPC_", "formId": "000C3A3F", "editorId": "Sylgja"},
+    "cell": {"kind": "CELL", "formId": "00032AE7", "editorId": "QASmoke"}
+  },
+  "actor": {
+    "flags": 51,
+    "weight": 100,
+    "textureLightingRgb": [0.8666666666666667, 0.8666666666666667, 0.8666666666666667],
+    "headPartsOrder": ["00072917", "000E4DA4", "000EAA72", "000EC1B2"],
+    "dnamByteOverrides": {"50": 1},
+    "dnamNote": "Preserve historical DNAM byte 50 as 1. The available VR master stores 30; the available SE master stores 1. Field semantics are not inferred by this recipe.",
+    "omitSubrecords": ["SNAM", "COCT", "CNTO", "PKID", "VMAD", "DOFT", "SOFT"],
+    "notes": "Keep remaining Sylgja appearance/stat fields; replace EDID/FULL/race/skin, insert own WNAM after RNAM, and replace the ACBS flags word, NAM7 weight and QNAM lighting."
+  },
+  "referenceFlags": 1024,
+  "addonAdditionalRacesOrder": ["00013741", "00013744", "00013746", "00013747", "00013748", "00088794", "0008883C", "00088844", "00088846", "000A82B9"],
+  "witnesses": [
+    {"name": "control", "displayName": "MB HUMAN CONTROL FIT x1", "positionRotation": [-554, 1893, 6650, 0, 0, 0]},
+    {"name": "marker", "displayName": "MB HUMAN MARKER LEFT x3", "positionRotation": [-224, 1893, 6650, 0, 0, 0]}
+  ],
+  "raceAttackOrder": [
+    "attackPowerStartDualWield",
+    "attackStartSprintLeftHand",
+    "attackPowerStartForwardLeftHand",
+    "attackStartLeftHand",
+    "attackPowerStartForwardH2HRightHand",
+    "attackPowerStartInPlace",
+    "attackPowerStartLeftLeftHand",
+    "attackPowerStartBackward",
+    "attackPowerStartForwardH2HLeftHand",
+    "attackPowerStart_2HMSprint",
+    "AttackStartH2HLeft",
+    "attackPowerStartInPlaceLeftHand",
+    "attackPowerStartForward",
+    "attackPowerStart_Sprint",
+    "bashPowerStart",
+    "attackPowerStartBackLeftHand",
+    "attackPowerStart_2HWSprint",
+    "attackPowerStart_SprintLeftHand",
+    "attackStartSprint",
+    "attackPowerStartH2HCombo",
+    "attackStart",
+    "AttackStartH2HRight",
+    "attackPowerStartRight",
+    "bashStart",
+    "attackPowerStartRightLeftHand",
+    "attackStartDualWield",
+    "attackPowerStartLeft"
+  ],
+  "expectedEspSha256": "a114f3b23ba80cbacc81191dd104e60f27b3637c58a964e7bd3441ee65e26ed7"
+}

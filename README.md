@@ -1,299 +1,38 @@
-# morphbench
+# Morphbench
 
-Release packages use **Morphbench/launcher**, **Morphbench/app** and
-**Morphbench/plugins**, with a `root/` archive envelope for optional MO2 Root Builder.
-Existing flat installations remain supported. See [installation and migration](docs/install-layout.md).
+A Windows workbench for Skyrim NIF/TRI meshes, morphs, bounds and skeleton collision
+capsules. Version 0.8.5 offers Morphs, Colliders, CLI/HTTP automation and browser add-ons;
+Physics and Body Slots remain disabled in browser navigation.
 
-A workbench for meshes and named morphs of Skyrim, outside the game. It opens a `.nif`, reads the
-sliders from the `.tri` beside it, applies any set of values, and answers in numbers: what this
-slider tears, how far the geometry now reaches, whether the collision capsules still cover the
-skin. No game, no Blender, no window editor, no save
-to load. Seconds, not a play session.
+[Русская версия](README.ru.md) · [User guide](src/main/README.md) ·
+[Installation](src/main/docs/install-layout.md) · [Quick start](src/main/docs/quickstart.md)
 
-Русская версия этого файла — [README.ru.md](README.ru.md).
+This is the canonical source repository, [Vhodnoylogin/morphbench](https://github.com/Vhodnoylogin/morphbench).
+Released source belongs on `main`; the active development branch is `experimental/body-slots`.
 
-## Repository
-
-The authoritative source is [Vhodnoylogin/morphbench](https://github.com/Vhodnoylogin/morphbench),
-branch `main`. Run commands from the repository root: `mb.py`, `release.py`, `launcher/`,
-`docs/` and `tests/` start here. `morphbench/` is the importable Python core.
-
-The project was extracted from Skyrim-Mods on 2026-10-02. All 42 retained history commits,
-the module contents and Git LFS were verified on 2026-10-03. The old local and remote
-`Skyrim-Mods/morphbench` branches were deleted after verification; historical checkouts remain.
-
-Version **0.8.5** includes visual capsule editing, bidirectional source-preserving
-[PPB tuning editing](docs/ppb.md), the skeleton-only blank-page fix and browser add-ons with
-API v1. It distinguishes [native file visibility](docs/visibility.md) from the viewer's shape selection.
-Version **0.8.5** enables only **Morphs** and **Colliders**; Physics and Body Slots
-are disabled in browser navigation. Their code and script APIs remain for development.
-See the [editing workspace](docs/workspace.md) and [changelog](CHANGELOG.md).
-
-## Why this and not BodySlide
-
-**BodySlide builds the body; morphbench checks it.** BodySlide is where sliders are authored and
-meshes are generated, and it shows the result in its preview. What it does not do is tell you
-whether the result holds up: a slider that stretches a seam past tearing, a bounding sphere that
-was computed on the resting body and no longer contains the morphed one, a collision capsule that
-leaves two thirds of the skin outside it.
-
-These file defects can contribute to symptoms such as a part blinking out at certain angles
-or a hand passing through a thigh. Those symptoms also depend on the engine and interaction mods.
-
-morphbench measures the mesh, morph and skeleton files you select. It identifies insufficient
-file bounds and gaps in capsule coverage; it does not observe runtime culling or contacts. The
-point of the tool is to shorten the distance between a guess and its check: anything that can be
-seen without the game should be seen without the game.
-
-What it does **not** do: it does not author morphs, and it does not build bodies — that is
-BodySlide's job and there is no reason to repeat it. It writes corrected bounding spheres,
-edited or fitted collision capsules, and edited physics configurations into new files.
-
-## What it needs
-
-**From a release — no separate Python or Blender installation.** Download
-**Application 0.8.5** and the separate required **Morphbench Launcher v1**.
-Application contains the workbench's Python, browser assets, translations and documentation;
-Launcher contains the unchanged native Runtime (`runtime-1-win64`). Their versions are independent.
-
-Both archives start at `root/Morphbench/`. Merge their `Morphbench` directories into one
-writable tools folder or the game root. Run `Morphbench/launcher/morphbench.exe`.
-The result has `launcher/`, `app/` and `plugins/` under one `Morphbench` directory.
-Do not copy the literal `root` folder into the game or place its contents in `Data`.
-
-For installation through MO2, optionally use
-[Kezyma's Root Builder](https://www.nexusmods.com/skyrimspecialedition/mods/31720).
-Install both ZIPs as separate enabled mods, keeping `root/Morphbench`; give Application
-higher priority than Launcher and build the root deployment. Register the deployed
-`Morphbench/launcher/morphbench.exe` in MO2. A manual external installation also works
-through MO2 and does not require Root Builder. On Nexus, both downloads are Main Files,
-Application Primary; Manual and Mod manager download are supported.
-
-Stop the server and close the launcher before an Application update. From `Morphbench`:
-
-```powershell
-.\launcher\python\python.exe .\app\update.py --check --package "<application.zip>" --json
-.\launcher\python\python.exe .\app\update.py --package "<application.zip>" --json
-```
-
-The updater preserves native Runtime, settings and plugins. With Root Builder, sync state
-back to persistent mod sources before clearing deployment and update those sources,
-then rebuild. See [installation, updates and recovery](docs/updating.md) for exact steps.
-Existing flat installations remain supported; cross-layout in-place updates are refused.
-Migrate into a new folder and copy your settings/plugins as described there.
-
-The split avoids reuploading unchanged native binaries and repeating their quarantine review
-for each Application update. The new archive envelope changes its ZIP hash. Each upload
-remains subject to Nexus security checks; the split does not guarantee antivirus approval
-or a review exemption.
-
-Blender is not bundled or needed: morphbench never touches `bpy`; it uses PyNifly's folder,
-which normally happens to live among Blender's add-ons. The legacy full archive remains a
-supported build format.
-
-**From the sources**, in a working copy, you supply those yourself:
-
-| What | Why | Without it |
-|---|---|---|
-| Python 3.12 | the workbench is written in it | nothing runs |
-| `numpy` | all the arithmetic over vertices | nothing runs |
-| `pillow` | writing frames to PNG | `render` and `sheet` stop; the browser page still works |
-| **PyNifly** add-on folder | reading and writing NIF and the TRI/TRIP morph files | no file can be opened |
-| .NET Framework 4 (`csc.exe`, stock on Windows) | building `morphbench.exe` | the command line still works; MO2 has no entry point |
-
-PyNifly is found on its own in the Blender add-ons folder
-(`%APPDATA%\Blender Foundation\Blender\<version>\scripts\addons\io_scene_nifly`); if it lives
-elsewhere, the `pynifly` key in `morphbench.json` says where. morphbench has no NIF or TRI parser
-of its own and must not have one: PyNifly's modules are the same ones that write these files, so
-a second reading that could drift away from the first never appears.
-
-## Starting it
-
-The examples below use a source checkout's `python mb.py ...`. In a structured release,
-run `.\launcher\python\python.exe .\launcher\mb.py ...` from `Morphbench` instead.
-A first look at a mesh from sources:
-
-```
-python mb.py summary body.nif
-```
-
-The morph file is picked up beside the mesh by name (`--tri` names it by hand), and so is
-`skeleton.nif` (`--skeleton` names it by hand), and beside the skeleton its `skeleton.hkx`,
-where the game stands the bodies (`--hkx` names it by hand). Every command takes `--json` and
-answers the same thing machine-readably.
-
-The viewer as one self-contained HTML file, which opens from disk and needs no server:
-
-```
-python mb.py web body.nif --out page.html
-```
-
-The same viewer with a list of meshes to switch between, on a local port:
-
-```
-python mb.py serve
-```
-
-`serve` is idempotent on purpose: if a server is already up at that address, a second `serve` does
-not start another one — it hands the running one the browse root and opens the page. Neither a
-person nor a script has to remember whether it is running.
-
-### From Mod Organizer 2, and why that matters
-
-MO2 does not copy mods into the game folder. It shows the game a merged `Data` — every mod of the
-build in one tree — and that merged view exists **only inside processes MO2 starts itself**
-(usvfs, its virtual file system). A program started any other way sees the bare `Data` on disk,
-where the meshes of the build simply are not.
-
-So to look at the build's meshes, morphbench has to be launched **by** MO2. That is what
-`morphbench.exe` is for: it is a small window with the state of the server, the browse root, and
-buttons to start it, stop it and open the page. It computes nothing — every button is the same
-call `serve` makes. Started from MO2, it starts the server as its own child, and that server sees
-the merged `Data`.
-
-1. A release already includes the window. From sources, build it once with
-   `launcher\build.cmd`; the result lands beside `mb.py`.
-2. In MO2, add an executable: use the release's `Morphbench/launcher/morphbench.exe`
-   (or the built EXE in the source root); `--start` as an argument raises the
-   server and opens the page in one click. "Start in" is not needed.
-3. Run that entry from MO2. The window reports whether it is under MO2, and the page will not step
-   outside `Data`.
-
-**The window is a convenience, not a condition.** MO2 launches executables rather than scripts,
-which is the only reason it exists - but `python.exe` is an executable too. An entry whose
-**Binary** is `<path to Morphbench>\launcher\python\python.exe` and whose **Arguments** are
-`mb.py serve` does the same job: MO2 injects usvfs into it exactly the same way, and the server
-sees the same merged `Data`. Set **Start in** to `Morphbench/launcher` for that variant. Anyone
-who would rather not run an unsigned binary downloaded from the internet can work this way and
-lose nothing but the buttons.
-
-Outside MO2 there is no default browse root and you name the folder yourself — on the page, with
-`--root`, or in `catalogRoot`. That is deliberate: a guessed root is how you end up browsing the
-`Data` of a different Skyrim install without noticing.
-
-Step-by-step, with what the answers look like, is in [docs/quickstart.md](docs/quickstart.md).
-
-For automation of a running server, use its [HTTP API](docs/http.md). File-based batch
-calculations use `mb.py`; repeated server operations do not require clicking the viewer.
-
-## The commands
-
-One line each; every option and every `--json` shape is in [docs/cli.md](docs/cli.md).
-
-| Command | What it answers |
+| Path | Purpose |
 |---|---|
-| `summary`, `shapes`, `bones`, `morphs` | what mesh is open: its shapes, its bones, what each slider moves |
-| `empty`, `missing` | sliders that are in the file and move nothing; sliders a recipe promised and the file does not have |
-| `strain` | where a morph tears the surface — one slider, a whole set (`--slider A=1 --slider B=1`), or every pair (`--pairs`) |
-| `budget` | at what value each slider crosses the tearing threshold |
-| `layers` | whether cover shapes — a second skin, a seam patch — follow the skin under them, and which of them are obliged to |
-| `binding` | which bones own what a morph moves, and which bones it leaves half behind |
-| `bounds` | the bounding sphere in the file against the one the morphed geometry needs; `--out` puts corrected spheres in a new file |
-| `colliders`, `fit` | the invisible collision capsules from the skeleton: where they sit, how much skin is left outside, and fitting them to the skin |
-| `focus` | where the camera would look at a bone, a morph or a part, in numbers — and, with no key, everything it could be aimed at |
-| `render`, `sheet`, `web` | a PNG frame, a set of views, the browser viewer |
-| `env`, `catalog`, `serve` | whether we are under MO2, what meshes lie under a root, the page with the list |
-| `workspace` | replay mode, capsule and configuration edits; export a new configuration, skeleton or session recipe |
+| [src/main/](src/main/) | production Python, browser assets, translations, launcher source, documentation and packaging scripts |
+| [src/test/](src/test/README.md) | automated checks, reusable fixtures and game-test instructions |
+| `target/` | ignored build trees, generated icons, packages and reports |
+| `mb.py`, `release.py` | source-checkout delegates to the maintained entry points in `src/main/` |
+| [CLAUDE.md](CLAUDE.md), [AGENTS.md](AGENTS.md) | contributor and assistant guidance |
 
-What the bench measures and what each number means is in [docs/physics.md](docs/physics.md).
-That page also explains how to verify generated files in a game test and which conclusions
-require runtime evidence.
+From the checkout root, with Python 3.12 and the documented dependencies:
 
-## The folder
+```text
+python mb.py --help
+python src/test/run.py
+python release.py --list
+```
 
-| Path | What is there |
-|---|---|
-| `mb.py` | the command line — one client of the facade like everything else |
-| `mb_distribution.py`, `update.py` | release manifest verification, install locking and the local Application updater |
-| `morphbench\` | the core: geometry, morphs, measurement. It does not draw, does not open windows and does not know the word "pixel" |
-| `presenters\` | the layers that show what the core computed: console tables, PNG, the page, and the settings format of PPB |
-| `web\` | the viewer page as real files — `page.html`, `style.css`, `js\*.js`; `presenters\assets.py` either serves them one by one or folds them into one self-contained file, and the load order is declared once in `PageAssets.SCRIPTS` |
-| `locale\` | the texts. A language is a **folder** (`locale\en\`, `locale\ru\`) holding any number of section files, merged when read |
-| `docs\` | the documents listed below |
-| `launcher\` | `morphbench.cs` and `build.cmd` — the MO2 entry point; `make-icon.py` draws the window icon, whose `.ico` is versioned through Git LFS because those bytes travel inside the exe |
-| `tests\` | the checks; `python tests\run.py` runs them all |
-| `dependencies.json` | what third-party work goes inside the release, what it is needed for, and under which licence |
-| `release.py` | builds the release archive; it belongs to the repository and never travels inside the archive |
-| `morphbench.json` | settings, written on first run from built-in defaults; every machine has its own, and new keys are added to an old file automatically |
-| `LICENSE` | the GNU GPL version 3 |
+Build the optional Windows launcher with `src\main\launcher\build.cmd`; output stays in
+`target/launcher/`. See [building and release rules](src/main/docs/building.md).
+The source layout does not change installed packages: they retain
+`root/Morphbench/{launcher,app,plugins}` and their documented entry points.
 
-`morphbench\`, `presenters\`, `web\`, `launcher\` and `tests\` each carry a short README of their
-own, in both languages: what the layer is, what it may depend on, and what must never import it.
-Open the folder and the boundary is right there.
-
-A structured release puts Runtime and the entry shim in `Morphbench/launcher`, the workbench
-and documentation in `Morphbench/app`, and installed add-ons in `Morphbench/plugins`.
-`launcher/runtime-manifest.json` identifies the exact Runtime files;
-`application-manifest.json` in `Morphbench` identifies App ownership and required Runtime.
-Application updates preserve settings, launcher state, plugins and unknown user files.
-Tests and `release.py` remain in the repository. Old flat installations and source checkouts
-retain their original layout; source checkouts without release manifests remain usable.
-
-The line between the core and the presenters is hard, and there is a way to check it: if an action
-cannot be performed from the command line, the line was drawn wrong. Everything the viewer can do
-— turn the camera, pull a slider, colour vertices by bone, aim at a hand — is a method of the core
-that the button merely calls. The side benefit is the reason for the whole arrangement: what can
-be driven without a window can be driven by a script, with no person and no screen.
-
-## Licence
-
-morphbench is under the **GNU GPL version 3** — the full text is in [LICENSE](LICENSE). The choice
-was not free: morphs are read and written by PyNifly's modules, which carry a GPL-3 block, and a
-program that includes them is bound by the same licence when it is handed on.
-
-For anyone who wants to use it, the terms are the friendly ones. Use it for anything, including
-your own mods. Change it, for yourself or for everyone. Hand it on — with the source, under the
-same licence, with the copyright notices kept. What goes inside the release archive is decided by
-licence and not by convenience: PyNifly is GPL-3 like us, `numpy` is BSD-3, `pillow` is MIT-CMU,
-Python is PSF. Full archives generate `THIRD-PARTY.md` from `dependencies.json`.
-The split Runtime carries these notices as `RUNTIME-THIRD-PARTY.md`, alongside the
-dependency statement `runtime-dependencies.json` and the bundled licence files.
-
-## Documents
-
-| Document | What is in it |
-|---|---|
-| [docs/quickstart.md](docs/quickstart.md) | the first hour: install, open a mesh, read the answer, launch from MO2 |
-| [docs/cli.md](docs/cli.md) | every command of `mb.py`, every option, and what `--json` returns |
-| [docs/page.md](docs/page.md) | the viewer in the browser: what each panel does and what the picture means |
-| [docs/physics.md](docs/physics.md) | what the bench measures — reach spheres and collision capsules |
-| [docs/workspace.md](docs/workspace.md) | the four modes, capsule/configuration editing, session replay and limits |
-| [docs/localisation.md](docs/localisation.md) | how the texts are laid out and how to add a language |
-| [docs/building.md](docs/building.md) | building `morphbench.exe` and the release archive: what is bundled and under what licence |
-| [docs/updating.md](docs/updating.md) | install Runtime and Application, update locally, recover an interruption and migrate an older release |
-
-Each of these exists twice, in English and in Russian: `NAME.md` and `NAME.ru.md`.
-
-## Development assistance
-
-Developed with assistance from [Codex (OpenAI)](https://github.com/codex).
-
-[Contributor and AI development guidance](https://github.com/Vhodnoylogin/morphbench/blob/main/CLAUDE.md)
-stays in the source repository and is not included in the end-user archive.
-
-## Editing workspace
-
-The 0.8.5 viewer enables **Morphs** and **Colliders**, with mode tabs above the view, models
-on the left and an inspector on the right. Edit supported collision capsules, save a
-replayable workspace and export new files. **Physics** and **Slots** remain disabled in the
-browser. Experimental FSMP XML/CBPC TXT editing remains accessible through `mb.py workspace`
-and the local HTTP API; FSMP overlays represent nominal configured limits, not simulation.
-See [the workspace workflow](docs/workspace.md) for controls, automation and offline limits.
-
-## Offline Slots mode
-
-Local preview variants add independent author → definition → variant inheritance. Session recipes preserve variants and edit targets; `mb.py slots --editor` recovers unfinished projects and exports unbound placement presets. Authored JSON and `.bslots` remain authored-only. See [the Slots workflow](docs/slots.md).
-
-Experimental Slots authoring remains available through `mb.py slots` and the local HTTP API;
-the browser tab is disabled in 0.8.5. The backend supports named skeleton-node placements,
-local transforms/access spheres, author defaults and temporary effective overrides, session
-recipes, Body Slots schema-v1 JSON and `.bslots` exports. It does not edit game saves,
-equipment or inventories. See [docs/slots.md](docs/slots.md) for the offline workflow and limits.
-
-## Browser add-ons
-
-Application 0.8.5 includes a versioned local browser add-on host.
-Install a ZIP, enable its inspector tab, and use API v1 to select models, read geometry,
-set existing morphs, control the view and save add-on state for the current browser tab.
-Installed add-ons can be explicitly updated while disabled. [Contract and workflow](docs/addons.md);
-[neutral example](examples/scene-inspector/).
+Released downloads are [GitHub release assets](https://github.com/Vhodnoylogin/morphbench/releases)
+and [Nexus files](https://www.nexusmods.com/skyrimspecialedition/mods/194795).
+Application requires the separately versioned Launcher/Runtime for a first installation.
+Morphbench is licensed under [GNU GPL v3](LICENSE) and developed with assistance from
+[Codex (OpenAI)](https://github.com/codex).

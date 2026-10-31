@@ -40,5 +40,7 @@
   "release.optRuntimeVersion": "Independent Runtime version, changed only for native/runtime updates.",
   "release.splitFlags": "Split-only options cannot be mixed with legacy bundling options.",
   "release.needRuntime": "--package application requires --runtime <runtime-manifest.json>.",
-  "release.needRuntimeSeed": "--package runtime requires --runtime-from <audited release folder>."
+  "release.needRuntimeSeed": "--package runtime requires --runtime-from <audited release folder>.",
+  "release.optLayout": "Package layout: structured root/Morphbench (default), or legacy flat.",
+  "release.fullLayout": "Structured archives use --package runtime or --package application. The legacy full format supports --layout flat only."
 }

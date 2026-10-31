@@ -22,9 +22,12 @@ import json
 import os
 from pathlib import Path
 
-from .i18n import t, use
+from mb_paths import default_plugins, installation_root, runtime_root, structured_app
 
-_ROOT = Path(__file__).resolve().parent.parent
+from .i18n import t, use
+from .environment import dir_exists
+
+_ROOT = Path(os.path.abspath(__file__)).parent.parent
 _FILE = _ROOT / "morphbench.json"
 
 DEFAULTS = {
@@ -304,6 +307,11 @@ class Config:
         """A value for this run: in memory, the file is not touched."""
         self._values[key] = value
 
+    def addon_directory(self) -> Path:
+        """Keep explicit registries and flat add-ons; structured installs use plugins/."""
+        explicit = self._values.get("addonDirectory")
+        return Path(explicit) if explicit else default_plugins(_ROOT, self.path.parent)
+
     # ---- what cannot be written down as a number: somebody else's library ---------------
     def pynifly_root(self) -> Path:
         """The folder of the PyNifly add-on. An explicit setting outweighs the search."""
@@ -315,9 +323,14 @@ class Config:
         # A release is self-contained: the add-on lies inside the package and is looked at
         # first. A working copy has no such folder, and the search goes on - among the
         # Blender add-ons.
-        inside = _ROOT / "vendor" / "io_scene_nifly"
-        if inside.is_dir():
-            return inside
+        candidates = [runtime_root(_ROOT)]
+        if structured_app(_ROOT):
+            candidates.append(installation_root(_ROOT) / "launcher")
+        candidates.append(_ROOT)
+        for base in dict.fromkeys(candidates):
+            inside = base / "vendor" / "io_scene_nifly"
+            if dir_exists(inside):
+                return inside
         root = Path(os.environ.get("APPDATA", "")) / "Blender Foundation" / "Blender"
         if root.is_dir():
             for ver in sorted(root.iterdir(), reverse=True):

@@ -7,12 +7,12 @@ import os
 import sys
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent
+ROOT = Path(os.path.abspath(__file__)).parent
 sys.dont_write_bytecode = True
 # Never import a stale timestamp-based cache of the updater/application after replacement.
 sys.pycache_prefix = str(ROOT / ".morphbench-no-bytecode")
 sys.path.insert(0, str(ROOT))
-from mb_distribution import PackageError, message, recover, update  # noqa: E402
+from mb_distribution import PackageError, installation_home, message, recover, update  # noqa: E402
 
 
 def main(argv=None) -> int:
@@ -24,7 +24,7 @@ def main(argv=None) -> int:
         except (OSError, ValueError):
             pass
     parser = argparse.ArgumentParser(description=texts.get("distribution.usage"))
-    parser.add_argument("--target", type=Path, default=ROOT, help=texts.get("distribution.target"))
+    parser.add_argument("--target", type=Path, default=installation_home(ROOT), help=texts.get("distribution.target"))
     source = parser.add_mutually_exclusive_group(required=True)
     source.add_argument("--package", type=Path, help=texts.get("distribution.package"))
     source.add_argument("--recover", action="store_true", help=texts.get("distribution.recover"))

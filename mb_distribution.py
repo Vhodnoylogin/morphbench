@@ -38,6 +38,7 @@ MAX_ARCHIVE = 64 * 1024 * 1024
 MAX_MANIFEST = 1024 * 1024
 MAX_JOURNAL = 3 * MAX_MANIFEST  # Old/new inventory union plus the new manifest.
 APP_ROOT_FILES = frozenset(("mb.py", "mb_distribution.py", "update.py", "LICENSE",
+                           "mb_paths.py",
                            "README.md", "README.ru.md", "CHANGELOG.md", "CHANGELOG.ru.md",
                            "dependencies.json", "THIRD-PARTY.md"))
 NATIVE_SUFFIXES = frozenset((".exe", ".dll", ".pyd", ".so", ".dylib", ".lib", ".a",
@@ -91,7 +92,7 @@ def relative(name: str) -> str:
     return name
 
 
-def app_path(name: str) -> bool:
+def flat_app_path(name: str) -> bool:
     relative(name)
     parts = name.split("/")
     if any(p.lower() in ("test", "tests", "__pycache__", "agents.md", "claude.md", "skill.md")
@@ -106,6 +107,25 @@ def app_path(name: str) -> bool:
                 or (len(parts) == 2 and parts[0] == "web"
                     and (Path(name).suffix in (".html", ".css") or name == "web/addon-sdk.js"))
                 or (len(parts) == 3 and parts[:2] == ["web", "js"] and name.endswith(".js")))
+
+
+STRUCTURED = "structured-v1"
+
+
+def application_layout(manifest: dict) -> str:
+    return manifest.get("layout", "flat-v1")
+
+
+def app_path(name: str, layout: str | None = None) -> bool:
+    """Separate allowlists; neither namespace owns settings, plugins or native code."""
+    relative(name)
+    structured = (name.startswith("app/") and flat_app_path(name[4:])) or name in (
+        "launcher/mb.py", "launcher/locale/en/launcher.json", "launcher/locale/ru/launcher.json")
+    if layout == STRUCTURED:
+        return structured
+    if layout == "flat-v1":
+        return flat_app_path(name)
+    return flat_app_path(name) or structured
 
 
 def runtime_path(name: str) -> bool:
@@ -136,13 +156,20 @@ def _linked(path: Path) -> bool:
                                             & getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0x400))
 
 
-def checked_root(root: Path) -> Path:
+def checked_root(root: Path, *, virtual=False) -> Path:
     root = Path(os.path.abspath(root))
     for parent in (root, *root.parents):
         if parent.exists() and _linked(parent):
             raise PackageError("unsafePath", path=str(parent))
     if not root.is_dir():
-        raise PackageError("notInstallation", path=str(root))
+        # usvfs may expose a listable directory whose attributes say it is absent.
+        # Updates retain the strict physical-directory check.
+        try:
+            if not virtual:
+                raise OSError()
+            os.listdir(root)
+        except OSError as error:
+            raise PackageError("notInstallation", path=str(root)) from error
     return root
 
 
@@ -180,12 +207,12 @@ def read_json(path: Path, limit=MAX_MANIFEST) -> dict:
         return _json(stream.read(limit + 1), limit)
 
 
-def _inventory(files, kind: str) -> dict:
+def _inventory(files, kind: str, layout=None) -> dict:
     if not isinstance(files, dict) or not files or len(files) > MAX_FILES:
         raise PackageError("manifest")
     seen = set()
     for name, checksum in files.items():
-        allowed = app_path(name) if kind == "application" else runtime_path(name)
+        allowed = app_path(name, layout) if kind == "application" else runtime_path(name)
         if not allowed or name.casefold() in seen or not isinstance(checksum, str) or not re.fullmatch(
                 "[0-9a-f]{64}", checksum):
             raise PackageError("manifest", path=name)
@@ -201,7 +228,10 @@ def validate_manifest(value: dict, kind: str) -> dict:
     if (value.get("schemaVersion") != 1 or value.get("name") != "morphbench"
             or value.get("kind") != kind):
         raise PackageError("manifest")
-    _inventory(value.get("files"), kind)
+    layout = application_layout(value) if kind == "application" else None
+    if kind == "application" and layout not in ("flat-v1", STRUCTURED):
+        raise PackageError("manifest")
+    _inventory(value.get("files"), kind, layout)
     if kind == "runtime":
         if (not re.fullmatch(r"runtime-[A-Za-z0-9._-]+-win64", str(value.get("id", "")))
                 or value.get("platform") != "win-amd64"
@@ -222,6 +252,8 @@ def validate_manifest(value: dict, kind: str) -> dict:
             raise PackageError("manifest")
         required = {"mb.py", "mb_distribution.py", "update.py", "morphbench/__init__.py",
                     "morphbench/api.py", "morphbench/config.py", "LICENSE"}
+        if layout == STRUCTURED:
+            required = {"app/" + name for name in required} | {"app/mb_paths.py", "launcher/mb.py"}
     if not required.issubset(value["files"]):
         raise PackageError("manifest", missing=sorted(required - value["files"].keys()))
     return value
@@ -230,21 +262,56 @@ def validate_manifest(value: dict, kind: str) -> dict:
 def verify_files(root: Path, manifest: dict) -> None:
     for name, checksum in manifest["files"].items():
         path = safe_path(root, name)
-        if not path.is_file() or file_digest(path) != checksum:
+        try:
+            correct = file_digest(path) == checksum
+        except OSError:
+            correct = False
+        if not correct:
             raise PackageError("changedFile", path=name)
 
 
-def runtime_for(root: Path, app: dict, *, verify=True) -> dict:
-    path = safe_path(root, RUNTIME_MANIFEST)
-    if not path.is_file():
-        raise PackageError("runtimeMissing")
-    runtime = validate_manifest(read_json(path), "runtime")
+def runtime_home(root: Path, app: dict, *, launch=False) -> Path:
+    if application_layout(app) != STRUCTURED:
+        return root
+    # Only the entry shim sets the process-local override for a launcher physically
+    # separate from the deployed app. Offline updates use the installation sibling.
+    override = os.environ.get("MORPHBENCH_RUNTIME_HOME") if launch else None
+    return Path(os.path.abspath(override)) if override else safe_path(root, "launcher")
+
+
+def installation_home(root: Path) -> Path:
+    root = Path(os.path.abspath(root))
+    if root.name.casefold() == "app":
+        marker = root.parent / APP_MANIFEST
+        try:
+            # A marker binds installed mode even if its JSON/layout is invalid.
+            # Validation happens in startup; damaged metadata never becomes source mode.
+            with marker.open("rb"):
+                return root.parent
+        except FileNotFoundError:
+            # An incomplete split install is not an unmanifested source checkout.
+            try:
+                read_json(root.parent / "launcher" / RUNTIME_MANIFEST)
+            except FileNotFoundError:
+                pass
+            else:
+                return root.parent
+    return root
+
+
+def runtime_for(root: Path, app: dict, *, verify=True, launch=False) -> dict:
+    base = runtime_home(root, app, launch=launch)
+    path = safe_path(base, RUNTIME_MANIFEST)
+    try:
+        runtime = validate_manifest(read_json(path), "runtime")
+    except FileNotFoundError as error:
+        raise PackageError("runtimeMissing") from error
     requirement = app["requiresRuntime"]
     if any(requirement[key] != runtime[key] for key in ("id", "contentHash")):
         raise PackageError("runtimeMismatch", required=requirement, installed={
             key: runtime[key] for key in ("id", "contentHash")})
     if verify:
-        verify_files(root, runtime)
+        verify_files(base, runtime)
     return runtime
 
 
@@ -298,8 +365,16 @@ def startup(root: Path):
     No manifests means a developer checkout, retaining source CLI behavior. A runtime
     marker without the app marker is an incomplete installation, never source mode.
     """
-    root = checked_root(root)
-    if not (root / APP_MANIFEST).exists() and not (root / RUNTIME_MANIFEST).exists():
+    root = checked_root(installation_home(root), virtual=True)
+    def marker(name):
+        try:
+            with (root / name).open("rb"):
+                return True
+        except FileNotFoundError:
+            return False
+    if not marker(APP_MANIFEST) and not marker(RUNTIME_MANIFEST):
+        if marker("launcher/" + RUNTIME_MANIFEST):
+            raise PackageError("runtimeMissing")
         return None
     lease = installation_lock(root, exclusive=False)
     lease.__enter__()
@@ -307,12 +382,14 @@ def startup(root: Path):
         if os.path.lexists(root / TRANSACTION):
             raise PackageError("recoveryRequired")
         app = validate_manifest(read_json(safe_path(root, APP_MANIFEST)), "application")
-        runtime = runtime_for(root, app)
+        runtime = runtime_for(root, app, launch=True)
+        native = runtime_home(root, app, launch=True)
         if (sys.platform != "win32" or struct.calcsize("P") != 8
                 or platform.python_version() != runtime["python"]
-                or Path(sys.executable).resolve() != (root / "python/python.exe").resolve()):
+                or os.path.normcase(os.path.abspath(sys.executable)) != os.path.normcase(
+                    os.path.abspath(native / "python/python.exe"))):
             raise PackageError("interpreterMismatch", python=sys.executable,
-                               required=str(root / "python/python.exe"))
+                               required=str(native / "python/python.exe"))
     except BaseException:
         lease.__exit__(*sys.exc_info())
         raise
@@ -334,7 +411,8 @@ def read_application(archive: Path) -> tuple[dict, dict[str, bytes]]:
             if len(manifests) != 1:
                 raise PackageError("manifest")
             prefix = manifests[0].filename[:-len(APP_MANIFEST)]
-            if prefix and (prefix.count("/") != 1 or relative(prefix[:-1]) != prefix[:-1]):
+            if prefix and prefix != "root/Morphbench/" and (
+                    prefix.count("/") != 1 or relative(prefix[:-1]) != prefix[:-1]):
                 raise PackageError("archive")
             contents, seen, total = {}, set(), 0
             for entry in infos:
@@ -416,7 +494,7 @@ def _recover_locked(root: Path) -> dict:
     # Check the entire backup BEFORE restoring/removing anything. An edited recovery
     # journal still cannot name settings, add-ons or native runtime files.
     for name, checksum in before.items():
-        if name != APP_MANIFEST and not app_path(name):
+        if name != APP_MANIFEST and not app_path(name, application_layout(after)):
             raise PackageError("recoveryInvalid")
         safe_path(root, name)
         if checksum is not None and not re.fullmatch("[0-9a-f]{64}", str(checksum)):
@@ -454,20 +532,22 @@ def _recover_locked(root: Path) -> dict:
 
 
 def recover(root: Path) -> dict:
-    root = checked_root(root)
+    root = checked_root(installation_home(root))
     with installation_lock(root, exclusive=True):
         return _recover_locked(root)
 
 
 def update(root: Path, archive: Path, *, check=False) -> dict:
-    root = checked_root(root)
+    root = checked_root(installation_home(root))
     app, contents = read_application(Path(archive))
     with installation_lock(root, exclusive=True):
         if os.path.lexists(root / TRANSACTION):
             raise PackageError("recoveryRequired")
-        runtime = runtime_for(root, app)
         previous_path = safe_path(root, APP_MANIFEST)
         old = validate_manifest(read_json(previous_path), "application") if previous_path.exists() else None
+        if old and application_layout(old) != application_layout(app):
+            raise PackageError("layoutMismatch")
+        runtime = runtime_for(root, app)
         if old:
             verify_files(root, old)  # Preserve hand-edited application files by refusing.
         old_files = old["files"] if old else {}

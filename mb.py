@@ -25,15 +25,15 @@ from pathlib import Path
 
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 sys.stderr.reconfigure(encoding="utf-8", errors="replace")
-sys.path.insert(0, str(Path(__file__).resolve().parent))
+sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
 
 # The release contract is checked before importing numpy/PyNifly or touching config.
 # Source checkouts without release manifests retain their ordinary CLI behavior.
 sys.dont_write_bytecode = True
-sys.pycache_prefix = str(Path(__file__).resolve().parent / ".morphbench-no-bytecode")
+sys.pycache_prefix = str(Path(os.path.abspath(__file__)).parent / ".morphbench-no-bytecode")
 from mb_distribution import PackageError, message, startup  # noqa: E402
 try:
-    _installation_lease = startup(Path(__file__).resolve().parent)
+    _installation_lease = startup(Path(os.path.abspath(__file__)).parent)
 except (PackageError, OSError) as error:
     print(message(error, Path(__file__).resolve().parent) if isinstance(error, PackageError)
           else str(error), file=sys.stderr)

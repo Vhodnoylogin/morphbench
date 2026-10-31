@@ -1,5 +1,9 @@
 # morphbench
 
+Development packages use **Morphbench/launcher**, **Morphbench/app** and
+**Morphbench/plugins**, with a `root/` archive envelope for optional MO2 Root Builder.
+Existing flat installations remain supported. See [installation and migration](docs/install-layout.md).
+
 A workbench for meshes and named morphs of Skyrim, outside the game. It opens a `.nif`, reads the
 sliders from the `.tri` beside it, applies any set of values, and answers in numbers: what this
 slider tears, how far the geometry now reaches, whether the collision capsules still cover the

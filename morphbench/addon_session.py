@@ -19,7 +19,7 @@ class AddonSessionMixin:
     def _addon_packages(self):
         from .addons import AddonRegistry
         if not hasattr(self, "_addon_registry"):
-            directory = self.cfg["addonDirectory"] or self.cfg.path.parent / "addons"
+            directory = self.cfg.addon_directory()
             self._addon_registry = AddonRegistry(Path(directory), self.cfg["addonLimits"])
         return self._addon_registry
 

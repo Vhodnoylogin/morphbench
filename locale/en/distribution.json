@@ -22,5 +22,6 @@
   "distribution.notInstallation": "The target must be an existing installation folder.",
   "distribution.immutableRuntime": "A Runtime identifier cannot be reused with different contents.",
   "distribution.runtimeJunk": "The Runtime seed contains development files or generated caches.",
-  "distribution.io": "A file operation failed."
+  "distribution.io": "A file operation failed.",
+  "distribution.layoutMismatch": "Layout migration requires a new folder; preserve the current installation and copy settings and plugins explicitly."
 }

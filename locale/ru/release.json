@@ -40,5 +40,7 @@
   "release.optRuntimeVersion": "Независимая версия Runtime, меняется при обновлении нативной среды.",
   "release.splitFlags": "Нельзя совмещать параметры разделённых пакетов с параметрами прежней сборки.",
   "release.needRuntime": "Для --package application требуется --runtime <runtime-manifest.json>.",
-  "release.needRuntimeSeed": "Для --package runtime требуется --runtime-from <папка проверенного релиза>."
+  "release.needRuntimeSeed": "Для --package runtime требуется --runtime-from <папка проверенного релиза>.",
+  "release.optLayout": "Структура архива: root/Morphbench (по умолчанию) или прежняя плоская.",
+  "release.fullLayout": "Для новой структуры используйте --package runtime или --package application. Прежний полный пакет поддерживает только --layout flat."
 }

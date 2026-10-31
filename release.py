@@ -83,6 +83,7 @@ def t(key: str, **values) -> str:
 CONTENT = [
     "mb.py",
     "mb_distribution.py",
+    "mb_paths.py",
     "update.py",
     "morphbench.exe",
     "LICENSE",
@@ -315,7 +316,7 @@ def third_party(deps: list[dict], stage: Path, version: str) -> None:
 def application_files(home: Path) -> list[Path]:
     """The application namespace is shared with the installer, never a deny-list."""
     return [path for path in own_files(home)
-            if distribution.app_path(path.relative_to(home).as_posix())]
+            if distribution.flat_app_path(path.relative_to(home).as_posix())]
 
 
 def _inventory(stage: Path) -> dict:
@@ -323,7 +324,8 @@ def _inventory(stage: Path) -> dict:
             for path in sorted(stage.rglob("*")) if path.is_file()}
 
 
-def _publish_split(stage: Path, out: Path, name: str, manifest: dict, stage_only: bool) -> None:
+def _publish_split(stage: Path, out: Path, name: str, manifest: dict, stage_only: bool,
+                   layout="flat") -> None:
     marker = (distribution.RUNTIME_MANIFEST if manifest["kind"] == "runtime"
               else distribution.APP_MANIFEST)
     distribution.validate_manifest(manifest, manifest["kind"])
@@ -344,13 +346,31 @@ def _publish_split(stage: Path, out: Path, name: str, manifest: dict, stage_only
         shutil.rmtree(target)
     if not target.exists():
         os.replace(stage, target)
+    overlay = {}
+    if layout == "structured" and manifest["kind"] == "runtime":
+        # The unchanged EXE requires mb.py beside itself BEFORE Python can locate
+        # App elsewhere. This explicit App-owned overlay is repeated in both ZIPs
+        # byte-for-byte; it is not part of the immutable native Runtime inventory.
+        overlay["mb.py"] = (HERE / "launcher/mb.py").read_bytes()
+        for language in ("en", "ru"):
+            path = "locale/" + language + "/launcher.json"
+            overlay[path] = (HERE / path).read_bytes()
+        for path, data in overlay.items():
+            destination = distribution.safe_path(target, path)
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            destination.write_bytes(data)
     if not stage_only:
         # Use the inventory even when reusing an existing Runtime stage. A local log,
         # cache or user file added beside it must never leak into the archive.
         archive = str(out / (name + ".zip"))
         with zipfile.ZipFile(archive, "w", zipfile.ZIP_DEFLATED) as package:
-            for path in sorted([*manifest["files"], marker]):
-                package.write(distribution.safe_path(target, path), name + "/" + path)
+            prefix = ("root/Morphbench/" + ("launcher/" if manifest["kind"] == "runtime" else "")
+                      if layout == "structured" else name + "/")
+            for path in sorted([*manifest["files"], marker, *overlay]):
+                package.write(distribution.safe_path(target, path), prefix + path)
+            if layout == "structured" and manifest["kind"] == "application":
+                # User/plugin-owned, intentionally absent from the App inventory.
+                package.writestr("root/Morphbench/plugins/", b"")
         if manifest["kind"] == "application":
             distribution.read_application(Path(archive))  # Inspect the actual finished ZIP too.
         print(t("release.archive", path=archive, size=Path(archive).stat().st_size / 1048576.0))
@@ -366,6 +386,7 @@ def split_release(args, parser) -> int:
     if args.no_vendor or args.no_python or args.pynifly:
         parser.error(t("release.splitFlags"))
     out = (Path(args.out) if args.out else HERE / "build").resolve()
+    layout = getattr(args, "layout", "flat")
     if args.package == "application":
         if not args.runtime:
             parser.error(t("release.needRuntime"))
@@ -376,6 +397,12 @@ def split_release(args, parser) -> int:
                 print(path.relative_to(HERE).as_posix())
             return 0
         contents = {path.relative_to(HERE).as_posix(): path.read_bytes() for path in files}
+        if layout == "structured":
+            contents = {"app/" + name: data for name, data in contents.items()}
+            contents["launcher/mb.py"] = (HERE / "launcher/mb.py").read_bytes()
+            for language in ("en", "ru"):
+                path = "locale/" + language + "/launcher.json"
+                contents["launcher/" + path] = (HERE / path).read_bytes()
         for name, data in contents.items():
             distribution.check_application_file(name, data)
         if len(contents) > distribution.MAX_FILES or sum(map(len, contents.values())) > distribution.MAX_TOTAL:
@@ -384,6 +411,8 @@ def split_release(args, parser) -> int:
                     "version": args.version, "license": "GPL-3.0",
                     "requiresRuntime": {key: runtime[key] for key in ("id", "contentHash")},
                     "files": {name: distribution.digest(data) for name, data in contents.items()}}
+        if layout == "structured":
+            manifest["layout"] = distribution.STRUCTURED
         distribution.validate_manifest(manifest, "application")
         name = "morphbench-application-" + args.version
     else:
@@ -440,7 +469,7 @@ def split_release(args, parser) -> int:
             target = stage / path
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_bytes(data)
-        _publish_split(stage, out, name, manifest, args.stage_only)
+        _publish_split(stage, out, name, manifest, args.stage_only, layout)
     return 0
 
 
@@ -461,7 +490,12 @@ def main(argv=None) -> int:
     ap.add_argument("--runtime-from", help=t("release.optRuntimeFrom"))
     ap.add_argument("--runtime", help=t("release.optRuntimeManifest"))
     ap.add_argument("--runtime-version", default="1", help=t("release.optRuntimeVersion"))
+    ap.add_argument("--layout", choices=("structured", "flat"), default=None,
+                    help=t("release.optLayout"))
     args = ap.parse_args(argv)
+    args.layout = args.layout or ("flat" if args.package == "full" else "structured")
+    if args.package == "full" and args.layout != "flat":
+        ap.error(t("release.fullLayout"))
 
     # Versions are labels, never paths. Validate before any staging folder is removed.
     if not re.fullmatch(r"[0-9][A-Za-z0-9._-]*", args.version):

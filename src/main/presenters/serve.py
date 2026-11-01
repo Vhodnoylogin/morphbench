@@ -348,7 +348,11 @@ class WebServer:
         The answer has to leave before the serving loop stops, and `shutdown()` waits for
         that loop and cannot be called from the request's own thread - hence a thread of its
         own."""
-        threading.Thread(target=self.httpd.shutdown, daemon=True).start()
+        def shutdown():
+            self.httpd.shutdown()
+            # start() has no foreground run()/finally to release its socket.
+            self.close()
+        threading.Thread(target=shutdown, daemon=True).start()
         return {"stopping": True, "url": self.url}
 
     def api_physics_import(self, body):

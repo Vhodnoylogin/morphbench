@@ -1,77 +1,48 @@
-# `launcher\` — the entry point for Mod Organizer 2
+# `launcher/` — stable entry point for Mod Organizer 2
 
-Русская версия этого файла — [README.ru.md](README.ru.md).
+Русская версия — [README.ru.md](README.ru.md).
 
-MO2 replaces the file system only for the processes it starts itself: the mods are merged into
-one game `Data` by usvfs. To see the meshes of the whole build the workbench has to be started
-**by** MO2 — and MO2 starts executables, not scripts. `morphbench.exe` is exactly such an
-executable: a small window with the state of the server, the browse root and buttons to start
-it, stop it and open the page. Started from MO2 it brings up `python mb.py serve` as its own
-child, and that child sees the merged `Data`.
+MO2 injects its filesystem into executables and their children. Development Launcher
+v3 only starts bundled Python, waits and returns its exit code: one class, two methods.
+The window, translations, options, settings, discovery, diagnostics, HTTP and server
+ownership are updateable Application code.
 
-Application **0.8.6** uses the separate **Morphbench Launcher v2** (`runtime-2-win64`);
-their versions are independent. Both release ZIPs start at `root/Morphbench/`. A merged
-installation contains `launcher/` for the EXE and native Runtime, `app/` for
-Application and `plugins/` for installed add-ons. Run `Morphbench/launcher/morphbench.exe`.
-The archive's `root/` envelope supports optional MO2 Root Builder; manual installation
-extracts `Morphbench` from inside it. See [installation and migration](../docs/install-layout.md).
-
-| File | What it is |
+| File | Responsibility |
 |---|---|
-| `morphbench.cs` | the window, in C# — the whole of it |
-| `mb.py` | pure-Python entry shim used by structured releases to locate and run Application |
-| `morphbench.manifest` | DPI awareness and the common controls, compiled in |
-| `build.cmd` | builds `<checkout>/target/launcher/morphbench.exe` with the stock .NET Framework compiler; ASCII and CRLF on purpose |
-| `make-icon.py` | generates `<checkout>/target/launcher/morphbench.ico`; the optional PNG preview is also build output |
+| `morphbench.cs` | fixed interpreter/shim invocation and pure Windows argv quoting |
+| `mb.py` | Application-owned shim, discovery and compatibility adapters |
+| `morphbench.manifest` | compiled Windows manifest |
+| `build.cmd`, `make-icon.py` | source-only recipes; generated output in `target/launcher/` |
 
-In a source checkout, run `src\main\launcher\build.cmd` from its root. The source lives
-in `src/main/launcher/`; EXE, generated ICO and preview output stay in ignored
-`target/launcher/`. Python with Pillow is needed when the icon must be generated. The
-recipe is tracked; generated binary output is not. To launch this EXE against the sources,
-pass the absolute `<checkout>/src/main` folder or set `MORPHBENCH_HOME` to that folder.
-Release packaging keeps the installed `Morphbench/launcher` path. Every published Runtime inventory remains immutable; Launcher v2 has a new identity.
-New native builds must not replace it under the same Runtime identity. See the [build and dependency-pin guide](../docs/building.md).
+Installation stays `root/Morphbench/{launcher,app,plugins}`. Optional Root Builder
+supports MO2 deployment; manual installation extracts Morphbench from inside root.
+See [installation](../docs/install-layout.md).
 
-## May depend on
+## Fixed native boundary
 
-**The server's HTTP API, and the command line.** Everything a button does is a call the command
-line makes too: `serve --status`, `serve`, `serve --stop`, `/api/root`, open the page. Nothing
-else of the workbench is reachable from here — the window is a client like any other.
+Only `python/python.exe` and `mb.py` beside the EXE are native anchors. The host opens
+them through the filesystem, uses no shell/console/redirected pipes and passes all
+original arguments, cwd and environment to the shim. C# interprets no App option,
+setting, PATH, registry, JSON or HTTP protocol.
 
-The EXE finds `mb.py` beside itself, in an explicit folder argument or through
-`MORPHBENCH_HOME`. In a structured release this is `launcher/mb.py`, an entry shim supplied
-with both packages. It selects Application through an explicit absolute `MORPHBENCH_APP`,
-the sibling `../app`, or one complete game-root installation. Ambiguous candidates are refused.
-Application startup verifies Runtime API/ABI compatibility, file hashes and exact bundled
-`launcher/python/python.exe`; interpreter overrides must name that same bundled executable.
+`presenters/launcher.py` owns pure policy functions and LauncherSession, which reuses
+WebServer/ServerLink. `presenters/launcher_window.py` owns stdlib Win32 controls and
+a serialized worker/parent watch. Closing stops only the session's in-process server.
+See [protocol and migration](../docs/launcher-protocol.md).
 
-Source checkouts use `src/main/`; old flat installations retain their installed paths. For sources without
-release manifests, Python discovery tries `MORPHBENCH_PYTHON`, the `python` key in
-`morphbench.json`, `python\` beside `mb.py`, `python.exe` on PATH (excluding the Windows Store
-stub), the `PythonCore` registry and `py.exe`. Manifested flat split installations still
-verify their pinned Runtime. No machine-specific paths are compiled into the window.
+Released v1/v2 Runtime files remain immutable; their App adapters remain supported.
+Install an App advertising host protocol 1 before v3: published App 0.8.6 predates it.
+Future compatible Apps can update window/policy without changing the native host.
 
-## Must never import it
+## Build and source development
 
-Nothing does, and nothing can: this is a separate program in another language. The dependency
-runs one way — the window calls the workbench, the workbench has never heard of the window.
+Run `src/main/launcher/build.cmd` from the checkout. It compiles host/icon only into
+ignored `target/launcher/`, without downloading or selecting Python. To run this EXE
+against source, stage the pinned Runtime's python/ and vendor/ beside it, copy
+launcher/mb.py beside it, and set MORPHBENCH_APP to absolute `<checkout>/src/main`.
+A bare EXE without its bundled interpreter is deliberately not runnable. Never modify
+an installed/published Runtime for source development.
 
-## The rule that decides what belongs here
-
-**The window computes nothing and knows nothing about meshes.** Argument parsing and window
-plumbing, and that is all. A button that can do something `mb.py` cannot is the same defect as
-a control on the page that the command line cannot reach.
-
-**The window is a convenience, not a condition.** An MO2 entry whose binary is
-`<Morphbench>\launcher\python\python.exe` with arguments `mb.py serve` and **Start in**
-set to `<Morphbench>\launcher` does the same job: usvfs is injected the same way and the server
-sees the same merged `Data`. For an old flat installation, use its root `python\python.exe`
-and set **Start in** to that installation root. Anyone who would rather not
-run an unsigned binary loses nothing but the buttons — so nothing may ever be made to work only
-through this folder.
-
-## Stable native boundary
-
-Launcher v2 queries the Application-owned shim with `--launcher-context --protocol 1`.
-Paths, settings and versioned server adapters are supplied by the updateable shim; the EXE
-does not duplicate game/App discovery. See [the protocol contract](../docs/launcher-protocol.md).
+The source CLI still runs directly with system Python. An MO2 entry using bundled
+python/python.exe with `mb.py serve` also remains supported: the EXE adds convenience,
+not exclusive tool capabilities. See [building](../docs/building.md).

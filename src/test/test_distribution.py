@@ -49,7 +49,7 @@ class TestApplicationUpdates(unittest.TestCase):
         (self.root / dist.RUNTIME_MANIFEST).write_bytes(dist.canonical(self.runtime))
         self.first, self.first_manifest = self.package("0.8.0", {"morphbench/obsolete.py": b"# old"})
 
-    def package(self, version, extra=None, *, runtime=None, schema=1):
+    def package(self, version, extra=None, *, runtime=None, schema=1, hosts=None):
         files = {"mb.py": b"# entry " + version.encode(), "update.py": b"# updater",
                  "mb_distribution.py": b"# bootstrap", "morphbench/__init__.py": b"# init",
                  "morphbench/api.py": b"# facade", "morphbench/config.py": b"# config",
@@ -59,6 +59,8 @@ class TestApplicationUpdates(unittest.TestCase):
                     "version": version, "requiresRuntime": runtime or {
                         key: self.runtime[key] for key in ("id", "contentHash")},
                     "files": {name: dist.digest(data) for name, data in files.items()}}
+        if hosts is not None:
+            manifest["launcherHostProtocols"] = hosts
         archive = self.folder / ("application-" + version + ".zip")
         with zipfile.ZipFile(archive, "w", zipfile.ZIP_DEFLATED) as stream:
             for name, data in files.items():
@@ -162,6 +164,23 @@ class TestApplicationUpdates(unittest.TestCase):
     def test_legacy_application_keeps_exact_binding_even_for_an_advertised_runtime(self):
         self.advertise_runtime()
         self.assert_code("runtimeMismatch", lambda: dist.runtime_for(self.root, self.first_manifest))
+
+    def test_native_host_capability_refuses_old_app_before_updating_any_files(self):
+        dist.update(self.root, self.first)
+        self.advertise_runtime("runtime-3-win64")
+        self.runtime["launcherHostProtocol"] = 1
+        self.advertise_runtime("runtime-3-win64")
+        contract = {"apiVersion": 1, "pythonAbi": "cp312-win_amd64"}
+        old, _ = self.package("0.8.6", runtime=contract, schema=2)
+        before = snapshot(self.root)
+        self.assert_code("runtimeMismatch", lambda: dist.update(self.root, old))
+        self.assertEqual(snapshot(self.root), before)
+        new, manifest = self.package("0.8.7-dev.1", runtime=contract, schema=2, hosts=[1])
+        self.assertTrue(dist.update(self.root, new)["ok"])
+        self.assertEqual(dist.runtime_for(self.root, manifest)["launcherHostProtocol"], 1)
+        for hosts in (True, [True], [0], [1, 1], ["1"]):
+            bad, _ = self.package("0.8.7-dev.2", runtime=contract, schema=2, hosts=hosts)
+            self.assert_code("manifest", lambda: dist.read_application(bad))
 
     def test_missing_runtime_contract_is_not_an_unlimited_legacy_exception(self):
         archive, _ = self.package("0.8.6", runtime={"apiVersion": 1,

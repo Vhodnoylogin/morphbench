@@ -2,8 +2,9 @@
 
 This development branch retains the separate **Morphbench Slots 0.8.0-slots.1**
 experiment. Keep experimental Application builds separate from the main Nexus Mods
-page 194795 release line, and reuse the pinned Launcher v2 without changing its native
-code or branding. Experimental branding belongs to Application sources and locales.
+page 194795 release line. The owner's separate native-host minimization task prepares
+Launcher v3 here; the published v1/v2 inventories and assets remain unchanged.
+Experimental branding belongs to Application sources and locales.
 No reference meshes or skeletons belong in an archive. Package validation can run
 without a browser; an unavailable visual check must remain reported as unavailable.
 
@@ -16,9 +17,13 @@ build folder. Released source belongs on `main`; unfinished Application work rem
 
 Build with `src\main\launcher\build.cmd`. It uses the installed .NET Framework compiler;
 Pillow draws the generated icon. Output is `target/launcher/morphbench.exe`.
-Launcher v2 is assembly version 2.0.0.0 and speaks bootstrap/server protocol 1.
-[The frozen native contract](launcher-protocol.md) separates process/window code from the
-Application-owned discovery, settings and adapters. Existing user flags remain supported.
+Development Launcher v3 is assembly version 3.0.0.0 and speaks minimal host protocol 1.
+[The native contract](launcher-protocol.md) leaves only fixed bundled Python/shim startup,
+argv quoting and wait/exit code in C#. Source execution requires staging the pinned
+Runtime's python/ and vendor/ plus the App-owned launcher/mb.py beside the built EXE;
+set MORPHBENCH_APP to absolute src/main. A bare EXE no longer searches system Python.
+Existing App options remain supported by the shim/controller. Released v1/v2 adapters
+remain available. A v3 Runtime also requests launcherHostProtocol 1; update App first.
 
 `runtime-lock.json` is an exact **build dependency pin**, not a runtime compatibility rule.
 Application schema 2 declares API/ABI compatibility; a compatible future Runtime can have
@@ -98,8 +103,10 @@ half/Miniball notices ship with the DLL. Minimality does not waive source obliga
 
 ## Qualification and publication
 
-Run `python src/test/run.py`. Native tests compile the actual C# and exercise failures,
-deadlines, inherited pipes, cancellation, ownership and callback races. Also verify the
+Run `python src/test/run.py`. Native tests compile the actual minimal C# host and
+exercise argv/cwd/environment, fixed interpreter, startup failures, waiting and exit
+codes without showing windows. Python session/hidden Win32 tests cover ownership,
+close races, parent death/PID reuse and controls without desktop interaction. Also verify the
 assembled archives using their bundled interpreter: imports, CLI/HTTP, native window,
 NIF/TRI/PNG, v1-to-v2 App migration, repeated updates and preserved settings/plugins.
 Actual MO2/usvfs qualification is a separate observation; synthetic discovery is not it.

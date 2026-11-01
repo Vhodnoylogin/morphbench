@@ -45,6 +45,7 @@ NATIVE_SUFFIXES = frozenset((".exe", ".dll", ".pyd", ".so", ".dylib", ".lib", ".
                              ".o", ".obj", ".pdb", ".pyc", ".pyi", ".zip", ".7z"))
 APPLICATION_API = 1
 PYTHON_ABI = "cp312-win_amd64"
+LAUNCHER_HOST_PROTOCOL = 1
 # Only this frozen pre-contract release has an implicit compatibility contract.
 # New Runtime releases advertise compatibility independently of their byte inventory.
 LEGACY_RUNTIME = ("runtime-1-win64",
@@ -259,6 +260,9 @@ def validate_manifest(value: dict, kind: str) -> dict:
         raise PackageError("manifest")
     _inventory(value.get("files"), kind, layout)
     if kind == "runtime":
+        if ("launcherHostProtocol" in value and
+                (type(value["launcherHostProtocol"]) is not int or value["launcherHostProtocol"] <= 0)):
+            raise PackageError("manifest")
         if (any(key in value for key in ("applicationApi", "pythonAbi"))
                 and not _api_contract({"apiVersion": value.get("applicationApi"),
                                        "pythonAbi": value.get("pythonAbi")})):
@@ -274,6 +278,10 @@ def validate_manifest(value: dict, kind: str) -> dict:
                     "vendor/io_scene_nifly/pyn/pynifly.py", "vendor/io_scene_nifly/tri/trifile.py",
                     "vendor/io_scene_nifly/tri/tripfile.py"}
     else:
+        protocols = value.get("launcherHostProtocols", [])
+        if (not isinstance(protocols, list) or any(type(item) is not int or item <= 0 for item in protocols)
+                or len(set(protocols)) != len(protocols)):
+            raise PackageError("manifest")
         runtime = value.get("requiresRuntime")
         if schema == 2:
             compatible = _api_contract(runtime)
@@ -345,6 +353,9 @@ def runtime_for(root: Path, app: dict, *, verify=True, launch=False) -> dict:
                  if app["schemaVersion"] == 1 else runtime_contract(runtime))
     if requirement != installed:
         raise PackageError("runtimeMismatch", required=requirement, installed=installed)
+    host = runtime.get("launcherHostProtocol")
+    if host is not None and host not in app.get("launcherHostProtocols", []):
+        raise PackageError("runtimeMismatch", launcherHostProtocol=host)
     if verify:
         verify_files(base, runtime)
     return runtime

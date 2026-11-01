@@ -65,7 +65,7 @@ file, and edits travel as a mod of their own.
 | Facade | `morphbench/api.py` | the whole core | the only surface above the core; returns plain data (`json.dumps`-ready) plus numpy arrays for bulk geometry |
 | Presenters | `presenters\` (`text`, `raster`, `web`, `assets`, `serve`, `ppb`, `smp`, `cbpc`) | the facade only | no computation; a presenter that computes is a bug report against the facade |
 | Page | `web\page.html`, `web\style.css`, `web\js\*.js` | the payload `presenters/web.py` packs | mirrors the facade by name; no library, no font, no request that leaves the machine |
-| Entry points | `mb.py`, `launcher\morphbench.cs` | the facade / the server's HTTP API | argument parsing and window plumbing, nothing else |
+| Entry points | `mb.py`, `launcher\mb.py`, `launcher\morphbench.cs` | facade / updateable Application host | C# forwards argv to bundled Python; App owns discovery, options and UI |
 | Infrastructure | `morphbench/config.py`, `morphbench/i18n.py`, `morphbench/journal.py`, `morphbench/environment.py` | standard library | used by everyone; must not import the core |
 
 Two cross-cutting rules that hold in every layer:

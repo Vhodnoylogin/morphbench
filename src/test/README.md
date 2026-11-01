@@ -42,6 +42,8 @@ not one real build folder anywhere.
 | `test_release.py` | no | truthful bundle manifests, version/runtime preflight, preservation of a previous stage on missing dependencies, launcher sources, dependency test/stub cleanup with licences preserved, unpacked stdlib and import paths |
 | `test_distribution.py` | no | application-only ZIP ownership/native-content checks; two updates preserving settings, add-ons and Runtime; modified-file/collision refusals; cross-process shared/exclusive installation leases; real process crashes, rollback and committed-cleanup recovery |
 | `test_launcher_args.py` | no; Windows/.NET compiler | compiles the production launcher helper and round-trips Windows arguments, including trailing backslashes, drive roots, quotes, spaces and following switches |
+| `test_launcher_native.py` | no; Windows/.NET compiler | actual minimal EXE, hidden bundled child, opaque argv/cwd/environment, exit code/waiting and startup errors without dialogs |
+| `test_launcher_application.py`, `test_launcher_window.py` | no; Win32 window checks require Windows | pure policy, real local HTTP/session ownership, hidden controls, close races, parent death/reused PID and Browse accept/cancel without dialogs |
 | `test_workspace_modes.py` | no; Node for browser mirror | release navigation, disabled experimental links/recipes, keyboard skipping and independent mode overlays; scripted experimental APIs remain available |
 | `test_tri.py` | yes | a real TRIP written by `TripFile` reads back through `MorphSet.from_file` to the precision of the int16 quantum; an FRTRI written by `TriFile` |
 | `test_nif.py` | yes | a tiny NIF made by PyNifly reads back through `BodyModel.from_nif`; `open()` finds the `.tri` lying beside it |

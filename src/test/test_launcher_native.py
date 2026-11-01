@@ -1,19 +1,43 @@
-"""Exercise the complete compiled native launcher against synthetic children and UI races.
+"""Compile the complete native host and launch real Python children under ignored target/.
 
-No form or message box is shown. No game, installed Runtime or machine settings are touched.
-All generated source-independent output is kept under the checkout's ignored target folder.
+Startup error checks compile the same source with a captured MessageBox; no modal UI,
+game, installed Runtime or machine settings are used.
 """
 from __future__ import annotations
 
+import ctypes
+import json
 import os
 from pathlib import Path
+import shutil
+import struct
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 
 
 REPOSITORY = Path(__file__).resolve().parents[2]
+CHILD = '''\
+import ctypes, json, os, pathlib, sys, time
+report = {
+    "argv": sys.argv[1:], "cwd": os.getcwd(), "executable": sys.executable,
+    "parent": os.getppid(), "isolated": sys.flags.isolated,
+    "console": ctypes.windll.kernel32.GetConsoleWindow(),
+    "environment": {key: os.environ.get(key) for key in (
+        "MORPHBENCH_HOME", "MORPHBENCH_APP", "MORPHBENCH_PYTHON",
+        "MORPHBENCH_TEST_UNICODE", "PYTHONHOME", "PYTHONPATH", "PATH")},
+}
+pathlib.Path(os.environ["MORPHBENCH_TEST_REPORT"]).write_text(json.dumps(report), encoding="utf-8")
+gate = os.environ.get("MORPHBENCH_TEST_GATE")
+deadline = time.monotonic() + 10
+while gate and not pathlib.Path(gate).is_file():
+    if time.monotonic() >= deadline:
+        sys.exit(99)
+    time.sleep(0.02)
+sys.exit(int(os.environ.get("MORPHBENCH_TEST_EXIT", "0")))
+'''
 
 
 @unittest.skipUnless(os.name == "nt", "Windows/.NET Framework is required")
@@ -31,44 +55,151 @@ class TestNativeLauncher(unittest.TestCase):
         cls.box = tempfile.TemporaryDirectory(dir=target)
         cls.addClassCleanup(cls.box.cleanup)
         cls.folder = Path(cls.box.name)
-        cls.executable = cls.folder / "launcher-native.exe"
-        subprocess.run([str(compiler), "/nologo", "/codepage:65001", "/target:exe",
-                        "/main:LauncherNativeChecks", "/r:System.Windows.Forms.dll",
-                        "/r:System.Drawing.dll", "/r:System.Web.Extensions.dll",
-                        "/out:" + str(cls.executable),
-                        str(REPOSITORY / "src/main/launcher/morphbench.cs"),
-                        str(REPOSITORY / "src/test/launcher_native.cs")],
+        cls.executable = cls.folder / "morphbench.exe"
+        cls.harness = cls.folder / "startup-check.exe"
+        source = str(REPOSITORY / "src/main/launcher/morphbench.cs")
+        common = [str(compiler), "/nologo", "/codepage:65001", "/r:System.Windows.Forms.dll"]
+        subprocess.run(common + ["/target:winexe", "/out:" + str(cls.executable), source],
                        check=True, capture_output=True, text=True, timeout=30)
+        subprocess.run(common + ["/target:exe", "/main:LauncherNativeChecks",
+                       "/out:" + str(cls.harness), source,
+                       str(REPOSITORY / "src/test/launcher_native.cs")],
+                       check=True, capture_output=True, text=True, timeout=30)
+        # Reuse only the test interpreter's stdlib; the executable/DLLs are real local copies.
+        # _pth makes this portable to normal, venv and embedded Python test runners.
+        cls.python_home = cls.folder / "python-template"
+        cls.python_home.mkdir()
+        executable = Path(getattr(sys, "_base_executable", sys.executable))
+        shutil.copy2(executable, cls.python_home / "python.exe")
+        base = Path(sys.base_prefix)
+        for pattern in ("python*.dll", "vcruntime*.dll"):
+            for dependency in base.glob(pattern):
+                shutil.copy2(dependency, cls.python_home / dependency.name)
+        paths = [str(Path(path).absolute()) for path in sys.path if path and Path(path).exists()]
+        (cls.python_home / f"python{sys.version_info.major}{sys.version_info.minor}._pth").write_text(
+            "\n".join(paths) + "\n", encoding="utf-8")
 
-    def check_native(self, name):
-        scratch = self.folder / name
-        scratch.mkdir()
-        env = dict(os.environ, MORPHBENCH_LANG="en")
-        for key in ("MORPHBENCH_HOME", "MORPHBENCH_APP", "MORPHBENCH_PYTHON",
-                    "MORPHBENCH_NATIVE_TEST_CHILD"):
-            env.pop(key, None)
-        result = subprocess.run([str(self.executable), "check", name, str(scratch),
-                                 str(REPOSITORY / "src/main"), sys.executable], env=env,
-                                capture_output=True, text=True, encoding="utf-8",
-                                errors="replace", timeout=25)
+    def setUp(self):
+        self.case = Path(tempfile.mkdtemp(prefix="Моды host ", dir=self.folder))
+        self.cwd = self.case / "caller Меши"
+        self.cwd.mkdir()
+        self.host = self.case / "host Мой launcher" / "morphbench.exe"
+        self.host.parent.mkdir()
+        shutil.copy2(self.executable, self.host)
+        self.report = self.case / "child report.json"
+        self.env = dict(os.environ,
+                        MORPHBENCH_TEST_REPORT=str(self.report), MORPHBENCH_TEST_EXIT="37",
+                        MORPHBENCH_HOME="source override must reach App",
+                        MORPHBENCH_APP="App override must reach shim",
+                        MORPHBENCH_PYTHON=sys.executable,
+                        MORPHBENCH_TEST_UNICODE="Привет 日本語 🐉",
+                        PYTHONHOME="invalid interpreter home", PYTHONPATH="invalid import path",
+                        PATH="")
+
+    def prepare_child(self):
+        shutil.copytree(self.python_home, self.host.parent / "python")
+        (self.host.parent / "mb.py").write_text(CHILD, encoding="utf-8")
+
+    def launch(self, arguments, **extra):
+        return subprocess.Popen([str(self.host), *arguments], cwd=self.cwd, env=self.env,
+                                creationflags=subprocess.CREATE_NO_WINDOW, **extra)
+
+    def read_report(self, process):
+        deadline = time.monotonic() + 8
+        while time.monotonic() < deadline:
+            if self.report.is_file():
+                try:
+                    return json.loads(self.report.read_text(encoding="utf-8"))
+                except json.JSONDecodeError:
+                    pass
+            if process.poll() is not None:
+                self.fail(f"Host exited {process.returncode} without a complete child report")
+            time.sleep(0.02)
+        self.fail("Python child did not report before its deadline")
+
+    def test_whole_executable_forwards_argv_cwd_environment_and_exit_code(self):
+        self.prepare_child()
+        arguments = ["", "--start", "--root", "D:\\Моды Skyrim\\меши\\", 'a\\"b',
+                     "--launcher-host", "argument", "--native-parent", "unchanged",
+                     "--", "a\tb", "a\nb", "& | < > ^ %PATH% $(echo x)", "日本語 🐉"]
+        with self.launch(arguments) as process:
+            report = self.read_report(process)
+            self.assertEqual(process.wait(timeout=8), 37)
+        self.assertEqual(report["argv"], ["--launcher-host", "1", "--native-parent",
+                                         str(process.pid), "--", *arguments])
+        self.assertEqual(report["parent"], process.pid)
+        self.assertEqual(Path(report["cwd"]), self.cwd)
+        self.assertEqual(Path(report["executable"]), self.host.parent / "python/python.exe")
+        self.assertEqual(report["isolated"], 1)
+        self.assertEqual(report["console"], 0)
+        self.assertEqual(report["environment"], {key: self.env[key] for key in report["environment"]})
+
+    def test_no_arguments_are_forwarded_without_inventing_app_options(self):
+        self.prepare_child()
+        with self.launch([]) as process:
+            report = self.read_report(process)
+            self.assertEqual(process.wait(timeout=8), 37)
+        self.assertEqual(report["argv"], ["--launcher-host", "1", "--native-parent",
+                                         str(process.pid), "--"])
+
+    def test_host_stays_alive_until_child_exits_without_windows(self):
+        self.prepare_child()
+        gate = self.case / "release child"
+        self.env["MORPHBENCH_TEST_GATE"] = str(gate)
+        with self.launch([]) as process:
+            try:
+                report = self.read_report(process)
+                self.assertIsNone(process.poll())
+                windows = []
+                callback_type = ctypes.WINFUNCTYPE(ctypes.c_bool, ctypes.c_void_p, ctypes.c_void_p)
+
+                @callback_type
+                def collect_window(window, _):
+                    owner = ctypes.c_ulong()
+                    ctypes.windll.user32.GetWindowThreadProcessId(window, ctypes.byref(owner))
+                    if owner.value == process.pid:
+                        windows.append(window)
+                    return True
+
+                ctypes.windll.user32.EnumWindows(collect_window, 0)
+                self.assertEqual(windows, [])
+                self.assertEqual(report["console"], 0)
+                time.sleep(0.15)
+                self.assertIsNone(process.poll())
+            finally:
+                gate.touch()
+                process.wait(timeout=8)
+            self.assertEqual(process.returncode, 37)
+
+    def test_production_executable_has_windows_gui_subsystem(self):
+        binary = self.executable.read_bytes()
+        pe_offset = struct.unpack_from("<I", binary, 0x3c)[0]
+        self.assertEqual(binary[pe_offset:pe_offset + 4], b"PE\0\0")
+        self.assertEqual(struct.unpack_from("<H", binary, pe_offset + 24 + 68)[0], 2)
+
+    def startup_error(self, expected):
+        shutil.copy2(self.harness, self.host)
+        result = subprocess.run([str(self.host), "startup-error", expected], cwd=self.cwd,
+                                env=self.env, capture_output=True, text=True, timeout=10)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertIn("PASS " + name, result.stdout)
+        self.assertIn("PASS startup-error", result.stdout)
+        self.assertFalse(self.report.exists())
 
-    def test_process_creation_failures_are_results(self): self.check_native("start-failure")
-    def test_concurrent_pipe_flood_is_bounded_and_drained(self): self.check_native("pipes")
-    def test_child_deadline_terminates_child(self): self.check_native("timeout")
-    def test_inherited_pipe_eof_has_deadline(self): self.check_native("inherited-pipe")
-    def test_close_cancels_and_prevents_cli_children(self): self.check_native("cancel")
-    def test_status_keeps_stderr_separate_and_rejects_failed_exit(self): self.check_native("cli")
-    def test_shared_bootstrap_settings_language_and_protocol(self): self.check_native("discovery")
-    def test_pending_and_racing_callbacks_are_ignored_after_close(self): self.check_native("dispatch")
-    def test_only_owned_server_stops_on_close(self): self.check_native("ownership")
-    def test_http_body_deadline_close_and_versioned_adapter(self): self.check_native("http")
-    def test_close_shutdown_is_pinned_to_its_owned_child(self): self.check_native("shutdown-pin")
-    def test_repeated_timeouts_release_readers_while_descendants_live(self): self.check_native("pipe-resources")
-    def test_repeated_exited_servers_release_readers_while_descendants_live(self): self.check_native("server-pipe-resources")
-    def test_utf8_split_writes_bom_and_incomplete_final_character(self): self.check_native("utf8")
-    def test_diag_uses_generic_commands_and_reports_child_creation_failure(self): self.check_native("diagnostic")
+    def test_missing_bundled_python_refuses_valid_override_and_path_interpreters(self):
+        (self.host.parent / "mb.py").write_text(CHILD, encoding="utf-8")
+        self.env["PATH"] = str(Path(sys.executable).parent)
+        self.startup_error("python.exe")
+
+    def test_missing_shim_reports_startup_failure(self):
+        (self.host.parent / "python").mkdir()
+        (self.host.parent / "python/python.exe").write_bytes(b"not an executable")
+        self.startup_error("mb.py")
+
+    def test_process_creation_failure_is_reported_without_running_app(self):
+        (self.host.parent / "python").mkdir()
+        (self.host.parent / "python/python.exe").write_bytes(b"not an executable")
+        (self.host.parent / "mb.py").write_text(CHILD, encoding="utf-8")
+        self.startup_error("Morphbench could not start.")
 
 
 if __name__ == "__main__":

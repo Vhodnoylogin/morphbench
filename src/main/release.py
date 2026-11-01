@@ -543,6 +543,7 @@ def split_release(args, parser) -> int:
             raise distribution.PackageError("runtimeMismatch")
         manifest = {"schemaVersion": 2, "kind": "application", "name": "morphbench",
                     "version": args.version, "license": "GPL-3.0",
+                    "launcherHostProtocols": [distribution.LAUNCHER_HOST_PROTOCOL],
                     "sourceCommit": commit, "requiresRuntime": contract,
                     "files": {name: distribution.digest(data) for name, data in contents.items()}}
         if layout == "structured":
@@ -621,7 +622,8 @@ def split_release(args, parser) -> int:
                     recipeSource="https://github.com/Vhodnoylogin/morphbench/blob/" + commit + "/" + native["recipe"])
                     + "\n").encode("utf-8")
                 manifest.update(sourceCommit=commit, applicationApi=distribution.APPLICATION_API,
-                                pythonAbi=distribution.PYTHON_ABI)
+                                pythonAbi=distribution.PYTHON_ABI,
+                                launcherHostProtocol=distribution.LAUNCHER_HOST_PROTOCOL)
             manifest["files"] = {name: distribution.digest(data) for name, data in contents.items()}
             manifest["contentHash"] = distribution.digest(distribution.canonical(manifest))
             distribution.validate_manifest(manifest, "runtime")

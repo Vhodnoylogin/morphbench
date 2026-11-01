@@ -156,6 +156,103 @@ console.log(JSON.stringify({navigations}));
         self.assertEqual(result["navigations"], 0)
 
 
+class TestAddonWorkspaces(unittest.TestCase):
+    """Exercise real host selection/refresh with a DOM double, including iframe identity."""
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.bench = common.bench(self.tmp.name, common.sample_model(), common.sample_morphs())
+
+    def run_ui(self, scenario, **values):
+        code = (ROOT / "web/js/addons.js").read_text(encoding="utf8")
+        return run_browser(self, self.tmp.name, WebPage(self.bench).payload(), code + r"""
+class Node {
+  constructor(tag){this.tag=tag;this.children=[];this.listeners={};this.attrs={};this.hidden=false;
+    this.classList={toggle(){}};if(tag==='iframe')this.contentWindow={postMessage(){}};}
+  setAttribute(key,value){this.attrs[key]=String(value);}
+  getAttribute(key){return this.attrs[key];}
+  addEventListener(name,handler){this.listeners[name]=handler;}
+  appendChild(node){this.children.push(node);node.parentNode=this;return node;}
+  remove(){this.removed=true;if(this.parentNode)this.parentNode.children=this.parentNode.children.filter(node=>node!==this);}
+  set textContent(value){this.text=value;this.children=[];}
+  get textContent(){return this.text||'';}
+  querySelector(selector){return this.children.find(node=>'.'+node.attrs.class===selector)||null;}
+  querySelectorAll(){return [];}
+}
+const nav=new Node('nav'),core=new Node('button'),panel=new Node('aside'),workspace=new Node('div');nav.appendChild(core);
+document.getElementById=id=>({'mode-nav':nav,panel}[id]);document.querySelector=()=>workspace;
+document.createElement=tag=>new Node(tag);document.createTextNode=text=>({textContent:text});
+const url='http://localhost/?mode=morphs&tab=sliders'+(input.wanted?'&addon='+input.wanted:'');
+global.window={location:{href:url},history:{replaceState(a,b,url){window.location.href=String(url);}},addEventListener(){}};
+let entries=[{id:'example',name:'Example',version:'1',generation:'g1',enabled:true,compatible:true,entry:'index.html'}];
+let assetFetch=async()=>({ok:true});
+global.fetch=async(path,options)=>path.startsWith('/addon-assets/')?assetFetch(path,options):({ok:true,json:async()=>({addons:entries})});
+const bench=new BenchMirror(DATA);bench.server={root:'/external'};
+const app={bench,workspace:{setAddonTabs(tabs){this.tabs=new Map(tabs);},refresh(){}}};
+const host=new AddonHost(app);app.addons=host;
+(async()=>{await host.ready;
+""" + scenario + r"""
+})().catch(error=>{console.error(error);process.exitCode=1;});
+""", **values)
+
+    def test_refresh_preserves_core_tabs_and_current_frame_until_explicit_reload(self):
+        result = self.run_ui(r"""
+host.select('example');await host.frameReady;const first=host.frame;let resets=0;host.previewHost={reset(){resets++;}};
+host.select('example');await host.refresh();const kept=host.frame===first;
+const staleLoad=first.listeners.load;
+host.select('example',true);await host.frameReady;const replacement=host.frame,status=host.panel.children.find(node=>node.attrs.role==='status');
+staleLoad();const staleIgnored=!status.hidden;
+replacement.listeners.load();
+console.log(JSON.stringify({coreKept:nav.children.includes(core),tabs:[...app.workspace.tabs.keys()],kept,
+  replaced:first!==replacement,removed:first.removed,resets,staleIgnored,loaded:status.hidden,
+  url:window.location.href,frame:replacement.attrs.src}));
+host.close();
+""")
+        self.assertTrue(result["coreKept"])
+        self.assertEqual(result["tabs"], [None, "example"])
+        self.assertTrue(result["kept"])
+        self.assertTrue(result["replaced"])
+        self.assertTrue(result["removed"])
+        self.assertEqual(result["resets"], 1)
+        self.assertTrue(result["staleIgnored"])
+        self.assertTrue(result["loaded"])
+        self.assertIn("addon=example", result["url"])
+        self.assertEqual(result["frame"], "/addon-assets/example/g1/index.html")
+
+    def test_navigation_restores_enabled_plugin_and_reports_unavailable_plugin(self):
+        restored = self.run_ui("await host.frameReady;console.log(JSON.stringify({active:host.active,src:host.frame?.attrs.src}));", wanted="example")
+        self.assertEqual(restored, {"active": "example", "src": "/addon-assets/example/g1/index.html"})
+        unavailable = self.run_ui("console.log(JSON.stringify({active:host.active,opened:host.opened,error:host.managerError?.textContent,frame:host.frame}));", wanted="removed")
+        self.assertIsNone(unavailable["active"])
+        self.assertTrue(unavailable["opened"])
+        self.assertTrue(unavailable["error"])
+        self.assertIsNone(unavailable["frame"])
+
+    def test_failed_asset_is_not_mounted_and_reload_timeout_and_stale_load_are_bounded(self):
+        result = self.run_ui(r"""
+assetFetch=async()=>({ok:false});host.select('example');await host.frameReady;
+const status=host.panel.children.find(node=>node.attrs.role==='status');
+const failed={frame:host.frame,error:status.textContent,iframes:host.panel.children.filter(node=>node.tag==='iframe').length};
+assetFetch=async()=>({ok:true});host.select('example',true);await host.frameReady;
+const recovered=!!host.frame?.attrs.src;host.close();
+let complete;assetFetch=()=>new Promise(resolve=>{complete=resolve;});
+host.select('example');const pending=host.frameReady;host.close();complete({ok:true});await pending;
+const stale=host.frame===null&&host.panel.children.every(node=>node.tag!=='iframe');
+bench.settings.addonFrameLoadTimeoutMs=1;
+assetFetch=(path,options)=>new Promise((resolve,reject)=>options.signal.addEventListener('abort',()=>reject(Error('aborted'))));
+host.select('example');await host.frameReady;
+console.log(JSON.stringify({failed,recovered,stale,timedOut:host.frame===null,
+  timeoutError:host.panel.children.find(node=>node.attrs.role==='status').textContent}));host.close();
+""")
+        self.assertIsNone(result["failed"]["frame"])
+        self.assertTrue(result["failed"]["error"])
+        self.assertEqual(result["failed"]["iframes"], 0)
+        self.assertTrue(result["recovered"])
+        self.assertTrue(result["stale"])
+        self.assertTrue(result["timedOut"])
+        self.assertTrue(result["timeoutError"])
+
+
 class TestAddonHTTP(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()

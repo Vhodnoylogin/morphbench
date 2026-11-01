@@ -45,7 +45,7 @@ label { cursor: pointer; }
 .app-header .sub { display: block; color: var(--muted); font-size: 11px; max-width: 32vw;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #mode-nav { display: flex; align-items: center; gap: 4px; background: #10191f; padding: 4px;
-  border: 1px solid #2d3e48; border-radius: 8px; }
+  border: 1px solid #2d3e48; border-radius: 8px; min-width:0; overflow-x:auto; scrollbar-width:thin; }
 .mode-button { display: flex; gap: 8px; align-items: center; border-color: transparent; background: transparent;
   padding: 7px 13px; min-height: 35px; font-weight: 550; white-space: nowrap; }
 .mode-button.on { background: #264249; border-color: #3a666b; color: #b8fff7; box-shadow: 0 1px 4px #0003; }
@@ -229,21 +229,30 @@ pre { background: #111b21; border: 1px solid #2e404a; border-radius: 5px; paddin
 .collider-source-settings .slot-field > select { font-size: 11px; }
 .collider-source-settings [hidden] { display: none; }
 
-/* Add-on tabs retain the shared model and viewport. */
-#addon-nav { display:flex; flex-wrap:wrap; gap:4px; max-width:28vw; }
-#addon-nav button { font-size:11px; padding:7px 10px; }
-#addon-nav button.on { color:var(--accent); border-color:var(--accent); }
+/* Plugin workspaces share the core tab hierarchy, with a small visual marker. */
+.addon-workspace-tab .mode-badge { color:#d8c9f3; border-color:#78628d; }
+.addon-workspace-tab.on { background:#393247; border-color:#82709b; color:#eddefe; }
+body[data-workspace-addon="true"] .workspace { grid-template-columns:225px minmax(240px,1fr) minmax(440px,1.2fr); }
 #addon-panel { grid-column:3; grid-row:1; display:flex; flex-direction:column; gap:10px; padding-top:16px; }
 #addon-panel[hidden] { display:none; }
 .addon-frame { width:100%; flex:1; min-height:420px; border:0; background:#162127; }
 .addon-manager input[type=file] { width:100%; }
-@media(max-width:1000px) { #addon-nav { max-width:none; } }
-@media(max-width:760px) { #addon-panel { grid-column:2; grid-row:2; } }
-@media(max-width:620px) { #addon-panel { display:block; } .addon-frame { height:550px; } }
+@media(max-width:1050px) {
+  body[data-workspace-addon="true"] .workspace { grid-template-columns:205px minmax(0,1fr); grid-template-rows:minmax(180px,1fr) minmax(260px,45%); }
+  body[data-workspace-addon="true"] #model-panel { grid-column:1; grid-row:1; }
+  body[data-workspace-addon="true"] #viewport { grid-column:2; grid-row:1; }
+  body[data-workspace-addon="true"] #addon-panel { grid-column:1 / -1; grid-row:2; border-left:0; border-top:1px solid var(--line); }
+  .addon-workspace-tab .mode-badge { display:inline; }
+}
+@media(max-width:800px) {
+  body[data-workspace-addon="true"] .workspace { grid-template-rows:auto auto; }
+  body[data-workspace-addon="true"] #addon-panel { min-height:440px; }
+}
+@media(max-width:520px) { #addon-panel { display:block; } .addon-frame { height:550px; } }
 
 /* Add-on previews occupy the former model/viewport columns; inactive main
    controls and the main camera remain intact until the previews close. */
-#viewport.has-addon-previews { grid-column:1 / 3; }
+#viewport.has-addon-previews, body[data-workspace-addon="true"] #viewport.has-addon-previews { grid-column:1 / 3; }
 .addon-preview-grid { position:absolute; inset:0; display:grid; grid-auto-flow:column; grid-auto-columns:minmax(0,1fr); min-height:0; }
 .addon-preview-surface { display:flex; flex-direction:column; min-width:0; min-height:0; margin:0; padding:0; border:0; border-right:1px solid var(--line); overflow:hidden; }
 .addon-preview-caption { margin:0; padding:8px 12px; flex:none; font-size:12px; color:var(--muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }

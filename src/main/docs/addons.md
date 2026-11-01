@@ -21,6 +21,12 @@ add-on against the public interface without adding that mod's formats or calcula
 ## Install, update, enable and disable
 
 Use the viewer's add-on manager to upload a ZIP, inspect its metadata, and explicitly enable it.
+Open **Add-ons** in the shared workspace navigation, choose **Install ZIP**, enable the
+installed package's checkbox, then choose **Open workspace** or its new **Plugin** tab.
+Reselecting the current tab preserves its iframe and unsaved controls. **Reload plugin**
+explicitly recreates the frame and its previews. Model changes still reload the host page;
+the selected plugin is restored if its generation is enabled and compatible. A missing or
+disabled plugin opens the manager with a visible diagnostic instead of an empty workspace.
 Installation always leaves the package **disabled**. Enabled compatible packages have their own
 inspector tabs. Selecting an add-on tab loads its entry page; disabling the active package in
 that viewer unloads the frame and removes its tab. Closing an add-on tab's inspector does not

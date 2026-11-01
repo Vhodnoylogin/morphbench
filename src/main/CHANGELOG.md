@@ -11,6 +11,13 @@ go in a major release, and nowhere else.
 
 Эта страница на русском: [CHANGELOG.ru.md](CHANGELOG.ru.md).
 
+## Unreleased — generic plugin hosting
+
+- Plugins share the workspace navigation, with keyboard selection and an explicit install/enable/open workflow.
+- Reopening the active workspace preserves its frame; explicit reload, bounded asset checks and stale-frame guards improve loading recovery.
+- Removed the built-in Body Slots tab and experimental entry branding; its future UI belongs in a plugin.
+- Browser API v1 and preview linkage remain unchanged. No CLAW-specific controls are included.
+
 ## [0.8.0-slots.1] — experimental, unreleased
 
 - Separate Body Slots authoring archive, identified in the launcher and page.

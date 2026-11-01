@@ -191,8 +191,11 @@ class ControlElement {
     if(tag==="template")this.content={firstChild:new ControlElement("svg")};
   }
   setAttribute(key,value){this.attrs[key]=String(value);if(key==="disabled")this.disabled=true;}
+  getAttribute(key){return this.attrs[key];}
   addEventListener(name,callback){this.events[name]=callback;}
   appendChild(child){this.children.push(child);child.parent=this;return child;}
+  click(){if(!this.disabled&&this.events.click)this.events.click();}
+  focus(){document.activeElement=this;}
   querySelector(selector){return this.children.find(child=>"."+child.className===selector);}
   remove(){if(this.parent)this.parent.children=this.parent.children.filter(child=>child!==this);}
   set textContent(value){this.text=String(value);this.children=[];}
@@ -200,6 +203,7 @@ class ControlElement {
 }
 const nodes=new Map();
 document.createElement=tag=>new ControlElement(tag);
+document.createTextNode=text=>Object.assign(new ControlElement("text"),{textContent:text});
 document.createElementNS=(namespace,tag)=>new ControlElement(tag);
 document.getElementById=id=>{if(!nodes.has(id))nodes.set(id,new ControlElement("div"));return nodes.get(id);};
 document.querySelectorAll=()=>[];document.body=new ControlElement("body");
@@ -217,9 +221,9 @@ host.json=async(path,options)=>{
   if(phase==="uploadFailure")throw Error("ZIP rejected");
 };
 host.refresh=async()=>{refreshes++;if(phase==="refreshFailure")throw Error("Refresh rejected");};
-host.showManager();const content=host.panel.children[0],error=content.children[1];
-const order=content.children.map(node=>node.attrs["aria-label"]||node.textContent);
-for(const control of content.children.filter(node=>node.tag==="input")) {
+host.showManager();const content=host.panel.children[0],error=host.managerError;
+const order=content.children.map(node=>node.tag==="label"?node.children[0].textContent:node.textContent);
+for(const control of content.children.flatMap(node=>node.children).filter(node=>node.tag==="input")) {
   await control.events.change();
   for(phase of ["success","uploadFailure","refreshFailure"]) {
     expectedFile={name:"package.zip"};control.files=[expectedFile];control.value="selected.zip";control.disabled=false;
@@ -227,7 +231,7 @@ for(const control of content.children.filter(node=>node.tag==="input")) {
     outcomes.push({phase,pending,disabled:control.disabled,value:control.value,error:error.textContent});
   }
 }
-console.log(JSON.stringify({order,expectedOrder:[T.addonInstallNote,"",T.addonInstall,T.addonUpdateNote,T.addonUpdate,T.addonEmpty],
+console.log(JSON.stringify({order,expectedOrder:[T.addonInstallNote,T.addonReadyNote,"",T.addonInstall,T.addonUpdateNote,T.addonUpdate,T.addonEmpty],
  requests,outcomes,refreshes}));
 ''')
         self.assertEqual(result["order"], result["expectedOrder"])
@@ -310,13 +314,45 @@ const bench=new BenchMirror(DATA),calls=[],ui=new WorkspaceUI({bench,invoke(...a
 const snapshot=()=>({tabs:[...ui.tabButtons.keys()],selected:[...ui.tabButtons].filter(([,button])=>button.attrs["aria-selected"]==="true").map(([name])=>name),label:document.getElementById("panel").attrs["aria-labelledby"]});
 const legacy=snapshot();ui.tabButtons.get("display").events.click();ui.refresh();const display=snapshot();
 bench.workspace_mode("morphs");ui.refresh();const morphs=snapshot();
-console.log(JSON.stringify({legacy,display,morphs,calls,disabled:[...ui.modeButtons].filter(([,button])=>button.disabled).map(([name])=>name)}));
+console.log(JSON.stringify({legacy,display,morphs,calls,modes:[...ui.modeButtons.keys()],controls:[...ui.modeButtons.values()].map(button=>button.attrs['aria-controls']),disabled:[...ui.modeButtons].filter(([,button])=>button.disabled).map(([name])=>name)}));
 ''')
         self.assertEqual(result["legacy"], {"tabs": ["edit", "display"], "selected": ["edit"], "label": "workspace-tab-edit"})
         self.assertEqual(result["display"], {"tabs": ["edit", "display"], "selected": ["display"], "label": "workspace-tab-display"})
         self.assertEqual(result["morphs"], {"tabs": ["sliders", "display"], "selected": ["sliders"], "label": "workspace-tab-sliders"})
         self.assertEqual(result["calls"], [["workspace_tab", "display"]])
-        self.assertEqual(result["disabled"], ["physics", "slots"])
+        self.assertEqual(result["modes"], ["morphs", "colliders", "physics"])
+        self.assertEqual(result["controls"], ["panel"] * 3)
+        self.assertEqual(result["disabled"], ["physics"])
+
+    def test_plugin_tabs_share_navigation_selection_and_keyboard_order(self):
+        result = self.run_js(r'''
+const bench=new BenchMirror(DATA),calls=[],addons={opened:false,active:null,entries:[{id:'inspector',name:'Inspector',description:'Inspect this pair'}]};
+let ui;const app={bench,addons,invoke(method,...args){calls.push([method,...args]);addons.opened=false;return bench[method](...args);}};
+ui=new WorkspaceUI(app);
+const manager=el('button',{id:'addon-manager-tab',class:'mode-button addon-workspace-tab',on:{click(){addons.opened=true;addons.active=null;ui.refresh();}}});
+const plugin=el('button',{id:'addon-tab-inspector',class:'mode-button addon-workspace-tab',on:{click(){addons.opened=true;addons.active='inspector';ui.refresh();}}});
+ui.modeNav.appendChild(manager);ui.modeNav.appendChild(plugin);ui.setAddonTabs(new Map([[null,manager],['inspector',plugin]]));
+const snapshot=()=>({selected:[...ui.modeButtons,...ui.addonButtons].filter(([,button])=>button.attrs['aria-selected']==='true').map(([id])=>id),
+  focused:[...ui.modeButtons,...ui.addonButtons].find(([,button])=>button===document.activeElement)?.[0],
+  tabsHidden:ui.tabNav.hidden,context:document.getElementById('viewport-mode').textContent,mode:bench.workspace_state().mode});
+app.invoke('workspace_mode','colliders');ui.refresh();ui.modeButtons.get('colliders').focus();
+ui.modeNav.events.keydown({key:'ArrowRight',preventDefault(){}});const managerState=snapshot();
+ui.modeNav.events.keydown({key:'ArrowRight',preventDefault(){}});const pluginState=snapshot();
+ui.modeNav.events.keydown({key:'Home',preventDefault(){}});ui.refresh();const coreState=snapshot();
+console.log(JSON.stringify({managerState,pluginState,coreState,roles:[...ui.modeButtons.values(),...ui.addonButtons.values()].map(button=>button.attrs.role),
+  count:ui.modeNav.children.length,navRole:ui.modeNav.attrs.role,calls}));
+''')
+        self.assertEqual(result["managerState"], {"selected": [None], "focused": None,
+                         "tabsHidden": True, "context": "Add-ons", "mode": "colliders"})
+        self.assertEqual(result["pluginState"], {"selected": ["inspector"], "focused": "inspector",
+                         "tabsHidden": True, "context": "Inspector", "mode": "colliders"})
+        self.assertEqual(result["coreState"], {"selected": ["morphs"], "focused": "morphs",
+                         "tabsHidden": False, "context": "Morphs", "mode": "morphs"})
+        self.assertEqual(result["roles"], ["tab"] * 5)
+        self.assertEqual(result["count"], 5)
+        self.assertEqual(result["navRole"], "tablist")
+        self.assertEqual(result["calls"], [["workspace_mode", "colliders"], ["workspace_mode", "morphs"]])
+
 
 
 if __name__ == "__main__":

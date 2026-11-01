@@ -28,8 +28,9 @@ the module contents and Git LFS were verified on 2026-10-03. The old local and r
 Version **0.8.7** includes visual capsule editing, bidirectional source-preserving
 [PPB tuning editing](docs/ppb.md), the skeleton-only blank-page fix and browser add-ons with
 API v1. It distinguishes [native file visibility](docs/visibility.md) from the viewer's shape selection.
-Version **0.8.7** enables only **Morphs** and **Colliders**; Physics and Body Slots
-are disabled in browser navigation. Their code and script APIs remain for development.
+The development workspace enables **Morphs** and **Colliders**; Physics is disabled.
+Body Slots has no built-in tab and is intended for a separate plugin. Its legacy code
+and scripted APIs remain available for that work.
 See the [editing workspace](docs/workspace.md) and [changelog](CHANGELOG.md).
 
 ## Why this and not BodySlide
@@ -298,8 +299,8 @@ stays in the source repository and is not included in the end-user archive.
 
 The 0.8.7 viewer enables **Morphs** and **Colliders**, with mode tabs above the view, models
 on the left and an inspector on the right. Edit supported collision capsules, save a
-replayable workspace and export new files. **Physics** and **Slots** remain disabled in the
-browser. Experimental FSMP XML/CBPC TXT editing remains accessible through `mb.py workspace`
+replayable workspace and export new files. **Physics** remains disabled; **Body Slots**
+is intended for a separate plugin. Experimental FSMP XML/CBPC TXT editing remains accessible through `mb.py workspace`
 and the local HTTP API; FSMP overlays represent nominal configured limits, not simulation.
 See [the workspace workflow](docs/workspace.md) for controls, automation and offline limits.
 

@@ -95,5 +95,13 @@
   "page.summaryVerts": " · вершин ",
   "page.underMo2": "под MO2: ",
   "page.withoutMorphs": "без морфов",
-  "page.yes": "да"
+  "page.yes": "да",
+  "page.wsPlugin": "Плагин",
+  "page.addonOpen": "Открыть вкладку",
+  "page.addonEnabled": "Включён",
+  "page.addonDisabledState": "Выключен",
+  "page.addonReadyNote": "Установите ZIP → включите плагин → откройте его вкладку.",
+  "page.addonFrameLoading": "Плагин загружается…",
+  "page.addonFrameError": "Плагин не завершил загрузку. Перезагрузите его вкладку или проверьте, включён ли пакет.",
+  "page.addonFrameReload": "Перезагрузить плагин"
 }

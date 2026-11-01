@@ -2,12 +2,17 @@
 
 Russian: [workspace.ru.md](workspace.ru.md).
 
-This release enables **Morphs** and **Colliders**. **Physics** and **Slots** remain visible
-but disabled; keyboard navigation skips them, and old links to those modes open Morphs.
+This workspace enables **Morphs** and **Colliders**. **Physics** remains visible but
+disabled; keyboard navigation skips it. **Body Slots** has no built-in tab: its future
+interface will be a plugin. Old links to unavailable modes open Morphs.
 A second row holds the current mode's tabs. Models and parts stay on the left, the 3D view
 in the centre, and the current inspector on the right. Ragdoll capsules are shown in Colliders
 mode. Experimental physics and [placement](slots.md) code, documents and scripted APIs are
 retained for further development; they are not offered as release UI features.
+
+Enabled plugins are full workspace tabs in the same top navigation, marked **Plugin**.
+The **Add-ons** tab manages installation and activation. A plugin has its own inspector;
+its selection does not change the underlying model's core mode or expose withheld tools.
 
 Colliders has **Edit capsules** and **Display** tabs. Skeleton geometry and PPB settings use
 the same capsule editor; PPB is a source of settings, not a separate editing mode. Old links

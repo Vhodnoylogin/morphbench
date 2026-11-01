@@ -33,6 +33,7 @@ _FILE = _ROOT / "morphbench.json"
 
 DEFAULTS = {
     "addonDirectory": "",
+    "addonFrameLoadTimeoutMs": 10000,
     "addonStateMaxBytes": 65536,
     "addonStateMaxDepth": 32,
     "addonExportMaxBytes": 1048576,

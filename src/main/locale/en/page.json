@@ -95,5 +95,13 @@
   "page.summaryVerts": " · vertices ",
   "page.underMo2": "under MO2: ",
   "page.withoutMorphs": "no morphs",
-  "page.yes": "yes"
+  "page.yes": "yes",
+  "page.wsPlugin": "Plugin",
+  "page.addonOpen": "Open workspace",
+  "page.addonEnabled": "Enabled",
+  "page.addonDisabledState": "Disabled",
+  "page.addonReadyNote": "Install ZIP → enable it → open its workspace tab.",
+  "page.addonFrameLoading": "Loading plugin…",
+  "page.addonFrameError": "The plugin did not finish loading. Reload its workspace or check that the package is enabled.",
+  "page.addonFrameReload": "Reload plugin"
 }

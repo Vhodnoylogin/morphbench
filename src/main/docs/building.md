@@ -1,11 +1,10 @@
 # Building and releasing Morphbench
 
-This development branch retains the separate **Morphbench Slots 0.8.0-slots.1**
-experiment over released Application 0.8.7 and Launcher v3. Keep experimental builds
-separate from the main Nexus Mods page 194795 release line. Experimental branding
-belongs to Application sources and locales; published Runtime inventories stay immutable.
-No reference meshes or skeletons belong in an archive. Package validation can run
-without a browser; an unavailable visual check remains reported as unavailable.
+This development branch contains generic plugin-host changes over released Application
+0.8.7 and Launcher v3. Body Slots has no core tab; its legacy implementation awaits
+a separate plugin. Keep development packages distinct from the published Nexus release.
+Published Runtime inventories remain immutable. No reference meshes or skeletons belong
+in a user archive; report browser checks separately from package validation.
 
 Run commands from the repository root. Maintained production code lives in `src/main/`,
 tests and fixtures in `src/test/`, generated output in ignored `target/` or an explicit

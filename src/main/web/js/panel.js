@@ -15,15 +15,15 @@ class WorkspaceUI {
         icon: ["M5 3a3 3 0 0 1 5 0l3 6a3 3 0 0 1-5 3L3 6a3 3 0 0 1 2-3Z", "M4 5l7 6"] },
       { id: "physics", label: T.wsPhysics, note: T.wsPhysicsNote,
         icon: ["M8 1v3M8 12v3M1 8h3M12 8h3", "M11.5 4.5a5 5 0 1 1-7 7M5 6l3 2 3-5"] },
-      { id: "slots", label: T.wsSlots, note: T.wsSlotsNote,
-        icon: ["M2 2h5v5H2zM9 2h5v5H9zM2 9h5v5H2zM9 9h5v5H9z"] },
     ];
     this.tabLabels = { sliders: T.wsSliders, display: T.wsDisplay, edit: T.wsEdit,
       configuration: T.wsConfiguration, ranges: T.wsRanges, author: T.wsAuthor };
     this.modeButtons = new Map();
+    this.addonButtons = new Map();
     this.tabButtons = new Map();
     if (!this.modeNav || !this.tabNav) return;
     this.modeNav.setAttribute("aria-label", T.wsModes);
+    this.modeNav.setAttribute("role", "tablist");
     this.tabNav.setAttribute("aria-label", T.wsTabs);
     this.tabNav.setAttribute("role", "tablist");
     document.getElementById("model-panel").setAttribute("aria-label", T.wsModels);
@@ -43,7 +43,7 @@ class WorkspaceUI {
         shape.setAttribute("d", path); svg.appendChild(shape);
       }
       icon.appendChild(svg);
-      const button = el("button", { class: "mode-button", type: "button", title: enabled ? mode.note : T.wsUnavailable,
+      const button = el("button", { class: "mode-button", type: "button", role: "tab", "aria-controls": "panel", title: enabled ? mode.note : T.wsUnavailable,
         ...(!enabled ? { disabled: "disabled" } : {}), "aria-disabled": String(!enabled),
         "data-workspace-mode": mode.id, on: { click: () => app.invoke("workspace_mode", mode.id) } },
       [icon, el("span", { text: mode.label }),
@@ -51,8 +51,14 @@ class WorkspaceUI {
       this.modeButtons.set(mode.id, button);
       this.modeNav.appendChild(button);
     }
-    this.modeNav.addEventListener("keydown", (event) => this.onNavigate(event, this.modeButtons, "workspace_mode"));
+    this.modeNav.addEventListener("keydown", (event) => this.onNavigate(event,
+      new Map([...this.modeButtons, ...Array.from(this.addonButtons, ([key, button]) => ["addon:" + (key === null ? "" : key), button])]), "workspace_mode"));
     this.tabNav.addEventListener("keydown", (event) => this.onNavigate(event, this.tabButtons, "workspace_tab"));
+    this.refresh();
+  }
+  setAddonTabs(buttons) {
+    this.addonButtons = new Map(buttons);
+    for (const button of this.addonButtons.values()) button.setAttribute("role", "tab");
     this.refresh();
   }
   onNavigate(event, buttons, method) {
@@ -63,14 +69,18 @@ class WorkspaceUI {
     event.preventDefault();
     const next = event.key === "Home" ? 0 : event.key === "End" ? keys.length - 1
       : (index + (event.key === "ArrowRight" ? 1 : -1) + keys.length) % keys.length;
-    this.app.invoke(method, keys[next]);
-    buttons.get(keys[next]).focus();
+    const button = buttons.get(keys[next]);
+    if (method === "workspace_mode" && keys[next].startsWith("addon:")) button.click();
+    else this.app.invoke(method, keys[next]);
+    button.focus();
   }
   refresh() {
     if (!this.modeNav || !this.tabNav) return;
     const state = this.bench.workspace_state();
     const mode = this.modes.find((item) => item.id === state.mode) || this.modes[0];
     const tab = state.tabs.includes(state.tab) ? state.tab : state.tabs[0];
+    const addons = this.app.addons, addonOpen = !!(addons && addons.opened);
+    const addon = addonOpen && addons.entries.find((entry) => entry.id === addons.active);
     if (this.activeMode !== mode.id) {
       this.tabNav.textContent = "";
       this.tabButtons.clear();
@@ -83,11 +93,20 @@ class WorkspaceUI {
       this.activeMode = mode.id;
     }
     for (const [id, button] of this.modeButtons) {
-      const selected = id === mode.id;
+      const selected = !addonOpen && id === mode.id;
       button.classList.toggle("on", selected);
+      button.setAttribute("aria-pressed", String(selected));
+      button.setAttribute("aria-selected", String(selected));
+      button.tabIndex = selected ? 0 : -1;
+    }
+    for (const [id, button] of this.addonButtons) {
+      const selected = addonOpen && id === addons.active;
+      button.classList.toggle("on", selected);
+      button.setAttribute("aria-selected", String(selected));
       button.setAttribute("aria-pressed", String(selected));
       button.tabIndex = selected ? 0 : -1;
     }
+    this.tabNav.hidden = addonOpen;
     for (const [id, button] of this.tabButtons) {
       const selected = id === tab;
       button.classList.toggle("on", selected);
@@ -100,9 +119,11 @@ class WorkspaceUI {
       section.hidden = !matches(section.getAttribute("data-mode"), mode.id) || !matches(section.getAttribute("data-tab"), tab);
     }
     document.body.setAttribute("data-workspace-mode", mode.id);
-    document.getElementById("workspace-description").textContent = mode.note;
-    document.getElementById("workspace-status").textContent = this.bench.is_open() ? T.wsReady : T.wsNoMesh;
-    document.getElementById("viewport-mode").textContent = mode.label;
+    document.body.setAttribute("data-workspace-addon", String(addonOpen));
+    document.getElementById("workspace-context").textContent = addonOpen ? T.addonTitle : T.wsModels;
+    document.getElementById("workspace-description").textContent = addonOpen ? addon && addon.description || T.addonReadyNote : mode.note;
+    document.getElementById("workspace-status").textContent = addonOpen ? T.wsPlugin : this.bench.is_open() ? T.wsReady : T.wsNoMesh;
+    document.getElementById("viewport-mode").textContent = addonOpen ? addon && addon.name || T.addonTitle : mode.label;
     document.getElementById("inspector-title").textContent = mode.label;
     document.getElementById("inspector-description").textContent = this.tabLabels[tab];
   }

@@ -1,6 +1,6 @@
 # Launcher and Application compatibility
 
-The development Launcher v3 is a fixed Windows-to-Python handoff: one class and two
+Launcher v3 is a fixed Windows-to-Python handoff: one class and two
 methods (entry point and Windows argument quoting). Application owns the window,
 discovery, settings, translations, diagnostics and server lifetime. Released v1/v2
 adapters remain supported; their native bytes are not changed.
@@ -39,8 +39,8 @@ A v3 Runtime declares `launcherHostProtocol: 1`; new Applications declare
 `launcherHostProtocols: [1]`. The updater refuses an App lacking the requested adapter
 before writing files. This capability is separate from native-library API/ABI and is not
 an exact version/hash pin. **Install the new Application before replacing v1/v2 with v3.**
-Published Application 0.8.6 predates this adapter. These development changes do not
-replace any published package.
+Application 0.8.7 introduces this adapter; Application 0.8.6 predates it. The new App
+still supports the v1/v2 adapters, so Application can be upgraded before the native host.
 
 Future UI, discovery, HTTP and lifecycle fixes update Application only. A correction to
 the fixed Python ABI/dependencies, handoff or quoting can still require a new native
@@ -128,5 +128,5 @@ require rebuilding Application. Application updates contain no EXE/DLL/PYD files
 preserve user settings and plugins. This separation avoids reuploading unchanged native
 files for each Application update; every new native upload may still require Nexus review.
 
-Do not promise that v2 will never need replacement: a native defect, interpreter ABI
+Do not promise that v3 will never need replacement: a native defect, interpreter ABI
 upgrade or new native facility can require it. Keep such changes out of routine App work.

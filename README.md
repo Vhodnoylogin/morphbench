@@ -1,9 +1,9 @@
 # Morphbench
 
-This development branch retains the experimental Body Slots entry and branding from `v0.8.0-slots.1`, now based on released 0.8.6 source. It is not a new release.
+This development branch retains the experimental Body Slots entry and branding from `v0.8.0-slots.1`, now based on released 0.8.7 source. It is not a new release.
 
 A Windows workbench for Skyrim NIF/TRI meshes, morphs, bounds and skeleton collision
-capsules. Version 0.8.6 offers Morphs, Colliders, CLI/HTTP automation and browser add-ons;
+capsules. Version 0.8.7 offers Morphs, Colliders, CLI/HTTP automation and browser add-ons;
 Physics and Body Slots remain disabled in browser navigation.
 
 [Русская версия](README.ru.md) · [User guide](src/main/README.md) ·
@@ -35,6 +35,8 @@ The source layout does not change installed packages: they retain
 
 Released downloads are [GitHub release assets](https://github.com/Vhodnoylogin/morphbench/releases)
 and [Nexus files](https://www.nexusmods.com/skyrimspecialedition/mods/194795).
-Application requires the separately versioned Launcher/Runtime for a first installation.
+First installation uses Application 0.8.7 and the separately versioned Launcher v3.
+The native host starts bundled Python; Application owns the launcher window and server.
+Existing Launcher v1/v2 adapters remain supported. Update Application before installing v3.
 Morphbench is licensed under [GNU GPL v3](LICENSE) and developed with assistance from
 [Codex (OpenAI)](https://github.com/codex).

@@ -85,61 +85,6 @@
     "url": "https://www.nexusmods.com/skyrimspecialedition/mods/194795?tab=posts&comment_id=178713507",
     "source": "docs/nexus-architecture-post-0.8.5.bbcode"
   },
-  "pendingContentUpdate": {
-    "status": "offline draft; not published",
-    "descriptionFile": "src/main/docs/nexus-description.bbcode",
-    "application": {
-      "fileId": 829889,
-      "name": "Morphbench Application",
-      "version": "0.8.6",
-      "description": "The Morphbench workbench: morph previews, collider editing and add-ons."
-    },
-    "launcher": {
-      "fileId": 829890,
-      "name": "Morphbench Launcher",
-      "version": "v2",
-      "description": "Starts Morphbench. Includes Python and the libraries needed to run it."
-    },
-    "changelogs": [
-      {
-        "version": "0.8.6",
-        "entries": [
-          "Application updates can reuse compatible Launcher versions without rebuilding the workbench.",
-          "Application and settings discovery now live in the updateable Application package.",
-          "Launcher v1 remains supported. When upgrading from Application 0.8.5, use the updater extracted from the new package before replacing Launcher.",
-          "User downloads exclude developer build material. Required licences and source links remain included.",
-          "Application updates preserve settings and installed add-ons."
-        ]
-      },
-      {
-        "version": "v2",
-        "entries": [
-          "Improved startup error reporting and handling of failed background commands.",
-          "Added time limits and cancellation for background operations.",
-          "Fixed output-pipe handling that could leave operations waiting after a child process exited.",
-          "Made window closure and background-server cleanup more reliable. Closing Launcher leaves an independently started server running.",
-          "Kept application discovery and future interface adaptation in the Application package so ordinary workbench updates can reuse Launcher."
-        ]
-      }
-    ],
-    "requirements": {
-      "fileDependencies": "Preserve the existing Application/Launcher file-to-file requirements and optional Root Builder requirement.",
-      "offSiteRequirements": [
-        {
-          "name": "Morphbench Launcher / Application compatibility and upgrade guide",
-          "url": "https://github.com/Vhodnoylogin/morphbench/blob/v0.8.6/src/main/docs/install-layout.md",
-          "notes": "Application 0.8.6 supports Launcher v1 and v2. Future Launchers must support Runtime API 1 and CPython 3.12 Windows x64. This link documents compatibility and migration; Launcher itself is available in Main files."
-        }
-      ]
-    },
-    "publicationNotes": [
-      "Recheck the live content before applying the draft; preserve owner edits and historical changelogs.",
-      "Add changelog entries once in Nexus's native version sections, separately for 0.8.6 and v2. The documented changelog API appends rather than replacing.",
-      "Keep technical compatibility text in Requirements / Off-site requirements, not in file descriptions.",
-      "Keep package roles, the quarantine-review rationale and installation steps in the main description.",
-      "Do not reupload or replace any archive as part of this text update."
-    ]
-  },
   "currentPublication": {
     "applicationVersion": "0.8.6",
     "launcherVersion": "v2",
@@ -285,5 +230,72 @@
       "imageDividers": 7,
       "archiveReupload": false
     }
+  },
+  "preparedRelease": {
+    "status": "offline candidate; not uploaded or published",
+    "applicationVersion": "0.8.7",
+    "launcherVersion": "v3",
+    "runtimeId": "runtime-3-win64",
+    "sourceTag": "https://github.com/Vhodnoylogin/morphbench/tree/v0.8.7",
+    "githubRelease": "https://github.com/Vhodnoylogin/morphbench/releases/tag/v0.8.7",
+    "descriptionFile": "src/main/docs/nexus-description.bbcode",
+    "mainFiles": [
+      {
+        "name": "Morphbench Application",
+        "version": "0.8.7",
+        "primary": true,
+        "filename": "morphbench-application-0.8.7.zip",
+        "allowModManagerDownload": true,
+        "description": "The Morphbench workbench: morph previews, collider editing and add-ons."
+      },
+      {
+        "name": "Morphbench Launcher",
+        "version": "v3",
+        "primary": false,
+        "filename": "morphbench-runtime-3-win64.zip",
+        "allowModManagerDownload": true,
+        "description": "Starts Morphbench. Includes Python and the libraries needed to run it."
+      }
+    ],
+    "changelogs": [
+      {
+        "version": "0.8.7",
+        "entries": [
+          "Moved the launcher window, settings, discovery and server control into the updateable Application.",
+          "Improved session recovery and preserved fitted capsule geometry in saved recipes and skeleton exports.",
+          "Kept repeated edits within the recovery action limit.",
+          "Improved validation of capsule radii, add-on metadata and update destinations.",
+          "Refactored editing sessions and settings ownership. Settings and installed add-ons are preserved.",
+          "Restored Morphbench window and taskbar icons. Incomplete launcher arguments now produce a diagnostic instead of silently exiting."
+        ]
+      },
+      {
+        "version": "v3",
+        "entries": [
+          "Reduced the native launcher to starting bundled Python and forwarding arguments and the exit code.",
+          "Moved the window and startup behavior into Application so routine fixes can reuse the same EXE.",
+          "Install Application 0.8.7 or a newer compatible Application before replacing Launcher."
+        ]
+      }
+    ],
+    "requirements": {
+      "method": "legacy",
+      "rootBuilderOptional": true,
+      "offSiteRequirements": [
+        {
+          "name": "Morphbench Launcher / Application compatibility",
+          "url": "https://github.com/Vhodnoylogin/morphbench/blob/v0.8.7/src/main/docs/install-layout.md",
+          "notes": "Install both Main files. Launcher v3 needs Application 0.8.7 or a compatible newer App. Update Application before replacing Launcher. Application 0.8.7 supports Launcher v1, v2 and v3. Root Builder is optional."
+        }
+      ]
+    },
+    "publicationNotes": [
+      "Keep historical tags, uploads and owner-authored posts unchanged.",
+      "Add each native version changelog once; keep file descriptions short.",
+      "Application is Primary Main and Launcher is another Main file.",
+      "New native Launcher v3 needs its own quarantine review; older review requests do not cover it.",
+      "No download quarantine-status banner in the mod description.",
+      "Verify final source is on main before publishing."
+    ]
   }
 }

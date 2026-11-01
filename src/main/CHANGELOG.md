@@ -17,15 +17,22 @@ go in a major release, and nowhere else.
 - A visible **Open Slots authoring** button uses the existing `slots_mode` action.
 - Retains authored JSON/package bytes, local variants, replayable session recovery and the existing mesh-inspection commands. No third-party reference meshes or game/runtime support claims are included.
 
+## [0.8.7] — 2026-11-01
 
-## [Unreleased]
-
-- Preserve fitted capsule geometry in saved recipes and skeleton exports.
-- Keep recovery recipes within the shared browser/server action budget after repeated edits.
-- Reject malformed Unicode in add-on metadata before installation, keeping add-on lists readable.
-- Reject oversized capsule radii without NumPy overflow warnings.
-- Support Windows case-only renames of owned Application files and reject conflicting
-  parent files during update preflight, before opening a transaction.
+- Restore Morphbench window/taskbar icons and report incomplete launcher arguments instead of silently exiting.
+- Introduce Launcher v3: the native EXE only starts bundled Python, forwards arguments,
+  waits and returns its exit code. Move the window, options, diagnostics, discovery and
+  server ownership into the updateable Application. Retain released v1/v2 adapters.
+- Declare host protocol compatibility separately from Runtime API/ABI. Upgrade
+  Application before installing v3; keep settings and plugins across updates.
+- Centralize staged editing sessions and pure recipe/add-on validation. Isolate nested
+  default settings between Config instances and remove the redundant state mixin module.
+- Preserve fitted capsule geometry in recovery recipes and skeleton exports; keep
+  repeated edits within the shared browser/server replay budget.
+- Reject malformed Unicode in add-on metadata, oversized capsule radii and conflicting
+  update parent paths. Handle Windows case-only renames of owned Application files.
+- Reduce duplicate mesh analysis, document export and browser validation work. Release
+  navigation still enables only Morphs and Colliders; Physics and Body Slots stay disabled.
 
 ## [0.8.6] — 2026-10-31
 

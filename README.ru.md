@@ -1,9 +1,9 @@
 # Morphbench
 
-Эта ветка разработки сохраняет экспериментальный вход Body Slots и обозначения из `v0.8.0-slots.1` поверх исходников выпущенной 0.8.6. Это не новый релиз.
+Эта ветка разработки сохраняет экспериментальный вход Body Slots и обозначения из `v0.8.0-slots.1` поверх исходников выпущенной 0.8.7. Это не новый релиз.
 
 Верстак для Windows: меши Skyrim NIF/TRI, морфы, шары охвата и капсулы столкновений
-скелета. В версии 0.8.6 доступны Morphs, Colliders, автоматизация CLI/HTTP и браузерные
+скелета. В версии 0.8.7 доступны Morphs, Colliders, автоматизация CLI/HTTP и браузерные
 аддоны; Physics и Body Slots остаются отключены в навигации браузера.
 
 [English](README.md) · [Руководство](src/main/README.ru.md) ·
@@ -35,6 +35,8 @@ python release.py --list
 
 Готовые выпуски находятся среди [файлов GitHub Releases](https://github.com/Vhodnoylogin/morphbench/releases)
 и [файлов Nexus](https://www.nexusmods.com/skyrimspecialedition/mods/194795).
-Для первой установки Application нужен отдельный Launcher/Runtime с собственной версией.
+Для первой установки нужны Application 0.8.7 и отдельный Launcher v3 с собственной версией.
+Нативный хост запускает комплектный Python; окно запуска и сервер принадлежат Application.
+Адаптеры Launcher v1/v2 сохранены. Перед установкой v3 сначала обновите Application.
 Лицензия Morphbench — [GNU GPL v3](LICENSE); разработка ведётся с помощью
 [Codex (OpenAI)](https://github.com/codex).

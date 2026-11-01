@@ -1,12 +1,11 @@
 # Building and releasing Morphbench
 
 This development branch retains the separate **Morphbench Slots 0.8.0-slots.1**
-experiment. Keep experimental Application builds separate from the main Nexus Mods
-page 194795 release line. The owner's separate native-host minimization task prepares
-Launcher v3 here; the published v1/v2 inventories and assets remain unchanged.
-Experimental branding belongs to Application sources and locales.
+experiment over released Application 0.8.7 and Launcher v3. Keep experimental builds
+separate from the main Nexus Mods page 194795 release line. Experimental branding
+belongs to Application sources and locales; published Runtime inventories stay immutable.
 No reference meshes or skeletons belong in an archive. Package validation can run
-without a browser; an unavailable visual check must remain reported as unavailable.
+without a browser; an unavailable visual check remains reported as unavailable.
 
 Run commands from the repository root. Maintained production code lives in `src/main/`,
 tests and fixtures in `src/test/`, generated output in ignored `target/` or an explicit
@@ -17,7 +16,7 @@ build folder. Released source belongs on `main`; unfinished Application work rem
 
 Build with `src\main\launcher\build.cmd`. It uses the installed .NET Framework compiler;
 Pillow draws the generated icon. Output is `target/launcher/morphbench.exe`.
-Development Launcher v3 is assembly version 3.0.0.0 and speaks minimal host protocol 1.
+Launcher v3 is assembly version 3.0.0.0 and speaks minimal host protocol 1.
 [The native contract](launcher-protocol.md) leaves only fixed bundled Python/shim startup,
 argv quoting and wait/exit code in C#. Source execution requires staging the pinned
 Runtime's python/ and vendor/ plus the App-owned launcher/mb.py beside the built EXE;
@@ -36,8 +35,8 @@ Download the exact archive URL in `src/main/runtime-lock.json`, verify its SHA25
 extract `root/Morphbench/launcher`. Do not modify its inventoried files. Package it with:
 
 ```text
-python release.py --package runtime --runtime-from <extracted-launcher> --runtime-version 2 --out <output>
-python release.py --package application --runtime <extracted-launcher>/runtime-manifest.json --version 0.8.6 --out <output>
+python release.py --package runtime --runtime-from <extracted-launcher> --runtime-version 3 --out <output>
+python release.py --package application --runtime <extracted-launcher>/runtime-manifest.json --version 0.8.7 --out <output>
 ```
 
 The builder checks Runtime ID, content hash and Python version against the source pin.
@@ -54,7 +53,7 @@ with the new EXE, `python/`, `vendor/`, licence/notices/dependency statement and
 stating its actual Python. Keep the old seed unchanged. Commit the source first, then:
 
 ```text
-python release.py --package runtime --new-runtime --runtime-from <fresh-seed> --runtime-version 2 --source-commit <exact-40-hex-commit> --out <output>
+python release.py --package runtime --new-runtime --runtime-from <fresh-seed> --runtime-version <new-runtime-version> --source-commit <exact-40-hex-commit> --out <output>
 ```
 
 `--new-runtime` refuses the frozen v1 ID and the current source lock's identity. It is
@@ -108,7 +107,9 @@ exercise argv/cwd/environment, fixed interpreter, startup failures, waiting and 
 codes without showing windows. Python session/hidden Win32 tests cover ownership,
 close races, parent death/PID reuse and controls without desktop interaction. Also verify the
 assembled archives using their bundled interpreter: imports, CLI/HTTP, native window,
-NIF/TRI/PNG, v1-to-v2 App migration, repeated updates and preserved settings/plugins.
+NIF/TRI/PNG, legacy v1/v2 adapters, App-first migration to v3, repeated updates and
+preserved settings/plugins. Keep Morphs and Colliders active; Physics and Body Slots
+remain disabled. Record actual final archive hashes and source commits before publication.
 Actual MO2/usvfs qualification is a separate observation; synthetic discovery is not it.
 
 Publish corresponding source on `main` and output as GitHub/Nexus downloads. Preserve

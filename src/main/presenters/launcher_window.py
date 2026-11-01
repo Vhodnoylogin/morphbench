@@ -15,11 +15,13 @@ from __future__ import annotations
 import ctypes
 from ctypes import wintypes
 import os
+from pathlib import Path
 import queue
 import threading
 import uuid
 
 from morphbench.i18n import t
+from mb_paths import runtime_root
 
 
 WM_DESTROY = 0x0002
@@ -28,6 +30,7 @@ WM_CLOSE = 0x0010
 WM_COMMAND = 0x0111
 WM_TIMER = 0x0113
 WM_SETFONT = 0x0030
+WM_SETICON = 0x0080
 WS_CHILD = 0x40000000
 WS_VISIBLE = 0x10000000
 WS_TABSTOP = 0x00010000
@@ -46,6 +49,7 @@ class _Windows:
         self.user = ctypes.WinDLL("user32", use_last_error=True)
         self.kernel = ctypes.WinDLL("kernel32", use_last_error=True)
         self.gdi = ctypes.WinDLL("gdi32", use_last_error=True)
+        self.shell = ctypes.WinDLL("shell32", use_last_error=True)
         self.LRESULT = ctypes.c_ssize_t
         self.WPARAM = ctypes.c_size_t
         self.LPARAM = ctypes.c_ssize_t
@@ -117,8 +121,12 @@ class _Windows:
         bind(self.user, "KillTimer", wintypes.BOOL, wintypes.HWND, ctypes.c_size_t)
         bind(self.user, "GetSysColorBrush", wintypes.HBRUSH, ctypes.c_int)
         bind(self.user, "LoadCursorW", wintypes.HANDLE, wintypes.HINSTANCE, wintypes.LPVOID)
+        bind(self.user, "DestroyIcon", wintypes.BOOL, wintypes.HICON)
         bind(self.user, "GetSystemMetrics", ctypes.c_int, ctypes.c_int)
         bind(self.gdi, "GetStockObject", wintypes.HANDLE, ctypes.c_int)
+        bind(self.shell, "ExtractIconExW", wintypes.UINT, wintypes.LPCWSTR, ctypes.c_int,
+             ctypes.POINTER(wintypes.HICON), ctypes.POINTER(wintypes.HICON), wintypes.UINT)
+        bind(self.shell, "SetCurrentProcessExplicitAppUserModelID", ctypes.c_int32, wintypes.LPCWSTR)
         # Python is a new process: the bootstrap EXE's manifest does not set its
         # child's DPI awareness. A preconfigured host may already own this setting.
         if hasattr(self.user, "SetProcessDpiAwarenessContext"):
@@ -226,6 +234,7 @@ class Win32Window:
         self.hwnd = None
         self.controls = {}
         self._class_registered = False
+        self._icons = []
         self._class_name = "MorphbenchLauncher_" + uuid.uuid4().hex
         self._instance = self.api.GetModuleHandleW(None)
         # This strong reference must outlive the registered class and every HWND.
@@ -240,10 +249,22 @@ class Win32Window:
 
     def _create(self):
         api = self.api
+        # Python is the visible process. Give its window a stable product identity
+        # and reuse the icons already embedded in this exact native Runtime.
+        result = api.SetCurrentProcessExplicitAppUserModelID("Vhodnoylogin.Morphbench")
+        if result < 0:
+            raise ctypes.WinError(result)
+        runtime = os.environ.get("MORPHBENCH_RUNTIME_HOME")
+        home = Path(os.path.abspath(runtime)) if runtime else runtime_root(Path(__file__).parent.parent)
+        large, small = wintypes.HICON(), wintypes.HICON()
+        api.ExtractIconExW(str(home / "morphbench.exe"), 0, ctypes.byref(large), ctypes.byref(small), 1)
+        self._icons = list(dict.fromkeys(icon for icon in (large.value, small.value) if icon))
         window_class = api.WindowClass()
         window_class.cbSize = ctypes.sizeof(window_class)
         window_class.lpfnWndProc = self._callback
         window_class.hInstance = self._instance
+        window_class.hIcon = large
+        window_class.hIconSm = small
         window_class.hCursor = api.LoadCursorW(None, ctypes.c_void_p(32512))
         window_class.hbrBackground = api.GetSysColorBrush(15)
         window_class.lpszClassName = self._class_name
@@ -258,6 +279,10 @@ class Win32Window:
                                        left, top, width, height, None, None, self._instance, None)
         if not self.hwnd:
             raise ctypes.WinError(ctypes.get_last_error())
+        if large.value:
+            api.SendMessageW(self.hwnd, WM_SETICON, 1, large.value)
+        if small.value:
+            api.SendMessageW(self.hwnd, WM_SETICON, 0, small.value)
         self._control("state", "STATIC", t("launcher.asking"))
         self._control("environment", "STATIC", "")
         self._control("root_label", "STATIC", t("launcher.rootLabel"))
@@ -604,6 +629,9 @@ class Win32Window:
             if self._class_registered:
                 self.api.UnregisterClassW(self._class_name, self._instance)
                 self._class_registered = False
+            for icon in self._icons:
+                self.api.DestroyIcon(icon)
+            self._icons.clear()
             if self._close_error is not None and self._callback_error is None:
                 raise self._close_error
 

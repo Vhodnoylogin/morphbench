@@ -2,7 +2,7 @@
 
 Русская версия — [README.ru.md](README.ru.md).
 
-MO2 injects its filesystem into executables and their children. Development Launcher
+MO2 injects its filesystem into executables and their children. Launcher
 v3 only starts bundled Python, waits and returns its exit code: one class, two methods.
 The window, translations, options, settings, discovery, diagnostics, HTTP and server
 ownership are updateable Application code.
@@ -31,7 +31,8 @@ a serialized worker/parent watch. Closing stops only the session's in-process se
 See [protocol and migration](../docs/launcher-protocol.md).
 
 Released v1/v2 Runtime files remain immutable; their App adapters remain supported.
-Install an App advertising host protocol 1 before v3: published App 0.8.6 predates it.
+Install Application 0.8.7 or a compatible newer App advertising host protocol 1
+before v3. Application 0.8.6 predates this adapter.
 Future compatible Apps can update window/policy without changing the native host.
 
 ## Build and source development

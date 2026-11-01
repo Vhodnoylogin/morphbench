@@ -4,6 +4,13 @@ Application 0.8.7 uses a structured layout with Morphbench Launcher v3.
 The versions are independent; Application retains the released v1/v2 adapters.
 Existing flat 0.8.0 installations remain supported; migrate into a fresh folder.
 
+**GitHub:** `morphbench-0.8.7-win64.zip` already contains Launcher and Application.
+Extract it once; there is no second required download. With Root Builder, install it
+as one enabled mod. **Nexus:** install the two Main files as described below.
+The optional Nifly corresponding-source ZIP is for developers and is not installed.
+For an existing installation, use the Application updater and the migration steps
+below; extracting the complete ZIP over an old installation is not a managed update.
+
 ```text
 Morphbench/
   launcher/                  EXE, Python, vendor and entry shim

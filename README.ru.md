@@ -35,7 +35,11 @@ python release.py --list
 
 Готовые выпуски находятся среди [файлов GitHub Releases](https://github.com/Vhodnoylogin/morphbench/releases)
 и [файлов Nexus](https://www.nexusmods.com/skyrimspecialedition/mods/194795).
-Для первой установки нужны Application 0.8.7 и отдельный Launcher v3 с собственной версией.
+На GitHub скачайте **morphbench-0.8.7-win64.zip**: он содержит Application 0.8.7
+и Launcher v3. На Nexus обе части остаются отдельными загрузками.
+Необязательный `morphbench-nifly-corresponding-source.zip` содержит соответствующие
+DLL исходники C/C++ сторонней зависимости Nifly/PyNifly. Для установки он не нужен.
+В этом репозитории самих сторонних исходников нет — только закрепления и рецепт сборки.
 Нативный хост запускает комплектный Python; окно запуска и сервер принадлежат Application.
 Адаптеры Launcher v1/v2 сохранены. Перед установкой v3 сначала обновите Application.
 Лицензия Morphbench — [GNU GPL v3](LICENSE); разработка ведётся с помощью

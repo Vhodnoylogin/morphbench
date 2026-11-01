@@ -93,6 +93,18 @@
     "nativeLauncherSourceCommit": "ac15b242dbe1013d2c46a521fb6fad1f03161b52",
     "githubRelease": "https://github.com/Vhodnoylogin/morphbench/releases/tag/v0.8.7",
     "applicationFileId": 830284,
+    "githubCombinedArchive": {
+      "name": "morphbench-0.8.7-win64.zip",
+      "bytes": 30179461,
+      "sha256": "3b95233f73e1588e1e9639c160ed4f051f7df951625a5231bd9118bc01fdc2bb",
+      "packagingCommit": "7bf060f",
+      "files": 1157,
+      "payloadBytesUnchanged": true,
+      "githubDigestVerified": true,
+      "componentAssetsPreserved": true,
+      "nexusFilesUnchanged": true,
+      "evidence": "D:/Skyrim VR Modding/Builds/morphbench-github-combined-20261101/publication.json"
+    },
     "launcherFileId": 830285,
     "applicationVersionId": "7318625102668",
     "launcherVersionId": "7318625102669",

@@ -30,6 +30,7 @@ import json
 import os
 import re
 import shutil
+import stat
 import subprocess
 import sys
 import tempfile
@@ -646,6 +647,107 @@ def split_release(args, parser) -> int:
     return 0
 
 
+def combined_release(args, parser) -> int:
+    """Combine qualified structured packages; neither payload is rebuilt or imported."""
+    if (not args.runtime_from or not args.application_from or args.layout != "structured"
+            or args.no_vendor or args.no_python or args.pynifly or args.new_runtime
+            or args.runtime or args.stage_only or args.source_commit or args.runtime_version != "1"):
+        parser.error(t("release.combinedFlags"))
+    application = Path(args.application_from)
+    app, app_files = distribution.read_application(application)
+    if distribution.application_layout(app) != distribution.STRUCTURED:
+        raise distribution.PackageError("archive")
+    if args.version not in ("0.0.0", app["version"]):
+        parser.error(t("release.badVersion", version=args.version))
+    prefix = "root/Morphbench/"
+    try:
+        with zipfile.ZipFile(application) as package:
+            app_files[distribution.APP_MANIFEST] = package.read(prefix + distribution.APP_MANIFEST)
+    except (KeyError, zipfile.BadZipFile) as error:
+        raise distribution.PackageError("archive") from error
+    runtime_archive = Path(args.runtime_from)
+    if runtime_archive.stat().st_size > distribution.MAX_ARCHIVE:
+        raise distribution.PackageError("archive")
+    contents, seen, total = {}, set(), 0
+    try:
+        with zipfile.ZipFile(runtime_archive) as package:
+            if len(package.infolist()) > distribution.MAX_FILES + 256:
+                raise distribution.PackageError("archive")
+            for entry in package.infolist():
+                name = distribution.relative(entry.filename.rstrip("/"))
+                # Native DLLs can exceed the App text-file limit; keep the total
+                # uncompressed archive budget, checked before reading each member.
+                if (name.casefold() in seen or stat.S_ISLNK(entry.external_attr >> 16)
+                        or entry.flag_bits & 1 or entry.file_size > distribution.MAX_TOTAL
+                        or entry.compress_type not in (zipfile.ZIP_STORED, zipfile.ZIP_DEFLATED)):
+                    raise distribution.PackageError("archive", path=name)
+                seen.add(name.casefold())
+                if entry.is_dir():
+                    if name not in ("root", "root/Morphbench", "root/Morphbench/launcher") and not name.startswith(prefix + "launcher/"):
+                        raise distribution.PackageError("archive", path=name)
+                    continue
+                if not name.startswith(prefix + "launcher/"):
+                    raise distribution.PackageError("archive", path=name)
+                total += entry.file_size
+                if total > distribution.MAX_TOTAL:
+                    raise distribution.PackageError("archive")
+                contents[name[len(prefix + "launcher/"):]] = package.read(entry)
+    except (zipfile.BadZipFile, NotImplementedError, RuntimeError) as error:
+        raise distribution.PackageError("archive") from error
+    marker = distribution.RUNTIME_MANIFEST
+    if marker not in contents:
+        raise distribution.PackageError("manifest")
+    runtime = distribution.validate_manifest(distribution._json(contents[marker]), "runtime")
+    check_runtime_pin(HERE, runtime)
+    requirement = ({key: runtime[key] for key in ("id", "contentHash")}
+                   if app["schemaVersion"] == 1 else distribution.runtime_contract(runtime))
+    if (app["requiresRuntime"] != requirement or runtime.get("launcherHostProtocol") is not None
+            and runtime["launcherHostProtocol"] not in app.get("launcherHostProtocols", [])):
+        raise distribution.PackageError("runtimeMismatch")
+    overlays = {"mb.py", "locale/en/launcher.json", "locale/ru/launcher.json"}
+    if set(contents) - runtime["files"].keys() - {marker} - overlays:
+        raise distribution.PackageError("manifest")
+    for name, checksum in runtime["files"].items():
+        if name not in contents or distribution.digest(contents[name]) != checksum:
+            raise distribution.PackageError("changedFile", path=name)
+    for name in overlays & contents.keys():
+        distribution.check_application_file("launcher/" + name, contents[name])
+        if "launcher/" + name not in app_files:
+            raise distribution.PackageError("manifest", path=name)
+    contents = {"launcher/" + name: data for name, data in contents.items()}
+    # Only the three explicitly App-owned shim/translation files may overlap.
+    if (contents.keys() & app_files.keys()) - {"launcher/" + name for name in overlays}:
+        raise distribution.PackageError("manifest")
+    contents.update(app_files)
+    names = {name.casefold() for name in contents}
+    if (len(contents) > distribution.MAX_FILES or sum(map(len, contents.values())) > distribution.MAX_TOTAL
+            or len(names) != len(contents) or any("/".join(name.split("/")[:index]) in names
+            for name in names for index in range(1, len(name.split("/"))))):
+        raise distribution.PackageError("manifest")
+    if args.list:
+        for name in sorted(contents):
+            print(prefix + name)
+        return 0
+    out = (Path(args.out) if args.out else default_output(HERE)).resolve()
+    out.mkdir(parents=True, exist_ok=True)
+    target = out / ("morphbench-" + app["version"] + "-win64.zip")
+    if target.is_symlink() or target in (application.resolve(), runtime_archive.resolve()):
+        raise distribution.PackageError("unsafePath", path=str(target))
+    with tempfile.TemporaryDirectory(prefix=".morphbench-combine-", dir=out) as temporary:
+        archive = Path(temporary) / target.name
+        with zipfile.ZipFile(archive, "w", zipfile.ZIP_DEFLATED) as package:
+            for name, data in sorted(contents.items()):
+                package.writestr(zipfile.ZipInfo(prefix + name), data, compress_type=zipfile.ZIP_DEFLATED)
+            package.writestr(zipfile.ZipInfo("root/Morphbench/plugins/"), b"")
+        with zipfile.ZipFile(archive) as package:
+            if (len(package.infolist()) != len(contents) + 1 or any(
+                    package.read(prefix + name) != data for name, data in contents.items())):
+                raise distribution.PackageError("archive")
+        os.replace(archive, target)
+    print(t("release.archive", path=target, size=target.stat().st_size / 1048576.0))
+    return 0
+
+
 def main(argv=None) -> int:
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     ap = argparse.ArgumentParser(prog="release.py", description=t("release.usage"),
@@ -658,9 +760,10 @@ def main(argv=None) -> int:
     ap.add_argument("--no-vendor", action="store_true", help=t("release.optNoVendor"))
     ap.add_argument("--stage-only", action="store_true", help=t("release.optStageOnly"))
     ap.add_argument("--list", action="store_true", help=t("release.optList"))
-    ap.add_argument("--package", choices=("full", "runtime", "application"), default="full",
+    ap.add_argument("--package", choices=("full", "runtime", "application", "combined"), default="full",
                     help=t("release.optPackage"))
     ap.add_argument("--runtime-from", help=t("release.optRuntimeFrom"))
+    ap.add_argument("--application-from", help=t("release.optApplicationFrom"))
     ap.add_argument("--runtime", help=t("release.optRuntimeManifest"))
     ap.add_argument("--runtime-version", default="1", help=t("release.optRuntimeVersion"))
     ap.add_argument("--new-runtime", action="store_true", help=t("release.optNewRuntime"))
@@ -681,11 +784,13 @@ def main(argv=None) -> int:
         ap.error(t("release.badVersion", version=args.runtime_version))
     if args.package != "full":
         try:
-            return split_release(args, ap)
+            if args.package != "combined" and args.application_from:
+                ap.error(t("release.combinedFlags"))
+            return combined_release(args, ap) if args.package == "combined" else split_release(args, ap)
         except (distribution.PackageError, OSError) as error:
             ap.error(distribution.message(error, HERE) if isinstance(error, distribution.PackageError)
                      else str(error))
-    if args.runtime or args.runtime_from or args.runtime_version != "1" or args.new_runtime:
+    if args.runtime or args.runtime_from or args.runtime_version != "1" or args.new_runtime or args.application_from:
         ap.error(t("release.splitFlags"))
 
     home = HERE

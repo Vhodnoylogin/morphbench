@@ -145,6 +145,113 @@ class TestRelease(unittest.TestCase):
         self.assertEqual(marker.read_text(), "previous build")
 
 
+class TestCombinedRelease(unittest.TestCase):
+    def setUp(self):
+        self.box = tempfile.TemporaryDirectory()
+        self.addCleanup(self.box.cleanup)
+        self.folder = Path(self.box.name)
+        self.out = self.folder / "output"
+        self.app_zip, self.runtime_zip = self.folder / "app.zip", self.folder / "runtime.zip"
+        self.native = {name: b"native " + name.encode() for name in (
+            "morphbench.exe", "python/python.exe", "vendor/numpy/__init__.py", "vendor/PIL/__init__.py",
+            "vendor/io_scene_nifly/NiflyDLL.dll", "vendor/io_scene_nifly/pyn/pynifly.py",
+            "vendor/io_scene_nifly/tri/trifile.py", "vendor/io_scene_nifly/tri/tripfile.py")}
+        self.runtime = {"schemaVersion": 1, "kind": "runtime", "name": "morphbench",
+                        "id": "runtime-3-win64", "platform": "win-amd64", "python": "3.12.8",
+                        "applicationApi": 1, "pythonAbi": "cp312-win_amd64", "launcherHostProtocol": 1,
+                        "files": {name: release.distribution.digest(data) for name, data in self.native.items()}}
+        self.runtime["contentHash"] = release.distribution.digest(release.distribution.canonical(self.runtime))
+        self.application = {"app/" + name: b"# application " + name.encode() for name in (
+            "mb.py", "mb_paths.py", "mb_distribution.py", "update.py", "morphbench/__init__.py",
+            "morphbench/api.py", "morphbench/config.py", "LICENSE")}
+        self.application.update({"launcher/mb.py": b"# current shim",
+                                 "launcher/locale/en/launcher.json": b"{}",
+                                 "launcher/locale/ru/launcher.json": b"{}"})
+        self.app = {"schemaVersion": 2, "kind": "application", "name": "morphbench", "version": "0.8.7",
+                    "layout": release.distribution.STRUCTURED, "launcherHostProtocols": [1],
+                    "requiresRuntime": {"apiVersion": 1, "pythonAbi": "cp312-win_amd64"},
+                    "files": {name: release.distribution.digest(data) for name, data in self.application.items()}}
+        self.addCleanup(mock.patch.stopall)
+        mock.patch.object(release, "HERE", self.folder).start()
+        self.write_packages()
+
+    def write_packages(self, extra=()):
+        self.runtime_bytes = json.dumps(self.runtime, indent=3).encode()
+        self.app_bytes = json.dumps(self.app, indent=3).encode()
+        with zipfile.ZipFile(self.runtime_zip, "w") as package:
+            for name, data in {**self.native, "runtime-manifest.json": self.runtime_bytes,
+                               "mb.py": b"# older App-owned shim"}.items():
+                package.writestr("root/Morphbench/launcher/" + name, data)
+            for name, data in extra:
+                package.writestr(name, data)
+        with zipfile.ZipFile(self.app_zip, "w") as package:
+            for name, data in {**self.application, "application-manifest.json": self.app_bytes}.items():
+                package.writestr("root/Morphbench/" + name, data)
+            package.writestr("root/Morphbench/plugins/", b"")
+
+    def run_release(self, *args):
+        with contextlib.redirect_stdout(Output()), contextlib.redirect_stderr(io.StringIO()):
+            return release.main(["--package", "combined", "--application-from", str(self.app_zip),
+                                 "--runtime-from", str(self.runtime_zip), "--out", str(self.out), *args])
+
+    def test_combines_exact_payloads_and_raw_manifests_with_application_owned_overlay(self):
+        self.assertEqual(self.run_release(), 0)
+        with zipfile.ZipFile(self.out / "morphbench-0.8.7-win64.zip") as package:
+            contents = {name: package.read(name) for name in package.namelist()}
+        expected = {"root/Morphbench/launcher/" + name: data for name, data in self.native.items()}
+        expected.update({"root/Morphbench/" + name: data for name, data in self.application.items()})
+        expected.update({"root/Morphbench/launcher/runtime-manifest.json": self.runtime_bytes,
+                         "root/Morphbench/application-manifest.json": self.app_bytes,
+                         "root/Morphbench/plugins/": b""})
+        self.assertEqual(contents, expected)
+
+    def test_mismatched_host_refuses_without_overwriting_previous_archive(self):
+        self.run_release()
+        archive = self.out / "morphbench-0.8.7-win64.zip"
+        before = archive.read_bytes()
+        self.app["launcherHostProtocols"] = [2]
+        self.write_packages()
+        with self.assertRaises(SystemExit):
+            self.run_release()
+        self.assertEqual(archive.read_bytes(), before)
+
+    def test_native_library_larger_than_application_file_limit_keeps_exact_bytes(self):
+        name = "vendor/numpy.libs/openblas.dll"
+        self.native[name] = b"MZ" + b"x" * release.distribution.MAX_FILE
+        self.runtime["files"][name] = release.distribution.digest(self.native[name])
+        self.runtime.pop("contentHash")
+        self.runtime["contentHash"] = release.distribution.digest(release.distribution.canonical(self.runtime))
+        self.write_packages()
+        self.assertEqual(self.run_release(), 0)
+        with zipfile.ZipFile(self.out / "morphbench-0.8.7-win64.zip") as package:
+            self.assertEqual(package.read("root/Morphbench/launcher/" + name), self.native[name])
+
+    def test_runtime_or_application_hash_tampering_refuses_before_output(self):
+        for files, name in ((self.native, "morphbench.exe"), (self.application, "app/mb.py")):
+            original = files[name]
+            files[name] = b"changed"
+            self.write_packages()
+            with self.assertRaises(SystemExit):
+                self.run_release()
+            self.assertFalse(self.out.exists())
+            files[name] = original
+
+    def test_runtime_extra_traversal_duplicate_and_case_alias_entries_refuse(self):
+        for name in ("root/Morphbench/launcher/tests/example.py", "root/Morphbench/../escape.txt",
+                     "root/Morphbench/launcher/MORPHBENCH.EXE", "root/Morphbench/launcher/runtime-manifest.json"):
+            with self.subTest(name=name), mock.patch("warnings.warn"):
+                self.write_packages([(name, b"unaccounted")])
+                with self.assertRaises(SystemExit):
+                    self.run_release()
+                self.assertFalse(self.out.exists())
+
+    def test_flat_layout_or_wrong_version_and_unsupported_build_flags_refuse(self):
+        for args in (("--layout", "flat"), ("--version", "0.8.8"), ("--no-python",), ("--stage-only",)):
+            with self.subTest(args=args), self.assertRaises(SystemExit):
+                self.run_release(*args)
+        self.assertFalse(self.out.exists())
+
+
 class TestRuntimeContents(unittest.TestCase):
     def test_runtime_omits_unused_f2py_build_configuration_and_keeps_licences(self):
         contents = {"vendor/numpy/f2py/setup.cfg": b"build configuration",

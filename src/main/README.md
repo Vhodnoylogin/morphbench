@@ -54,22 +54,25 @@ edited or fitted collision capsules, and edited physics configurations into new 
 
 ## What it needs
 
-**From a release — no separate Python or Blender installation.** Download
-**Application 0.8.7** and the separate required **Morphbench Launcher v3**.
+**From a release — no separate Python or Blender installation.** On GitHub, download
+**morphbench-0.8.7-win64.zip**, which includes **Application 0.8.7** and
+**Morphbench Launcher v3**. On Nexus, download the two separate Main files.
 Application contains the workbench's Python, browser assets, translations and documentation;
 Launcher contains the separately versioned native Runtime (`runtime-3-win64`). Their versions are independent.
 Launcher v3 only starts bundled Python; the window, options, discovery and server lifecycle
 are updateable Application code. This keeps ordinary fixes out of the native package.
 
-Both archives start at `root/Morphbench/`. Merge their `Morphbench` directories into one
-writable tools folder or the game root. Run `Morphbench/launcher/morphbench.exe`.
+Both distribution formats start at `root/Morphbench/`. Copy `Morphbench` into one
+writable tools folder or the game root; merge the two folders when using Nexus packages.
+Run `Morphbench/launcher/morphbench.exe`.
 The result has `launcher/`, `app/` and `plugins/` under one `Morphbench` directory.
 Do not copy the literal `root` folder into the game or place its contents in `Data`.
 
 For installation through MO2, optionally use
 [Kezyma's Root Builder](https://www.nexusmods.com/skyrimspecialedition/mods/31720).
-Install both ZIPs as separate enabled mods, keeping `root/Morphbench`; give Application
-higher priority than Launcher and build the root deployment. Register the deployed
+Install the GitHub ZIP as one enabled mod, keeping `root/Morphbench`. For Nexus's two
+ZIPs, use separate enabled mods and give Application higher priority than Launcher.
+Build the root deployment. Register the deployed
 `Morphbench/launcher/morphbench.exe` in MO2. A manual external installation also works
 through MO2 and does not require Root Builder. On Nexus, both downloads are Main Files,
 Application Primary; Manual and Mod manager download are supported.

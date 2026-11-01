@@ -54,22 +54,25 @@ morphbench измеряет выбранные файлы меша, морфов
 
 ## Что нужно
 
-**Из выпуска — отдельная установка Python или Blender не нужна.** Скачайте
-**Application 0.8.7** и отдельный обязательный **Morphbench Launcher v3**.
+**Из выпуска — отдельная установка Python или Blender не нужна.** На GitHub скачайте
+**morphbench-0.8.7-win64.zip**: он содержит **Application 0.8.7** и
+**Morphbench Launcher v3**. На Nexus скачайте два отдельных Main-файла.
 Application содержит Python-код верстака, браузер, переводы и документацию;
 Launcher — отдельно версионируемый нативный Runtime (`runtime-3-win64`). Их версии независимы.
 Launcher v3 только запускает комплектный Python; окно, параметры, поиск установки и
 управление сервером — обновляемый код Application. Обычные исправления не затрагивают EXE.
 
-Оба архива начинаются с `root/Morphbench/`. Объедините их папки `Morphbench` в одной
-папке инструментов с правом записи или корне игры. Запускайте `Morphbench/launcher/morphbench.exe`.
+Оба формата начинаются с `root/Morphbench/`. Перенесите `Morphbench` в папку инструментов
+с правом записи или корень игры; для пакетов Nexus объедините две папки.
+Запускайте `Morphbench/launcher/morphbench.exe`.
 Внутри `Morphbench` находятся `launcher/`, `app/` и `plugins/`. Саму папку `root`
 не копируйте в игру; её содержимое также не предназначено для `Data`.
 
 Для установки через MO2 можно использовать необязательный
 [Kezyma's Root Builder](https://www.nexusmods.com/skyrimspecialedition/mods/31720).
-Установите оба ZIP как отдельные включённые моды, сохранив `root/Morphbench`; дайте
-Application больший приоритет, чем Launcher, и соберите корневое развёртывание.
+Установите ZIP с GitHub одним включённым модом, сохранив `root/Morphbench`. Для двух
+ZIP с Nexus используйте отдельные моды и дайте Application больший приоритет, чем
+Launcher. Соберите корневое развёртывание.
 Добавьте `Morphbench/launcher/morphbench.exe` из развёртывания в MO2. Ручная внешняя
 установка тоже запускается через MO2 и не требует Root Builder. На Nexus оба пакета —
 Main Files, Application — Primary; доступны Manual и Mod manager download.

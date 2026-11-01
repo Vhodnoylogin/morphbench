@@ -38,6 +38,19 @@ Application-owned. Application contains no native binaries and accepts compatibl
 `--layout flat` remains available for existing flat installations; the normal published
 format is structured. Do not perform in-place cross-layout updates.
 
+For GitHub, combine the verified structured components into one user download:
+
+```text
+python release.py --package combined --runtime-from <runtime.zip> --application-from <application.zip> --out <output>
+```
+
+This creates `morphbench-<Application-version>-win64.zip` with both components under
+`root/Morphbench/`. It verifies inventories and compatibility, keeps manifests and file
+bytes, and takes the Application-owned shim/translation overlay from Application.
+No compiler or dependency download is involved. Nexus retains the two separate files.
+Preserve already-published component mirrors used by immutable pins and review requests;
+the GitHub release points ordinary users to the combined ZIP.
+
 ## Deliberately create a new Runtime
 
 A different EXE, interpreter or native dependency requires a new identity, qualification
@@ -92,6 +105,20 @@ output hash. Separate `morphbench-nifly-corresponding-source.zip` includes both 
 source inputs, licences, metadata and recipe; it can build without fetching their Git
 repositories. This developer asset stays on GitHub, never inside Runtime. Required
 half/Miniball notices ship with the DLL. Minimality does not waive source obligations.
+
+These are the dependency's C/C++ sources, not duplicate Morphbench sources. Morphbench
+Git tracks the pins and build recipe, not those upstream source trees. Users only need
+the combined GitHub ZIP (or both Nexus files); this source asset is for rebuilding and
+auditing the bundled DLL and preserves access to its matching source separately.
+
+Upstream source and licence: [PyNifly at the wrapper commit](https://github.com/BadDogSkyrim/PyNifly/tree/934fbbfbb41b63ed636d44afa957ec98d7fb0803)
+and [Nifly at the library commit](https://github.com/BadDogSkyrim/nifly/tree/8a57cdef83aa97a976b4e317aa5cc2a1fa7fd88d).
+Both are GPLv3; preserve licences and author notices. A third-party source link is an
+allowed distribution route when it supplies equivalent access to the corresponding
+source and remains available while binaries are distributed; see the
+[GNU FAQ](https://www.gnu.org/licenses/gpl-faq.en.html#SourceAndBinaryOnDifferentSites).
+Our optional snapshot also includes the build recipe used for this DLL and keeps the
+pinned inputs available without depending solely on upstream repository availability.
 
 ## Qualification and publication
 

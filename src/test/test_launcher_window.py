@@ -102,6 +102,71 @@ class TestLauncherWindow(unittest.TestCase):
             window._worker.join(1)
             self.assertFalse(window._worker.is_alive())
 
+    def _icon_runtime(self):
+        home = common.REPOSITORY / "target/launcher"
+        if not (home / "morphbench.exe").is_file():
+            self.skipTest("Build target/launcher/morphbench.exe to check its embedded icon")
+        return str(home)
+
+    def test_runtime_icons_and_product_identity_are_applied_and_released(self):
+        window = _Probe(_Session(), lambda window: None)
+        get_class = window.api.user.GetClassLongPtrW
+        get_class.restype, get_class.argtypes = ctypes.c_size_t, [wintypes.HWND, ctypes.c_int]
+        observed, destroyed = [], []
+        destroy = window.api.DestroyIcon
+        identity = window.api.SetCurrentProcessExplicitAppUserModelID
+
+        def inspect(current):
+            if current._busy or current._initial:
+                return
+            large = current.api.SendMessageW(current.hwnd, 0x007F, 1, 0)  # WM_GETICON
+            small = current.api.SendMessageW(current.hwnd, 0x007F, 0, 0)
+            self.assertGreater(large, 0)
+            self.assertGreater(small, 0)
+            self.assertEqual(get_class(current.hwnd, -14), large)  # GCLP_HICON
+            self.assertEqual(get_class(current.hwnd, -34), small)  # GCLP_HICONSM
+            self.assertEqual(set(current._icons), {large, small})
+            observed.extend(current._icons)
+            set_identity.assert_called_once_with("Vhodnoylogin.Morphbench")
+            current.close_window()
+
+        def release(icon):
+            self.assertIsNone(window.hwnd)
+            self.assertFalse(window._class_registered)
+            self.assertTrue(destroy(icon))
+            destroyed.append(icon)
+            return True
+
+        window.inspect = inspect
+        with mock.patch.dict(os.environ, MORPHBENCH_RUNTIME_HOME=self._icon_runtime()), \
+                mock.patch.object(window.api, "DestroyIcon", side_effect=release), \
+                mock.patch.object(window.api, "SetCurrentProcessExplicitAppUserModelID", wraps=identity) as set_identity:
+            self.run_window(window)
+        self.assertTrue(observed)
+        self.assertEqual(destroyed, observed)
+        self.assertEqual(window._icons, [])
+
+    def test_runtime_icons_are_released_if_window_creation_fails(self):
+        window = _Probe(_Session(), lambda window: None)
+        destroy = window.api.DestroyIcon
+        destroyed = []
+
+        def release(icon):
+            self.assertIsNone(window.hwnd)
+            self.assertFalse(window._class_registered)
+            self.assertTrue(destroy(icon))
+            destroyed.append(icon)
+            return True
+
+        with mock.patch.dict(os.environ, MORPHBENCH_RUNTIME_HOME=self._icon_runtime()), \
+                mock.patch.object(window.api, "CreateWindowExW", side_effect=OSError("window creation failed")), \
+                mock.patch.object(window.api, "DestroyIcon", side_effect=release):
+            with self.assertRaisesRegex(OSError, "window creation failed"):
+                window.run()
+        self.assertEqual(len(destroyed), 2)
+        self.assertFalse(window._class_registered)
+        self.assertEqual(window._icons, [])
+
     def test_actual_unicode_controls_commands_and_bounded_log(self):
         session, stage = _Session(), [0]
         explicit = "D:\\Моды Skyrim\\меши\\"

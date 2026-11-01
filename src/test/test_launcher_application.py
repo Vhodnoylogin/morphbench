@@ -167,6 +167,21 @@ class TestNativeHostEnvelope(unittest.TestCase):
                 self.assertEqual(self.shim.host_application(launcher, arguments, environ=env), common.ROOT)
             self.assertEqual(self.shim.host_application(common.ROOT, [], environ={}), common.ROOT)
 
+    def test_incomplete_option_reports_diagnostic_instead_of_silent_exit(self):
+        with tempfile.TemporaryDirectory(dir=common.REPOSITORY / "target") as folder:
+            launcher = Path(folder)
+            shim = launcher / "mb.py"
+            shutil.copyfile(common.ROOT / "launcher/mb.py", shim)
+            result = subprocess.run(
+                [sys.executable, "-I", str(shim), "--launcher-host", "1",
+                 "--native-parent", str(os.getpid()), "--", "--diag", "--root"],
+                capture_output=True, timeout=10)
+            self.assertEqual(result.returncode, 2)
+            diagnostic = json.loads((launcher / "morphbench.diag.json").read_text())
+            self.assertEqual(diagnostic["nativeHostProtocol"], 1)
+            self.assertIn("--root", diagnostic["error"])
+            self.assertIn("ArgumentError", (launcher / "morphbench.bootstrap.log").read_text())
+
     def test_real_shim_keeps_legacy_state_and_relative_plugin_working_directory(self):
         with tempfile.TemporaryDirectory(dir=common.REPOSITORY / "target") as folder:
             root = Path(folder)

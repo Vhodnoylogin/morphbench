@@ -29,7 +29,7 @@ def host_application(launcher, arguments, *, environ=None, **discovery):
     """Legacy home hints are policy in Python, not native interpreter discovery."""
     import argparse
     environ = os.environ if environ is None else environ
-    parser = argparse.ArgumentParser(add_help=False)
+    parser = argparse.ArgumentParser(add_help=False, exit_on_error=False)
     parser.add_argument("--start", action="store_true")
     parser.add_argument("--diag", action="store_true")
     parser.add_argument("--root")

@@ -73,7 +73,7 @@
   },
   "addonDistribution": "CLAW add-on is a separate Nexus mod and is not bundled in either package.",
   "historicalPublicationEvidence": "Top-level 0.8.5 metadata is retained as historical provenance; currentPublication is the verified 0.8.6 / Launcher v2 delivery.",
-  "requirementsMethod": "file-to-file",
+  "requirementsMethod": "legacy",
   "optionalRequirementDisclosure": "Root Builder is optional for MO2 root deployment; manual/external installation needs no Root Builder. Launcher v1 is required.",
   "pluginAuthoring": {
     "supported": true,
@@ -205,6 +205,85 @@
         "optionalRootBuilderPreserved": true,
         "method": "documented Nexus v3 API with existing personal key; no native file dialogs"
       }
+    }
+  },
+  "contentUpdate": {
+    "status": "published and verified through public file cards, per-version changelog popups and public requirements",
+    "descriptionFile": "src/main/docs/nexus-description.bbcode",
+    "application": {
+      "fileId": 829889,
+      "name": "Morphbench Application",
+      "version": "0.8.6",
+      "description": "The Morphbench workbench: morph previews, collider editing and add-ons."
+    },
+    "launcher": {
+      "fileId": 829890,
+      "name": "Morphbench Launcher",
+      "version": "v2",
+      "description": "Starts Morphbench. Includes Python and the libraries needed to run it."
+    },
+    "changelogs": [
+      {
+        "version": "0.8.6",
+        "entries": [
+          "Application updates can reuse compatible Launcher versions without rebuilding the workbench.",
+          "Application and settings discovery now live in the updateable Application package.",
+          "Launcher v1 remains supported. When upgrading from Application 0.8.5, use the updater extracted from the new package before replacing Launcher.",
+          "User downloads exclude developer build material. Required licences and source links remain included.",
+          "Application updates preserve settings and installed add-ons."
+        ]
+      },
+      {
+        "version": "v2",
+        "entries": [
+          "Improved startup error reporting and handling of failed background commands.",
+          "Added time limits and cancellation for background operations.",
+          "Fixed output-pipe handling that could leave operations waiting after a child process exited.",
+          "Made window closure and background-server cleanup more reliable. Closing Launcher leaves an independently started server running.",
+          "Kept application discovery and future interface adaptation in the Application package so ordinary workbench updates can reuse Launcher."
+        ]
+      }
+    ],
+    "requirements": {
+      "method": "legacy",
+      "nexusRequirements": [
+        {
+          "modId": 31720,
+          "name": "Kezyma's Root Builder for Mod Organizer",
+          "optional": true,
+          "note": "Optional. Only for installing root/Morphbench packages through MO2 and deploying them to the game root. Manual installation and existing flat tool folders do not require Root Builder."
+        }
+      ],
+      "offSiteRequirements": [
+        {
+          "name": "Morphbench Launcher / Application compatibility",
+          "url": "https://github.com/Vhodnoylogin/morphbench/blob/v0.8.6/src/main/docs/install-layout.md",
+          "notes": "Install both Main files. Application 0.8.6 supports Launcher v1/v2 (Runtime API 1, CPython 3.12 Windows x64). Compatibility and upgrade instructions."
+        }
+      ]
+    },
+    "publicationNotes": [
+      "Text-only update; existing archive identities and release tags are unchanged.",
+      "Native changelog entries were appended once and verified through each file version link.",
+      "Owner explicitly selected legacy requirements to enable Off-site requirements.",
+      "Previous per-file dependency definitions retained but inactive in legacy mode.",
+      "Launcher v2 remains quarantined; no new review request was sent in this task."
+    ],
+    "summary": "Inspect Skyrim NIF meshes and TRI morphs, edit skeleton collision capsules, and export your changes. Includes a browser viewer, command-line tools, a local HTTP API and support for add-ons.",
+    "appliedAt": "2026-10-31",
+    "sourceCommit": "2de6e17",
+    "descriptionSha256": "6f479513c52529e4dfb0968d2d28f44217d7fa818aacb4eb196a7aba51e940af",
+    "verification": {
+      "fileDescriptions": true,
+      "nativeVersionChangelogs": [
+        "0.8.6",
+        "v2"
+      ],
+      "mainDescription": true,
+      "offSiteRequirements": true,
+      "optionalRootBuilder": true,
+      "imageDividers": 7,
+      "archiveReupload": false
     }
   }
 }

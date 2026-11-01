@@ -19,7 +19,7 @@ Open a Skyrim mesh, adjust its named morphs, and inspect the result before start
 [url=https://github.com/Vhodnoylogin/morphbench/tree/v0.8.6]0.8.6 source and documentation[/url]
 
 
-[center][img width=600 height=100]https://staticdelivery.nexusmods.com/mods/1704/images/194796/194796-1791664990-433961669.png[/img][/center]
+[center][img width=600,height=100]https://staticdelivery.nexusmods.com/mods/1704/images/194796/194796-1791664990-433961669.png[/img][/center]
 [size=4][color=#D0B17A][b]What you can do[/b][/color][/size]
 [list]
 [*]Open NIF meshes and their TRI/TRIP morphs. Inspect parts, bones and sliders.[/*]
@@ -31,7 +31,7 @@ Open a Skyrim mesh, adjust its named morphs, and inspect the result before start
 [*]Save PNG views or a self-contained interactive HTML viewer.[/*]
 [*]Automate checks through the command line, JSON output and a local HTTP API.[/*]
 [/list]
-[center][img width=600 height=100]https://staticdelivery.nexusmods.com/mods/1704/images/194796/194796-1791664990-433961669.png[/img][/center]
+[center][img width=600,height=100]https://staticdelivery.nexusmods.com/mods/1704/images/194796/194796-1791664990-433961669.png[/img][/center]
 [size=4][color=#D0B17A][b]Install and start[/b][/color][/size]
 
 [b]First upgrade from Application 0.8.5 / Launcher v1:[/b] use the [b]newly extracted 0.8.6 updater[/b] with [b]--target[/b] before replacing the launcher folder with v2. The old updater cannot read the new schema. Settings and plugins are preserved. [url=https://github.com/Vhodnoylogin/morphbench/blob/v0.8.6/src/main/docs/install-layout.md]Exact upgrade steps[/url].
@@ -83,7 +83,7 @@ launcher\python\python.exe app\mb.py web "path\to\body_1.nif" --out preview.html
 The documented local HTTP API provides the same operations for automation.
 [/spoiler]
 
-[center][img width=600 height=100]https://staticdelivery.nexusmods.com/mods/1704/images/194796/194796-1791664990-433961669.png[/img][/center]
+[center][img width=600,height=100]https://staticdelivery.nexusmods.com/mods/1704/images/194796/194796-1791664990-433961669.png[/img][/center]
 [size=4][color=#D0B17A][b]Requirements and compatibility[/b][/color][/size]
 [list]
 [*]Windows x64 and a browser for the interactive viewer.[/*]
@@ -95,7 +95,7 @@ The documented local HTTP API provides the same operations for automation.
 [/list]
 Meshes without morph files are supported. If a body is absent from the default mesh list, enable the option to show meshes without morphs. With the HTTP API, use all=1 on both catalogue and payload requests.
 
-[center][img width=600 height=100]https://staticdelivery.nexusmods.com/mods/1704/images/194796/194796-1791664990-433961669.png[/img][/center]
+[center][img width=600,height=100]https://staticdelivery.nexusmods.com/mods/1704/images/194796/194796-1791664990-433961669.png[/img][/center]
 [size=4][color=#D0B17A][b]What the results mean[/b][/color][/size]
 Morphbench measures the selected files. Strain highlights stretching; bounds checks find geometry beyond the stored spheres; capsule checks show coverage in the selected skeleton's frame. These results help locate file problems, but game animation, culling and physical contacts still need an in-game check.
 
@@ -103,7 +103,7 @@ The human diagnostic comparison for 0.8.0 used a left-thigh capsule with three t
 
 Bounds and capsule fitting write [b]new files[/b]. The tool refuses to overwrite an existing output. Install a generated result as a separate patch mod in MO2, then verify it in game.
 
-[center][img width=600 height=100]https://staticdelivery.nexusmods.com/mods/1704/images/194796/194796-1791664990-433961669.png[/img][/center]
+[center][img width=600,height=100]https://staticdelivery.nexusmods.com/mods/1704/images/194796/194796-1791664990-433961669.png[/img][/center]
 [size=4][color=#D0B17A][b]Help and documentation[/b][/color][/size]
 Application includes English and Russian documentation: quick start, viewer controls, commands, HTTP API and an explanation of the measurements. The interface supports English and Russian.
 
@@ -111,7 +111,7 @@ Application includes English and Russian documentation: quick start, viewer cont
 When reporting a problem, include the tool version, the command or steps, the error message, and whether Morphbench was launched through MO2. Share third-party meshes only when their author permits redistribution.
 
 
-[center][img width=600 height=100]https://staticdelivery.nexusmods.com/mods/1704/images/194796/194796-1791664990-433961669.png[/img][/center]
+[center][img width=600,height=100]https://staticdelivery.nexusmods.com/mods/1704/images/194796/194796-1791664990-433961669.png[/img][/center]
 [size=4][color=#D0B17A][b]Create your own plugins[/b][/color][/size]
 Morphbench supports independent [b]browser plugins (add-ons)[/b]. Authors can create a local HTML/JavaScript/CSS package with an addon.json manifest, distribute it as a separate ZIP or Nexus mod, and install it through the viewer's add-on manager. Newly installed packages stay disabled until explicitly enabled; their files and registry live in [b]Morphbench/plugins[/b]. Compatible Application updates preserve them.
 [list]
@@ -130,7 +130,7 @@ Morphbench открывает меши NIF и морфы TRI/TRIP, показы�
 Режимы «Морфы» и «Коллайдеры» используют общий список моделей и инспектор. Alt + щелчок выбирает капсулу; Shift + перетаскивание или центральная ручка перемещает её. Концы и радиус редактируются числами. Результат сохраняется в новый NIF или рецепт правок. Настройки PPB подключаются в блоке «Источник и сохранение» и редактируются через ту же капсулу; отдельной вкладки PPB нет. Поддерживается выгрузка изменённого TXT с сохранением оформления. PPB необязателен, его игровой плагин работает только в VR; автоподгонка и контакты в Morphbench не моделируются. Физика и Body Slots в этом выпуске выключены.
 
 [b]Установка 0.8.6[/b]
-Скачайте оба Main-файла: Application 0.8.6 и обязательный Morphbench Launcher v2. При ручной установке объедините папки Morphbench изнутри root в одном каталоге инструментов либо в корне игры. Запускайте Morphbench/launcher/morphbench.exe. Саму папку root переносить в игру не нужно; в Data инструмент не устанавливается.
+Скачайте оба Main-файла: Application 0.8.6 и Morphbench Launcher. При ручной установке объедините папки Morphbench изнутри root в одном каталоге инструментов либо в корне игры. Запускайте Morphbench/launcher/morphbench.exe. Саму папку root переносить в игру не нужно; в Data инструмент не устанавливается.
 
 [b]Установка через MO2[/b]
 Необязательный [url=https://www.nexusmods.com/skyrimspecialedition/mods/31720]Root Builder[/url] разворачивает содержимое root в корень игры. Установите оба архива отдельными активными модами, сохранив root/Morphbench; Application должен быть ниже Launcher в левой панели. Выполните Build и добавьте в MO2 исполняемый файл из корня игры: Morphbench/launcher/morphbench.exe. Запуск через MO2 даёт доступ к объединённой Data профиля. При ручной внешней установке Root Builder не нужен.
@@ -156,7 +156,7 @@ API v1 позволяет добавлять свои вкладки и инст
 
 В архиве есть подробные инструкции на русском и английском. PLANCK, HIGGS и Collision Visualizer нужны только для соответствующего игрового сравнения Skyrim VR, а не для работы Morphbench.[/spoiler]
 
-[center][img width=600 height=100]https://staticdelivery.nexusmods.com/mods/1704/images/194796/194796-1791664990-433961669.png[/img][/center]
+[center][img width=600,height=100]https://staticdelivery.nexusmods.com/mods/1704/images/194796/194796-1791664990-433961669.png[/img][/center]
 [size=4][color=#D0B17A][b]Credits and permissions[/b][/color][/size]
 Morphbench: Vhodnoylogin, with development assistance from Codex. PyNifly: BadDogSkyrim and contributors. Python, NumPy and Pillow: their respective developers and contributors. Full dependency credits and licences are included in Runtime as RUNTIME-THIRD-PARTY.md, runtime-dependencies.json and the bundled licence files.
 

@@ -8,11 +8,48 @@ import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import common
-from morphbench.addons import AddonError
+from morphbench.addons import AddonError, state_limits, validate_state, decode_state
 from presenters.web import WebPage
 from test_workspace_integration import run_browser
 
 ROOT = common.ROOT
+
+
+class TestAddonStateCodec(unittest.TestCase):
+    """Explicit limits suffice: codecs never need a facade, Config or storage adapter."""
+    def test_pure_validation_detaches_repeated_references_without_mutating_inputs(self):
+        shared = {"name": "Русский 😀", "values": [0, 0.25, None, True]}
+        value = [shared, shared]
+        result = validate_state(value, max_bytes=1, max_depth=3)
+        self.assertEqual(result, value)
+        self.assertIs(value[0], value[1])
+        self.assertIsNot(result[0], value[0])
+        self.assertIsNot(result[0], result[1])
+        result[0]["values"].append("changed")
+        self.assertEqual(value[0]["values"], [0, 0.25, None, True])
+        self.assertEqual(result[1]["values"], value[0]["values"])
+
+    def test_pure_codec_applies_exact_utf8_text_and_depth_limits(self):
+        self.assertEqual(state_limits(6, 1), {"maxBytes": 6, "maxDepth": 1})
+        self.assertEqual(decode_state('"😀"', max_bytes=6, max_depth=1), "😀")
+        for data, limits, code in (
+                (' "😀"', {"max_bytes": 6, "max_depth": 1}, "limitExceeded"),
+                ('[[0]]', {"max_bytes": 10, "max_depth": 1}, "limitExceeded"),
+                ('NaN', {"max_bytes": 10, "max_depth": 1}, "invalidState"),
+                ('"\\ud800"', {"max_bytes": 10, "max_depth": 1}, "invalidState"),
+                ('{broken', {"max_bytes": 10, "max_depth": 1}, "invalidState")):
+            with self.subTest(data=repr(data)):
+                with self.assertRaises(AddonError) as caught:
+                    decode_state(data, **limits)
+                self.assertEqual(caught.exception.code, code)
+        cycle = []; cycle.append(cycle)
+        with self.assertRaises(AddonError) as caught:
+            validate_state(cycle, max_bytes=10, max_depth=3)
+        self.assertEqual(caught.exception.code, "invalidState")
+        for limit in (0, -1, True, 1.5):
+            with self.subTest(limit=limit), self.assertRaises(AddonError) as caught:
+                state_limits(limit, 1)
+            self.assertEqual(caught.exception.code, "invalidLimits")
 
 
 class TestAddonState(unittest.TestCase):

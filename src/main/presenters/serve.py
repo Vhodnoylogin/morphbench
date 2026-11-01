@@ -39,7 +39,6 @@ from __future__ import annotations
 
 import json
 import os
-import copy
 import hashlib
 import tempfile
 import socket
@@ -407,24 +406,15 @@ class WebServer:
                     "text": self.bench.physics_export() if physics["document"] else None}
 
     def api_skeleton(self, recipe):
-        if (not isinstance(recipe, dict) or recipe.get("format") != "morphbench-workspace"
-                or recipe.get("version") != 1):
-            raise ValueError(t("workspace.invalid", field="recipe"))
         with self.lock:
-            if self.bench.rig is None or recipe.get("source") != WebPage.source_identity(self.bench):
-                raise ValueError(t("workspace.stale"))
-            with open(self.bench.rig.path, "rb") as stream:
-                if hashlib.file_digest(stream, "sha256").hexdigest() != self.bench.rig.source_sha256:
+            actions = self.bench.workspace_actions(recipe, require_source=True)
+            source = self.bench.workspace_source()
+            with open(source["skeleton"], "rb") as stream:
+                if hashlib.file_digest(stream, "sha256").hexdigest() != source["sha256"]:
                     raise ValueError(t("workspace.stale"))
-            clone = copy.copy(self.bench)
-            clone.rig, clone.view, clone._placements = copy.deepcopy(self.bench.rig), copy.deepcopy(self.bench.view), copy.deepcopy(self.bench._placements)
-            if hasattr(clone, "_physics_workspace"):
-                clone._physics_workspace = copy.deepcopy(clone._physics_workspace)
-            if hasattr(clone, "_ppb_workspace"):
-                clone._ppb_workspace = copy.deepcopy(clone._ppb_workspace)
-            clone._workspace_tabs = copy.deepcopy(getattr(self.bench, "_workspace_tabs", {}))
+            clone = self.bench.edit_session(editors=True).candidate
             clone.collider_reset()
-            clone.workspace_replay(recipe.get("actions"))
+            clone.workspace_replay(actions)
         directory = self.cfg["editorTempDirectory"] or None
         with tempfile.TemporaryDirectory(prefix="morphbench-export-", dir=directory) as temporary:
             path = Path(temporary) / "skeleton.nif"
@@ -442,10 +432,8 @@ class WebServer:
         with self.lock:
             # Query options and a rig association belong to the same selection. Keep the
             # current workspace when a later part of that selection cannot be opened.
-            bench = copy.copy(self.bench)
-            bench.view = copy.deepcopy(self.bench.view)
-            bench._placements = copy.deepcopy(self.bench._placements)
-            bench._workspace_tabs = copy.deepcopy(getattr(self.bench, "_workspace_tabs", {}))
+            selection = self.bench.edit_session()
+            bench = selection.candidate
             root = self._root_of(query)
             shown_root = root
             catalog: list[dict] = []
@@ -481,7 +469,7 @@ class WebServer:
                            root=shown_root, with_morphs=with_morphs, error=error)
             html = page.html(linked=True)
             if error is None:
-                self.bench.__dict__.update(bench.__dict__)
+                selection.commit()
             return html, status
 
     def __repr__(self) -> str:

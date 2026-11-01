@@ -19,6 +19,7 @@ program, this run works from them, and what happened is noted for the journal.
 from __future__ import annotations
 
 import json
+import copy
 import os
 from pathlib import Path
 
@@ -263,7 +264,7 @@ class Config:
         if not self.path.exists():
             self._write(DEFAULTS)
         raw = self._read()
-        self._values = {**DEFAULTS, **(raw or {})}
+        self._values = {**copy.deepcopy(DEFAULTS), **(raw or {})}
         # The language of the messages is applied here: the settings are read by everyone who
         # does anything at all, and this is the earliest point at which the language is known.
         # Before the rewrite below on purpose - a failure of that write is a message too, and

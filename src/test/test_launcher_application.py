@@ -165,6 +165,7 @@ class TestNativeHostEnvelope(unittest.TestCase):
                                    ([], {"MORPHBENCH_HOME": str(common.ROOT)}),
                                    ([], {"MORPHBENCH_APP": str(common.ROOT)})):
                 self.assertEqual(self.shim.host_application(launcher, arguments, environ=env), common.ROOT)
+            self.assertEqual(self.shim.host_application(common.ROOT, [], environ={}), common.ROOT)
 
     def test_real_shim_keeps_legacy_state_and_relative_plugin_working_directory(self):
         with tempfile.TemporaryDirectory(dir=common.REPOSITORY / "target") as folder:

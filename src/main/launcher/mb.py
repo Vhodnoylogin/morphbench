@@ -151,6 +151,9 @@ def find_application(launcher, *, environ=None, cwd=None, registry_roots=None) -
         if not is_application(named):
             raise ValueError("applicationHintInvalid")
         return named
+    # A flat release shares the fixed native entry filename with its App CLI.
+    if is_application(launcher):
+        return launcher
     sibling = launcher.parent / "app"
     if is_application(sibling):
         return sibling

@@ -12,10 +12,22 @@ from pathlib import Path
 
 import numpy as np
 
+from .addons import state_limits, validate_state, decode_state
 from .i18n import t
 
 
 class AddonSessionMixin:
+    def addon_state_limits(self) -> dict:
+        return state_limits(self.cfg["addonStateMaxBytes"], self.cfg["addonStateMaxDepth"])
+
+    def addon_validate_state(self, value):
+        return validate_state(value, max_bytes=self.cfg["addonStateMaxBytes"],
+                              max_depth=self.cfg["addonStateMaxDepth"])
+
+    def addon_decode_state(self, data: str):
+        return decode_state(data, max_bytes=self.cfg["addonStateMaxBytes"],
+                            max_depth=self.cfg["addonStateMaxDepth"])
+
     def _addon_packages(self):
         from .addons import AddonRegistry
         if not hasattr(self, "_addon_registry"):

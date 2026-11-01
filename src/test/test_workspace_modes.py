@@ -1,4 +1,5 @@
 """Workspace modes own their overlays; switching never leaks capsule visibility."""
+import copy
 import tempfile
 import unittest
 import common
@@ -12,6 +13,67 @@ from test_workspace_integration import action, make_bench, run_browser
 
 
 class TestWorkspaceModes(unittest.TestCase):
+    def test_session_edit_has_one_owner_and_failed_replay_leaks_no_editable_state(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            bench = make_bench(common.config(temporary))
+            document = parse_document("ppb", block())
+            group = document["capsules"][0]["id"]
+            bench.ppb_replace(document)
+            bench.ppb_link(group, "A", 0)
+            bench.workspace_mode("physics")
+            bench.workspace_tab("ranges")
+            old_view, old_rig = bench.view, bench.rig
+            before = copy.deepcopy((bench.workspace_state(), bench._workspace_tabs,
+                                    bench.collider_edit_state(), bench.ppb_state(),
+                                    bench.ppb_export(), bench.view_state(precise=True), bench._placements.mode))
+            actions = [action("workspace_mode", "colliders"), action("workspace_tab", "display"),
+                       action("collider_set", "A", 0, {"radius": 8}),
+                       action("respect_file_visibility", True, True), action("workspace_tab", "invalid")]
+            with self.assertRaises(ValueError):
+                bench.workspace_replay(actions)
+            self.assertEqual((bench.workspace_state(), bench._workspace_tabs, bench.collider_edit_state(),
+                              bench.ppb_state(), bench.ppb_export(), bench.view_state(precise=True),
+                              bench._placements.mode), before)
+            self.assertIs(bench.rig, old_rig)
+            self.assertIs(bench.view, old_view)
+            edit = bench.edit_session(editors=True)
+            candidate = edit.candidate
+            self.assertIs(candidate.model, bench.model)
+            self.assertIsNot(candidate.view, bench.view)
+            self.assertIsNot(candidate.rig, bench.rig)
+            self.assertIs(candidate.view.cfg, bench.cfg)
+            self.assertIs(candidate._placements.cfg, bench.cfg)
+            candidate.workspace_mode("colliders")
+            candidate.collider_set("A", 0, {"radius": 7})
+            self.assertEqual(bench.ppb_export(), before[4])
+            edit.commit()
+            self.assertIn("capForeR 7", bench.ppb_export())
+            self.assertEqual(bench.workspace_state()["mode"], "colliders")
+            self.assertIs(bench.view.cfg, bench.cfg)
+            self.assertIs(bench._placements.cfg, bench.cfg)
+            committed_view = bench.view_state(precise=True)
+            with self.assertRaises(AttributeError):
+                candidate.look(90, 0)
+            self.assertEqual(bench.view_state(precise=True), committed_view)
+            self.assertIsNone(edit.candidate)
+            bench.cfg.set("views", {"custom": [12, 34]})
+            bench.preset("custom")
+            self.assertEqual(bench.view_state(precise=True)["yaw"], 12)
+            self.assertEqual(bench.view_state(precise=True)["pitch"], 34)
+            with self.assertRaises(ValueError):
+                edit.commit()
+
+    def test_document_only_recipe_uses_pure_identity_validation_without_a_rig(self):
+        from morphbench.workspace import recipe_actions
+        recipe = {"format": "morphbench-workspace", "version": 1,
+                  "actions": [action("workspace_mode", "physics")]}
+        self.assertEqual(recipe_actions(recipe, None), recipe["actions"])
+        with self.assertRaises(ValueError):
+            recipe_actions(recipe, None, require_source=True)
+        geometry = dict(recipe, actions=[action("collider_reset")], source={"sha256": "stale"})
+        with self.assertRaises(ValueError):
+            recipe_actions(geometry, None)
+
     def test_release_navigation_keeps_experimental_script_apis(self):
         with tempfile.TemporaryDirectory() as temporary:
             bench = common.MorphBench(common.config(temporary))
@@ -26,7 +88,7 @@ class TestWorkspaceModes(unittest.TestCase):
     def test_old_experimental_links_open_morphs_without_the_old_tab(self):
         with tempfile.TemporaryDirectory() as temporary:
             bench = common.MorphBench(common.config(temporary))
-            server = WebServer(bench, journal=Journal())
+            server = WebServer(bench, port=0, journal=Journal())
             self.addCleanup(server.stop)
             for query in ("mode=physics&tab=ranges", "mode=slots&tab=author"):
                 html, status = server.page(Query(query))

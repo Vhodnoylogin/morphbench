@@ -1,6 +1,7 @@
 # Portable installation and Root Builder
 
-Application 0.8.6 uses a structured layout with Morphbench Launcher v2.
+Application 0.8.7 uses a structured layout with Morphbench Launcher v3.
+The versions are independent; Application retains the released v1/v2 adapters.
 Existing flat 0.8.0 installations remain supported; migrate into a fresh folder.
 
 ```text
@@ -33,8 +34,9 @@ does not deploy root files. Manual/external installations need no Root Builder.
 
 Both packages include the same small Python entry shim and launcher translations. This
 deliberate overlap also lets the Launcher run from its physical MO2 mod directory while
-Application is deployed elsewhere. These files are App-owned. Each published Runtime inventory is immutable. Launcher v2 is a new native release;
-its identity differs from v1. Antivirus or moderator approval is not implied.
+Application is deployed elsewhere. These files are App-owned. Each published Runtime
+inventory is immutable. Launcher v3 has its own native identity; antivirus or moderator
+approval is not implied.
 
 The shim honors an explicit absolute `MORPHBENCH_APP`, then looks for sibling `../app`.
 Otherwise it checks exact game-root ancestors and registered Skyrim installations for
@@ -50,7 +52,9 @@ not reliably forward those arguments. A source EXE can still open the normal lau
 
 The EXE retains the existing user flags: `--start` and `--root` retain their meaning.
 `MORPHBENCH_APP` is a process environment override for ambiguous installations.
-Startup checks the Runtime API/ABI contract, every Runtime hash and the bundled interpreter.
+Application owns the window, options, discovery and server. The native v3 host only
+starts its bundled Python/shim, waits and returns the exit code. Startup checks the
+Runtime API/ABI, requested host protocol, every Runtime hash and the bundled interpreter.
 Compatible Runtime versions do not require an Application rebuild.
 
 ## Updates and old installations
@@ -83,6 +87,17 @@ default or deliberately retain a custom path. As before, a relative custom path 
 to the process working directory (normally `launcher` when started by the EXE); use an absolute
 path to keep an external registry unambiguous. No installation is automatically moved or reset.
 
+## Upgrade from Application 0.8.6 / Launcher v2 to v3
+
+Application 0.8.6 cannot drive the minimal v3 host. Stop the server and close Launcher.
+Update **Application to 0.8.7 first**, using the check/update commands above with the
+installed v2 Python. The new App still works with v2. Keep a rollback copy, replace the
+old `launcher` folder with the clean v3 folder, and copy back only
+`morphbench.launcher.json` if present. Leave `app/morphbench.json` and `plugins` intact;
+do not merge old native or developer files into v3. Then launch and verify your state.
+With Root Builder, preserve state and update persistent mod sources before rebuilding.
+A fresh folder containing both packages and copied user state is also supported.
+
 ## First upgrade from Application 0.8.5 / Launcher v1
 
 Stop the server and close the launcher. Keep a rollback copy. Extract the new Application
@@ -95,11 +110,12 @@ ZIP into a temporary folder. Use its **new** updater with the old bundled Python
 
 The old 0.8.5 updater cannot read schema 2. The new updater can read the old installation
 and removes obsolete inventoried App files transactionally while preserving settings/plugins.
-Update App first; 0.8.6 also works with v1. Then rename the old `launcher` folder as a
-rollback copy and extract the fresh v2 `launcher` folder in its place. Copy only your
-launcher state (`morphbench.launcher.json`) if present. Do not merge old native/developer files
-back into v2. If a custom launcher state filename exists in your older package, retain it
-in the rollback copy until verified. New v2 uses the same existing launcher-state filename.
+Update App to 0.8.7 first; it retains the v1 adapter. Then replace the `launcher` folder
+with clean v3 as described above, retaining only your launcher state
+(`morphbench.launcher.json`) if present. Keep any older custom state filename in the
+rollback copy until verified. Do not merge old native/developer files into v3.
+Historically, Application 0.8.6 introduced the schema-2/v2 transition; no intermediate
+0.8.6/v2 installation is required for this upgrade.
 
 With separate MO2 mods, preserve user files and replace the persistent package sources,
 then rebuild Root Builder; Application must win the shared shim/translation files. A

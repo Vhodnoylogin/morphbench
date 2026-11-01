@@ -2,10 +2,11 @@
 
 Русская версия — [updating.ru.md](updating.ru.md).
 
-Download both **Application 0.8.6** (main file) and **Morphbench Launcher v2**.
+Download both **Application 0.8.7** (main file) and **Morphbench Launcher v3**.
 Their versions are independent. Application accepts Runtime API 1 / CPython 3.12 Windows
-x64 compatibility and verifies each Runtime inventory separately. Launcher v2 is a new
-native package; compatible future Runtime versions do not require rebuilding Application. No separate Python or Blender installation is needed.
+x64 compatibility and verifies each Runtime inventory separately. Launcher v3 needs the
+host-protocol-1 adapter introduced in Application 0.8.7. Its minimal EXE starts bundled
+Python; Application owns the window and server. No separate Python or Blender is needed.
 
 Separating the packages avoids reuploading the same native binaries and repeating their
 quarantine review for each Application update. Each upload remains subject to Nexus checks;
@@ -13,7 +14,7 @@ this is not antivirus approval or a review exemption. Manual and Mod manager dow
 
 ## First installation
 
-Download `morphbench-application-0.8.6.zip` and `morphbench-runtime-2-win64.zip`.
+Download `morphbench-application-0.8.7.zip` and `morphbench-runtime-3-win64.zip`.
 Both archives start at `root/Morphbench/` and merge into:
 
 ```text
@@ -44,6 +45,17 @@ place root files: do not install these archives as ordinary `Data` contents. Bot
 packages are Main Files, Application Primary; Manual and Mod manager downloads are supported.
 See [install-layout.md](install-layout.md) for layout details and automatic App discovery
 when Launcher is in a physical mod source and App/plugins are deployed in the game root.
+
+## Upgrade an existing Launcher to v3
+
+**Update Application to 0.8.7 before installing Launcher v3.** Application 0.8.6 lacks
+its host adapter. Stop the server/window, update App using the installed v1/v2 Python,
+then replace only the `launcher` folder with a clean v3 folder, retaining
+`morphbench.launcher.json`. Keep `app/morphbench.json` and the entire `plugins` directory.
+Do not merge obsolete native files into the new Launcher. Application 0.8.7 retains
+v1/v2 adapters, so upgrading App first is supported. From App 0.8.5 use the newly
+extracted updater; see [exact transition steps](install-layout.md). Root Builder users
+update persistent mod sources and preserve state before rebuilding deployment.
 
 ## Update Application
 

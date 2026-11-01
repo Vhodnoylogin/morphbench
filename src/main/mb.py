@@ -23,6 +23,15 @@ import os
 import sys
 from pathlib import Path
 
+# A flat installation shares its native mb.py anchor with the ordinary CLI.
+# Dispatch the host before stream setup, release imports or argument parsing; the
+# updateable stdlib shim owns the same contract in flat and structured layouts.
+if __name__ == "__main__" and sys.argv[1:2] == ["--launcher-host"]:
+    import runpy
+    _home = Path(os.path.abspath(__file__)).parent
+    _host = runpy.run_path(str(_home / "launcher/mb.py"))
+    raise SystemExit(_host["run_host"](_home, sys.argv[1:]))
+
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
@@ -596,7 +605,6 @@ def cmd_workspace(args) -> int:
     """Replay the same bounded document/capsule actions as the workspace UI."""
     from presenters import body_slots
     from presenters.physics_document import parse_document
-    from presenters.web import WebPage
     bench = _bench(args) if args.nif or args.skeleton or getattr(args, "entry", None) is not None else MorphBench()
     actions = []
     if args.physics_config:
@@ -617,13 +625,7 @@ def cmd_workspace(args) -> int:
         actions.append({"method": "ppb_replace", "args": [document]})
     if args.recipe:
         recipe = body_slots.read_project(args.recipe)
-        if (not isinstance(recipe, dict) or recipe.get("format") != "morphbench-workspace"
-                or recipe.get("version") != 1 or not isinstance(recipe.get("actions"), list)):
-            raise ValueError(t("workspace.invalid", field="recipe"))
-        if any(str(action.get("method", "")).startswith("collider_") or action.get("method") in ("ppb_to_collider", "ppb_from_collider", "ppb_link") for action in recipe["actions"] if isinstance(action, dict)):
-            if recipe.get("source") != WebPage.source_identity(bench):
-                raise ValueError(t("workspace.stale"))
-        actions += recipe["actions"]
+        actions += bench.workspace_actions(recipe)
     actions += [json.loads(value) for value in args.action]
     if args.mode:
         actions.append({"method": "workspace_mode", "args": [args.mode]})
@@ -631,7 +633,7 @@ def cmd_workspace(args) -> int:
         actions.append({"method": "respect_file_visibility", "args": [True, args.show_file_hidden]})
     bench.workspace_replay(actions)
     recipe = {"format": "morphbench-workspace", "version": 1,
-              "source": WebPage.source_identity(bench), "actions": actions}
+              "source": bench.workspace_source(), "actions": actions}
     documents = []
     if args.config_out:
         if bench.physics_state()["document"] is None:

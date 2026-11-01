@@ -14,6 +14,13 @@ inside a presenter, it is missing from here — move it down rather than growing
 | Facade | `api.py` (`MorphBench`) | the single set of methods every layer above calls |
 | Infrastructure | `config.py`, `i18n.py`, `journal.py`, `environment.py` | settings, texts, the journal, and what the surroundings are — used by everyone, including each other |
 
+The facade's host-only `edit_session` owns in-memory staging through `SessionEdit`
+in `workspace.py`; presenters never enumerate/copy private editor fields. Publication
+transfers state and invalidates the staged facade. Config remains shared within one
+session, while each Config owns its fallback nested defaults. Recipe validation and
+add-on JSON codecs are pure functions with explicit identity/limits; registry/disk
+operations stay at their separate effect boundaries.
+
 ## May depend on
 
 `numpy`, the **PyNifly** add-on (the only reader and writer of NIF and TRI there is, or may

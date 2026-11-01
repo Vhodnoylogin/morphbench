@@ -11,12 +11,21 @@ go in a major release, and nowhere else.
 
 Эта страница на русском: [CHANGELOG.ru.md](CHANGELOG.ru.md).
 
-## [Unreleased]
+## [0.8.7] — 2026-11-01
 
-- Organize maintained production source under `src/main/` and checks/fixtures under
-  `src/test/`; keep root CLI delegates and generated output under ignored `target/`.
-- Pin the existing Launcher v1 Runtime as a build dependency. Installed package paths,
-  browser feature availability and CLI/SDK/HTTP contracts remain unchanged.
+- Introduce Launcher v3: the native EXE only starts bundled Python, forwards arguments,
+  waits and returns its exit code. Move the window, options, diagnostics, discovery and
+  server ownership into the updateable Application. Retain released v1/v2 adapters.
+- Declare host protocol compatibility separately from Runtime API/ABI. Upgrade
+  Application before installing v3; keep settings and plugins across updates.
+- Centralize staged editing sessions and pure recipe/add-on validation. Isolate nested
+  default settings between Config instances and remove the redundant state mixin module.
+- Preserve fitted capsule geometry in recovery recipes and skeleton exports; keep
+  repeated edits within the shared browser/server replay budget.
+- Reject malformed Unicode in add-on metadata, oversized capsule radii and conflicting
+  update parent paths. Handle Windows case-only renames of owned Application files.
+- Reduce duplicate mesh analysis, document export and browser validation work. Release
+  navigation still enables only Morphs and Colliders; Physics and Body Slots stay disabled.
 
 ## [0.8.6] — 2026-10-31
 

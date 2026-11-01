@@ -60,12 +60,13 @@ Object.assign(BenchMirror.prototype, {
   addon_morphs() { return {names:this.morphs(),values:this.sliders()}; },
   addon_set_morphs(values) {
     if(!this.is_open())throw Object.assign(Error(T.addonNoMesh),{code:"noMesh"});
+    const names=new Set(this.morphs());
     if(!values||typeof values!=="object"||Array.isArray(values)||Object.entries(values).some(
-      ([name,value])=>!this.morphs().includes(name)||typeof value!=="number"||!Number.isFinite(value)))throw Object.assign(Error(T.addonParams),{code:"invalidParams"});
+      ([name,value])=>!names.has(name)||typeof value!=="number"||!Number.isFinite(value)))throw Object.assign(Error(T.addonParams),{code:"invalidParams"});
     const previous=this.sliders();
     try {
       this.set_sliders(values);
-      if(this.shape_names().some((name)=>Array.from(this.deformed(name)).some((value)=>!Number.isFinite(value))))throw Object.assign(Error(T.addonParams),{code:"invalidParams"});
+      if(this.shape_names().some((name)=>this.deformed(name).some((value)=>!Number.isFinite(value))))throw Object.assign(Error(T.addonParams),{code:"invalidParams"});
     } catch(error) {this._sliders=new Map(Object.entries(previous));throw error;}
     return this.addon_morphs();
   },
@@ -81,7 +82,7 @@ Object.assign(BenchMirror.prototype, {
       ||("pan" in changes&&(!Array.isArray(changes.pan)||changes.pan.length!==2
         ||!changes.pan.every((value)=>numeric(value)&&Number.isFinite(Math.fround(value)))))
       ||("visibleShapes" in changes&&(!Array.isArray(changes.visibleShapes)||changes.visibleShapes.some(
-        (name)=>typeof name!=="string"||!this.shape_names().includes(name)))))throw Object.assign(Error(T.addonParams),{code:"invalidParams"});
+        (name)=>typeof name!=="string"||!this.shapes.has(name)))))throw Object.assign(Error(T.addonParams),{code:"invalidParams"});
     const previous=this.view;
     this.view=new ViewMirror(this.settings,this.presets(),this.view_state(true));
     try {

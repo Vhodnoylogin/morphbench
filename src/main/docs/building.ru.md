@@ -8,10 +8,13 @@
 ## Нативный хост и совместимость
 
 Команда `src\main\launcher\build.cmd` использует установленный компилятор .NET Framework;
-Pillow создаёт значок. Результат — `target/launcher/morphbench.exe`. Launcher v2 имеет
-версию сборки 2.0.0.0 и протокол bootstrap/сервера 1. [Контракт](launcher-protocol.ru.md)
-отделяет процессы и окно от поиска установки, настроек и адаптеров Application.
-Пользовательские флаги сохранены.
+Pillow создаёт значок. Результат — `target/launcher/morphbench.exe`. Launcher v3 имеет версию сборки 3.0.0.0 и минимальный протокол хоста 1.
+[Контракт](launcher-protocol.ru.md) оставляет C# только фиксированный запуск комплектного
+Python/shim, экранирование аргументов и ожидание/код выхода. Для работы с исходниками
+разместите рядом python/ и vendor/ закреплённого Runtime и launcher/mb.py из Application;
+задайте MORPHBENCH_APP абсолютным src/main. Один EXE больше не ищет системный Python.
+Параметры пользователя сохранены в shim/контроллере. Адаптеры v1/v2 остаются доступны.
+Runtime v3 также требует launcherHostProtocol 1; сначала обновите App.
 
 `runtime-lock.json` — точная зависимость **сборки**, не правило совместимости при запуске.
 Application схемы 2 проверяет API/ABI: совместимый будущий Runtime с другой версией и
@@ -24,8 +27,8 @@ Application схемы 2 проверяет API/ABI: совместимый бу
 `root/Morphbench/launcher`. Учтённые файлы не меняйте. Упаковка:
 
 ```text
-python release.py --package runtime --runtime-from <распакованный-launcher> --runtime-version 2 --out <результат>
-python release.py --package application --runtime <распакованный-launcher>/runtime-manifest.json --version 0.8.6 --out <результат>
+python release.py --package runtime --runtime-from <распакованный-launcher> --runtime-version 3 --out <результат>
+python release.py --package application --runtime <распакованный-launcher>/runtime-manifest.json --version 0.8.7 --out <результат>
 ```
 
 Сборщик сравнивает ID, contentHash и Python с закреплением исходников. Оба архива имеют
@@ -41,7 +44,7 @@ python release.py --package application --runtime <распакованный-la
 Python. Старую заготовку сохраните. Сначала зафиксируйте исходники, затем:
 
 ```text
-python release.py --package runtime --new-runtime --runtime-from <новая-заготовка> --runtime-version 2 --source-commit <точный-40-hex-коммит> --out <результат>
+python release.py --package runtime --new-runtime --runtime-from <новая-заготовка> --runtime-version <новая-версия-runtime> --source-commit <точный-40-hex-коммит> --out <результат>
 ```
 
 `--new-runtime` запрещает ID v1 и ID текущего закрепления, требует заготовку без манифеста
@@ -87,10 +90,15 @@ python src/main/build-nifly.py --out <нативная-сборка>
 
 ## Проверка и публикация
 
-Выполните `python src/test/run.py`. Нативные проверки компилируют реальный C#: ошибки,
-таймауты, наследованные каналы, отмена, владение и callbacks. Проверьте собранную установку
-встроенным Python: импорты, CLI/HTTP, окно, NIF/TRI/PNG, переход v1→v2, повторные обновления
-и сохранность настроек/плагинов. Фактическая работа MO2/usvfs проверяется отдельно;
+Выполните `python src/test/run.py`. Нативные проверки компилируют минимальный C#-хост:
+аргументы/рабочая директория/окружение, фиксированный Python, ошибки запуска, ожидание
+и коды выхода без показа окон. Проверки Python-сеанса и скрытого Win32-окна охватывают
+владение сервером, гонки закрытия, смерть/повторное использование PID и элементы управления.
+Проверьте собранную установку
+встроенным Python: импорты, CLI/HTTP, окно, NIF/TRI/PNG, адаптеры прежних v1/v2, переход
+на v3 после обновления App, повторные обновления и сохранность настроек/плагинов.
+Активны Морфы и Коллайдеры; Физика и Body Slots остаются отключены. Перед публикацией
+зафиксируйте хеши окончательных архивов и соответствующие коммиты. Фактическая работа MO2/usvfs проверяется отдельно;
 синтетический поиск её не доказывает.
 
 Публикуйте исходники в `main`, архивы — в GitHub/Nexus; историю сохраняйте. В Nexus имя

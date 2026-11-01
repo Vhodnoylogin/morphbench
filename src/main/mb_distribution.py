@@ -45,6 +45,7 @@ NATIVE_SUFFIXES = frozenset((".exe", ".dll", ".pyd", ".so", ".dylib", ".lib", ".
                              ".o", ".obj", ".pdb", ".pyc", ".pyi", ".zip", ".7z"))
 APPLICATION_API = 1
 PYTHON_ABI = "cp312-win_amd64"
+LAUNCHER_HOST_PROTOCOL = 1
 # Only this frozen pre-contract release has an implicit compatibility contract.
 # New Runtime releases advertise compatibility independently of their byte inventory.
 LEGACY_RUNTIME = ("runtime-1-win64",
@@ -259,6 +260,9 @@ def validate_manifest(value: dict, kind: str) -> dict:
         raise PackageError("manifest")
     _inventory(value.get("files"), kind, layout)
     if kind == "runtime":
+        if ("launcherHostProtocol" in value and
+                (type(value["launcherHostProtocol"]) is not int or value["launcherHostProtocol"] <= 0)):
+            raise PackageError("manifest")
         if (any(key in value for key in ("applicationApi", "pythonAbi"))
                 and not _api_contract({"apiVersion": value.get("applicationApi"),
                                        "pythonAbi": value.get("pythonAbi")})):
@@ -274,6 +278,10 @@ def validate_manifest(value: dict, kind: str) -> dict:
                     "vendor/io_scene_nifly/pyn/pynifly.py", "vendor/io_scene_nifly/tri/trifile.py",
                     "vendor/io_scene_nifly/tri/tripfile.py"}
     else:
+        protocols = value.get("launcherHostProtocols", [])
+        if (not isinstance(protocols, list) or any(type(item) is not int or item <= 0 for item in protocols)
+                or len(set(protocols)) != len(protocols)):
+            raise PackageError("manifest")
         runtime = value.get("requiresRuntime")
         if schema == 2:
             compatible = _api_contract(runtime)
@@ -345,6 +353,9 @@ def runtime_for(root: Path, app: dict, *, verify=True, launch=False) -> dict:
                  if app["schemaVersion"] == 1 else runtime_contract(runtime))
     if requirement != installed:
         raise PackageError("runtimeMismatch", required=requirement, installed=installed)
+    host = runtime.get("launcherHostProtocol")
+    if host is not None and host not in app.get("launcherHostProtocols", []):
+        raise PackageError("runtimeMismatch", launcherHostProtocol=host)
     if verify:
         verify_files(base, runtime)
     return runtime
@@ -586,10 +597,26 @@ def update(root: Path, archive: Path, *, check=False) -> dict:
         if old:
             verify_files(root, old)  # Preserve hand-edited application files by refusing.
         old_files = old["files"] if old else {}
-        affected = sorted(set(old_files) | set(contents) | {APP_MANIFEST})
+        # Windows may spell one existing owned file differently in the new inventory.
+        # Journal it once under its old name, so rollback restores the original snapshot;
+        # do not later delete the same file as an apparently obsolete old path.
+        old_paths = {os.path.normcase(name): name for name in old_files}
+        aliases = {}
+        for name in contents:
+            previous = old_paths.get(os.path.normcase(name))
+            if previous is not None and previous != name:
+                target = safe_path(root, name)
+                if os.path.lexists(target) and target.samefile(safe_path(root, previous)):
+                    aliases[name] = previous
+        affected = sorted(set(old_files) | (set(contents) - aliases.keys()) | {APP_MANIFEST})
         before = {}
         for name in affected:
             target = safe_path(root, name)
+            for parent in target.parents:
+                if parent == root:
+                    break
+                if os.path.lexists(parent) and not parent.is_dir():
+                    raise PackageError("userCollision", path=parent.relative_to(root).as_posix())
             if os.path.lexists(target):
                 if not target.is_file() or (name not in old_files and name != APP_MANIFEST):
                     raise PackageError("userCollision", path=name)
@@ -599,7 +626,8 @@ def update(root: Path, archive: Path, *, check=False) -> dict:
         result = {"ok": True, "checked": bool(check), "version": app["version"],
                   "previousVersion": old["version"] if old else None,
                   "runtime": {key: runtime[key] for key in ("id", "contentHash")},
-                  "written": len(contents), "removed": sorted(set(old_files) - set(contents))}
+                  "written": len(contents),
+                  "removed": sorted(set(old_files) - set(contents) - set(aliases.values()))}
         if check:
             return result
         transaction = safe_path(root, TRANSACTION)

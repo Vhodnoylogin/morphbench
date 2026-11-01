@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 import tempfile
 import unittest
+import warnings
 from pathlib import Path
 from unittest.mock import patch
 
@@ -75,6 +76,15 @@ class TestColliderEditor(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.bench.collider_translate("A", 0, [0, float("inf"), 0])
         self.assertEqual(self.bench.collider_edit_state(), before)
+
+    def test_oversized_radius_is_rejected_without_numpy_overflow_warnings(self):
+        before = self.bench.collider_edit_state()
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", RuntimeWarning)
+            for value in (1e100, np.float64(1e100)):
+                with self.subTest(value=value), self.assertRaises(ValueError):
+                    self.bench.collider_set("A", radius=value)
+                self.assertEqual(self.bench.collider_edit_state(), before)
 
     def test_invalid_index_and_selection_leave_state_untouched(self):
         before = self.bench.collider_edit_state()

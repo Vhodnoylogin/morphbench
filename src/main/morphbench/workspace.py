@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import copy
 import struct
+from functools import wraps
 
 from .i18n import t
 
@@ -23,7 +24,110 @@ WORKSPACE_TABS = {
 WORKSPACE_ENABLED_MODES = ("morphs", "colliders")
 
 
+def recipe_actions(recipe, source, *, require_source=False):
+    """Validate a recipe envelope/loaded identity without reading files or state."""
+    if (not isinstance(recipe, dict) or recipe.get("format") != "morphbench-workspace"
+            or recipe.get("version") != 1 or not isinstance(recipe.get("actions"), list)):
+        raise ValueError(t("workspace.invalid", field="recipe"))
+    geometry = any(str(action.get("method", "")).startswith("collider_")
+                   or action.get("method") in ("ppb_to_collider", "ppb_from_collider", "ppb_link")
+                   for action in recipe["actions"] if isinstance(action, dict))
+    if (require_source and source is None) or ((require_source or geometry) and recipe.get("source") != source):
+        raise ValueError(t("workspace.stale"))
+    return recipe["actions"]
+
+
+class SessionEdit:
+    """A detached editing candidate with one publication point.
+
+    Loaded model/morph data, config, environment and read caches are shared. View,
+    placement/navigation and slider state are isolated; geometry/source-document
+    owners are copied only for actions that edit them. The caller serializes live
+    access (HTTP already holds its session lock). Registry/filesystem writes are
+    deliberately outside this in-memory transaction. commit transfers ownership:
+    the candidate becomes unusable. Callers use facade operations while staged,
+    never retain references to its mutable owner fields beyond publication.
+    """
+
+    def __init__(self, origin, *, editors=False):
+        self._origin = origin
+        self.candidate = copy.copy(origin)
+        names = ["view", "_placements", "_sliders", "_workspace_tabs"]
+        if editors:
+            names += ["rig", "_physics_workspace", "_ppb_workspace", "_ppb_binding"]
+        owners = {name: getattr(origin, name) for name in names if hasattr(origin, name)}
+        # Every editing owner must retain the same authoritative Config. A deep
+        # copy of view/placements/rig must not silently fork its nested settings.
+        self.candidate.__dict__.update(copy.deepcopy(owners, {id(origin.cfg): origin.cfg}))
+        self._committed = False
+
+    def commit(self):
+        if self._committed:
+            raise ValueError(t("workspace.invalid", field="edit"))
+        # Replacing the mapping also preserves removal of optional owners; a plain
+        # update would retain stale fields deleted from the candidate.
+        state = self.candidate.__dict__
+        self.candidate.__dict__ = {}
+        self.candidate = None
+        self._origin.__dict__ = state
+        self._committed = True
+
+
+def workspace_edit(method):
+    """Publish direct edits only when their complete recovery recipe remains usable.
+
+    A replay already snapshots all owners and checks its final state once. Direct
+    facade calls stage the same editable owners, including linked PPB geometry.
+    """
+    @wraps(method)
+    def guarded(self, *args, **kwargs):
+        if getattr(self, "_workspace_editing", False):
+            return method(self, *args, **kwargs)
+        # Existing operations already validate atomically. Away from the recipe
+        # boundary, at most seven source-number edits and one geometry action can
+        # be added by a single call. Fitting stages its own arbitrary-size bundle.
+        # Avoid copying whole rigs/source documents merely to check that count.
+        if self._workspace_recipe_size() + 8 <= int(self.cfg["workspaceActionLimit"]):
+            return method(self, *args, **kwargs)
+        edit = self.edit_session(editors=True)
+        candidate = edit.candidate
+        candidate._workspace_editing = True
+        result = method(candidate, *args, **kwargs)
+        candidate._workspace_editing = False
+        candidate._workspace_check_recipe()
+        candidate.__dict__.pop("_workspace_editing", None)
+        edit.commit()
+        return result
+    return guarded
+
+
 class WorkspaceMixin:
+    def edit_session(self, *, editors=False):
+        """Stage facade operations without exposing private owners to presenters."""
+        return SessionEdit(self, editors=editors)
+
+    def workspace_source(self):
+        """Lexical source path and loaded-byte identity; never a fresh disk guess."""
+        return None if self.rig is None else {"skeleton": str(self.rig.path), "sha256": self.rig.source_sha256}
+
+    def workspace_actions(self, recipe, *, require_source=False):
+        return recipe_actions(recipe, self.workspace_source(), require_source=require_source)
+
+    def _workspace_recipe_size(self):
+        """Count recovery actions without taking expensive public document snapshots."""
+        count = 3 + (len(self.rig.edit_actions) + 2 if self.rig is not None else 0)
+        for name in ("_physics_workspace", "_ppb_workspace"):
+            owner = getattr(self, name, None)
+            if owner is not None:
+                count += owner.recipe_size()
+        count += bool(getattr(self, "_ppb_binding", None))
+        return count
+
+    def _workspace_check_recipe(self):
+        """Match the browser's final recipe budget, rather than just its input batch."""
+        if self._workspace_recipe_size() > int(self.cfg["workspaceActionLimit"]):
+            raise ValueError(t("workspace.invalid", field="actions"))
+
     def workspace_modes(self):
         """Modes offered by this release's browser navigation, in display order."""
         return list(WORKSPACE_ENABLED_MODES)
@@ -65,11 +169,13 @@ class WorkspaceMixin:
             self._physics_workspace = PhysicsWorkspace(max_chars=int(self.cfg["physicsMaxChars"]), max_fields=int(self.cfg["physicsMaxFields"]))
         return self._physics_workspace
 
+    @workspace_edit
     def physics_replace(self, document):
         if not isinstance(document, dict) or document.get("kind") not in ("fsmp", "cbpc"):
             raise ValueError(t("physicsw.document"))
         return self._physics_owner().replace(document)
 
+    @workspace_edit
     def physics_set(self, field_id, value):
         return self._physics_owner().set(field_id, value)
 
@@ -90,6 +196,7 @@ class WorkspaceMixin:
                                                    max_fields=int(self.cfg["physicsMaxFields"]))
         return self._ppb_workspace
 
+    @workspace_edit
     def ppb_replace(self, document):
         if not isinstance(document, dict) or document.get("kind") != "ppb":
             raise ValueError(t("physicsw.document"))
@@ -140,6 +247,7 @@ class WorkspaceMixin:
             raise ValueError(t("ppbw.float"))
         return result
 
+    @workspace_edit
     def ppb_set(self, field_id, value):
         candidate = copy.deepcopy(self._ppb_owner())
         candidate.set(field_id, self._ppb_value(value))
@@ -213,6 +321,7 @@ class WorkspaceMixin:
             raise ValueError(t("ppbw.transfer"))
         return ids, values
 
+    @workspace_edit
     def ppb_link(self, capsule_id, bone, index):
         """Explicitly bind one current source record to an existing editable NIF capsule."""
         _, values = self._ppb_geometry(capsule_id)
@@ -223,6 +332,7 @@ class WorkspaceMixin:
         self._ppb_binding = {"capsule": capsule_id, "bone": bone, "index": int(index)}
         return self.ppb_state()
 
+    @workspace_edit
     def ppb_unlink(self):
         """Detach the live binding while retaining both owners' current edits."""
         self._ppb_binding = None
@@ -266,11 +376,13 @@ class WorkspaceMixin:
         self.rig, self._ppb_workspace = rig, owner
         return result
 
+    @workspace_edit
     def ppb_to_collider(self, capsule_id, bone, index):
         """Copy explicit source geometry to one user-selected existing NIF capsule."""
         _, values = self._ppb_geometry(capsule_id)
         return self.collider_set(bone, index, {"p1": values[:3], "p2": values[3:6], "radius": values[6]})
 
+    @workspace_edit
     def ppb_from_collider(self, capsule_id, bone, index):
         """Copy selected NIF geometry to existing source spans, preserving every other byte."""
         ids, _ = self._ppb_geometry(capsule_id)
@@ -312,30 +424,18 @@ class WorkspaceMixin:
             lo, hi = allowed[name]
             if not lo <= len(args) <= hi:
                 raise ValueError(t("workspace.invalid", field="arguments"))
-        # Preserve all editable owners if a later action is invalid.
-        before = (copy.deepcopy(self.rig), copy.deepcopy(getattr(self, "_physics_workspace", None)),
-                  self.workspace_state(), copy.deepcopy(getattr(self, "_workspace_tabs", {})), self._placements.mode,
-                  self.view.colliders, self.view.bumper, copy.deepcopy(getattr(self, "_ppb_workspace", None)),
-                  copy.deepcopy(getattr(self, "_ppb_binding", None)),
-                  self.view.respect_file_visibility, self.view.show_file_hidden)
-        try:
-            for action in actions:
-                getattr(self, action["method"])(*action["args"])
-        except Exception:
-            self.rig, physics, state, tabs, placement_mode, colliders, bumper, ppb, binding, respect_file, show_hidden = before
-            self._ppb_binding = binding
-            if physics is None:
-                self.__dict__.pop("_physics_workspace", None)
-            else:
-                self._physics_workspace = physics
-            if ppb is None:
-                self.__dict__.pop("_ppb_workspace", None)
-            else:
-                self._ppb_workspace = ppb
-            self._workspace_mode, self._workspace_tabs = state["mode"], tabs
-            self.slots_mode(placement_mode)
-            self.view.colliders = colliders
-            self.view.bumper = bumper
-            self.view.respect_file_visibility, self.view.show_file_hidden = respect_file, show_hidden
-            raise
+        # Validate on the facade's isolated owners, then publish once. Owner
+        # registration is shared with selection/export instead of a rollback tuple.
+        edit = self.edit_session(editors=True)
+        candidate = edit.candidate
+        editing = getattr(self, "_workspace_editing", False)
+        candidate._workspace_editing = True
+        for action in actions:
+            getattr(candidate, action["method"])(*action["args"])
+        candidate._workspace_check_recipe()
+        if editing:
+            candidate._workspace_editing = editing
+        else:
+            candidate.__dict__.pop("_workspace_editing", None)
+        edit.commit()
         return self.workspace_state()

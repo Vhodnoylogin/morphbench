@@ -226,6 +226,17 @@ class TestPackageValidation(RegistryCase):
             del data[field]
             self.assert_error("invalidManifest", self.registry.install_bytes, package(data))
 
+    def test_unpaired_surrogate_metadata_is_rejected_before_publication(self):
+        for field in ("name", "version", "description"):
+            for value in ("bad\ud800name", "bad\udfffname"):
+                with self.subTest(field=field, value=repr(value)):
+                    self.assert_error("invalidManifest", self.registry.install_bytes,
+                                      package(manifest(**{field: value})))
+                    self.assert_unpublished()
+        row = self.registry.install_bytes(package(manifest(name="Tool \U0001f43a")))
+        self.assertEqual(row["name"], "Tool \U0001f43a")
+        json.dumps(self.registry.list(), ensure_ascii=False).encode("utf-8")
+
     def test_manifest_must_be_at_archive_root_and_entry_case_must_match(self):
         for name in ("nested/addon.json", "Addon.json"):
             buffer = io.BytesIO()
@@ -390,6 +401,15 @@ with AddonRegistry(sys.argv[1])._writer():
 
 
 class TestInstalledValidation(RegistryCase):
+    def test_invalid_unicode_in_installed_manifest_does_not_break_listing(self):
+        self.registry.install_bytes(package())
+        folder = self.installed_folder()
+        (folder / "addon.json").write_bytes(json.dumps(manifest(name="bad\ud800name")).encode("utf-8"))
+        rows = self.registry.list()
+        self.assertEqual(rows[0]["status"], "invalid")
+        self.assertEqual(rows[0]["error"]["code"], "invalidManifest")
+        json.dumps(rows, ensure_ascii=False).encode("utf-8")
+
     def test_corrupt_and_incompatible_packages_do_not_hide_healthy_entries(self):
         self.registry.install_bytes(package())
         self.registry.install_bytes(package(manifest(id="broken-tool")))

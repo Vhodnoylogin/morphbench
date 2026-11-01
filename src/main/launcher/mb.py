@@ -14,6 +14,89 @@ import runpy
 import sys
 
 
+def host_request(arguments):
+    """Decode only the frozen transport envelope, never Application options."""
+    if (len(arguments) < 5 or arguments[:2] != ["--launcher-host", "1"]
+            or arguments[2] != "--native-parent" or arguments[4] != "--"):
+        raise ValueError("launcherProtocolUnsupported")
+    parent = int(arguments[3])
+    if parent <= 0:
+        raise ValueError("launcherProtocolUnsupported")
+    return parent, arguments[5:]
+
+
+def host_application(launcher, arguments, *, environ=None, **discovery):
+    """Legacy home hints are policy in Python, not native interpreter discovery."""
+    import argparse
+    environ = os.environ if environ is None else environ
+    parser = argparse.ArgumentParser(add_help=False)
+    parser.add_argument("--start", action="store_true")
+    parser.add_argument("--diag", action="store_true")
+    parser.add_argument("--root")
+    parser.add_argument("home", nargs="?")
+    options, _unknown = parser.parse_known_args(arguments)
+    if "MORPHBENCH_APP" in environ:
+        return find_application(launcher, environ=environ, **discovery)
+    home = options.home or environ.get("MORPHBENCH_HOME")
+    if home:
+        named = absolute(home)
+        return named if is_application(named) else find_application(named, environ=environ, **discovery)
+    return find_application(launcher, environ=environ, **discovery)
+
+
+def run_host(launcher, arguments):
+    """Run the updateable desktop adapter after the ordinary release preflight.
+
+    Native launches without console/redirected pipes. No UI operation, settings,
+    discovery or server contract is baked into its executable anymore.
+    """
+    import contextlib
+    import traceback
+    parent, forwarded = host_request(arguments)
+    app = None
+    try:
+        app = host_application(launcher, forwarded)
+        # Discovery consumes the caller's cwd first. Released native hosts then ran
+        # App in the launcher directory: relative plugin/library settings keep that
+        # meaning, independently of MO2's Start-in directory.
+        os.chdir(launcher)
+        os.environ["MORPHBENCH_RUNTIME_HOME"] = str(launcher)
+        sys.dont_write_bytecode = True
+        sys.path[:0] = [str(app), str(launcher / "vendor")]
+        from mb_distribution import startup
+        lease = startup(app)
+        with contextlib.ExitStack() as stack:
+            if lease is not None:
+                stack.callback(lease.__exit__, None, None, None)
+            # Windows may provide invalid/absent std handles to a hidden python.exe.
+            # The server keeps its normal file journal; no native pipe reader exists.
+            with open(os.devnull, "w", encoding="utf-8") as output:
+                with contextlib.redirect_stdout(output), contextlib.redirect_stderr(output):
+                    from presenters.launcher import main as application_main
+                    return application_main(forwarded, app, native_parent=parent,
+                                            launcher_home=launcher)
+    except Exception as error:
+        details = traceback.format_exc()
+        try:
+            (launcher / "morphbench.bootstrap.log").write_text(details, encoding="utf-8")
+        except OSError:
+            pass
+        if "--diag" in forwarded:
+            try:
+                (launcher / "morphbench.diag.json").write_text(
+                    json.dumps({"nativeHostProtocol": 1, "error": str(error)}), encoding="utf-8")
+            except OSError:
+                pass
+        elif sys.platform == "win32":
+            import ctypes
+            from ctypes import wintypes
+            dialog = ctypes.WinDLL("user32", use_last_error=True).MessageBoxW
+            dialog.argtypes = [wintypes.HWND, wintypes.LPCWSTR, wintypes.LPCWSTR, wintypes.UINT]
+            dialog.restype = ctypes.c_int
+            dialog(None, str(error), "Morphbench", 0x10)
+        return 2
+
+
 def absolute(value) -> Path:
     return Path(os.path.abspath(os.path.normpath(os.fspath(value))))
 
@@ -68,6 +151,9 @@ def find_application(launcher, *, environ=None, cwd=None, registry_roots=None) -
         if not is_application(named):
             raise ValueError("applicationHintInvalid")
         return named
+    # A flat release shares the fixed native entry filename with its App CLI.
+    if is_application(launcher):
+        return launcher
     sibling = launcher.parent / "app"
     if is_application(sibling):
         return sibling
@@ -128,6 +214,8 @@ def launcher_context(launcher, protocol=1, **discovery) -> dict:
 
 def main() -> None:
     launcher = absolute(__file__).parent
+    if sys.argv[1:2] == ["--launcher-host"]:
+        raise SystemExit(run_host(launcher, sys.argv[1:]))
     if sys.argv[1:2] == ["--launcher-context"]:
         try:
             if sys.argv[2:] != ["--protocol", "1"]:

@@ -53,6 +53,15 @@ the bottom of its panel: **any session must be reproducible from the command lin
 a control, add the facade method first and call it by its own name; a control that does something
 the CLI cannot reach breaks the property the whole arrangement exists for.
 
+Host-only session staging is owned by `MorphBench.edit_session`, not by a presenter.
+`SessionEdit` isolates view/placements/sliders/navigation and optionally geometry/source
+documents while retaining the authoritative Config and read-only loaded model. A successful
+commit transfers state and invalidates the candidate; callers must not retain its mutable
+owner references. HTTP callers hold their existing session lock. Registry/filesystem writes
+are outside this in-memory transaction. This host infrastructure object is not an add-on or
+workspace-dispatch command. Pure `recipe_actions` validation and facade `workspace_source`
+keep recipe/loaded-byte identity policy out of CLI/HTML/HTTP adapters.
+
 A fourth, smaller rule with the same weight: **the bench never writes over what it read.** Meshes
 and skeletons belong to somebody else's mod. `bounds_write` and `collider_save` insist on a new
 file, and edits travel as a mod of their own.
@@ -65,7 +74,7 @@ file, and edits travel as a mod of their own.
 | Facade | `morphbench/api.py` | the whole core | the only surface above the core; returns plain data (`json.dumps`-ready) plus numpy arrays for bulk geometry |
 | Presenters | `presenters\` (`text`, `raster`, `web`, `assets`, `serve`, `ppb`, `smp`, `cbpc`) | the facade only | no computation; a presenter that computes is a bug report against the facade |
 | Page | `web\page.html`, `web\style.css`, `web\js\*.js` | the payload `presenters/web.py` packs | mirrors the facade by name; no library, no font, no request that leaves the machine |
-| Entry points | `mb.py`, `launcher\morphbench.cs` | the facade / the server's HTTP API | argument parsing and window plumbing, nothing else |
+| Entry points | `mb.py`, `launcher\mb.py`, `launcher\morphbench.cs` | facade / updateable Application host | C# forwards argv to bundled Python; App owns discovery, options and UI |
 | Infrastructure | `morphbench/config.py`, `morphbench/i18n.py`, `morphbench/journal.py`, `morphbench/environment.py` | standard library | used by everyone; must not import the core |
 
 Two cross-cutting rules that hold in every layer:

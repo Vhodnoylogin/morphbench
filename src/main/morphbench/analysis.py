@@ -323,15 +323,7 @@ class Analyzer:
         if es is None:
             return None
         edges, strain = es
-        shape = self.model.shape(shape_name)
-        worst = strain > threshold
-        worst_bounds = None
-        if worst.any():
-            pts = np.vstack([shape.verts[edges[worst, 0]], shape.verts[edges[worst, 1]]])
-            worst_bounds = (pts.min(axis=0), pts.max(axis=0))
-        return StrainStat(shape_name, morph_name, int(edges.shape[0]),
-                          float(strain.max()), float(np.percentile(strain, 99)),
-                          int(worst.sum()), threshold, worst_bounds)
+        return self._stat(shape_name, edges, strain, threshold, morph=morph_name)
 
     def strain_report(self, amount: float = 1.0, threshold: float | None = None,
                       morph_filter: str | None = None) -> list[StrainStat]:
@@ -401,14 +393,14 @@ class Analyzer:
         return edges, strain
 
     def _stat(self, shape_name: str, edges: np.ndarray, strain: np.ndarray,
-              threshold: float, sliders: dict) -> StrainStat:
+              threshold: float, sliders: dict | None = None, *, morph: str | None = None) -> StrainStat:
         shape = self.model.shape(shape_name)
         worst = strain > threshold
         worst_bounds = None
         if worst.any():
             pts = np.vstack([shape.verts[edges[worst, 0]], shape.verts[edges[worst, 1]]])
             worst_bounds = (pts.min(axis=0), pts.max(axis=0))
-        return StrainStat(shape_name, None, int(edges.shape[0]), float(strain.max()),
+        return StrainStat(shape_name, morph, int(edges.shape[0]), float(strain.max()),
                           float(np.percentile(strain, 99)), int(worst.sum()), threshold,
                           worst_bounds, sliders)
 

@@ -324,9 +324,7 @@ class WebPage:
     @staticmethod
     def source_identity(bench):
         """Bind exported edit recipes to the original skeleton bytes, not a display name."""
-        if bench.rig is None:
-            return None
-        return {"skeleton": str(bench.rig.path), "sha256": bench.rig.source_sha256}
+        return bench.workspace_source()
 
     def html(self, linked: bool = False) -> str:
         """The finished page as a string.

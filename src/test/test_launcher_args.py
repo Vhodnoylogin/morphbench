@@ -1,36 +1,16 @@
-"""Round-trip the production launcher's Windows quoting through a real child process."""
+"""Round-trip the production host's quoting through a real isolated Python child."""
 from __future__ import annotations
 
 import json
 import os
 from pathlib import Path
 import subprocess
+import sys
 import tempfile
 import unittest
 
 
-ROOT = (Path(__file__).resolve().parents[2] / "src/main")
-PROBE = r'''
-using System;
-using System.Text;
-using System.Web.Script.Serialization;
-
-static class MorphbenchArgProbe
-{
-    static void Main(string[] args)
-    {
-        Console.OutputEncoding = new UTF8Encoding(false);
-        if (args.Length == 2 && args[0] == "quote")
-        {
-            Console.Write(Module.Quote(args[1]));
-            return;
-        }
-        var values = new string[args.Length - 1];
-        Array.Copy(args, 1, values, 0, values.Length);
-        Console.Write(new JavaScriptSerializer().Serialize(values));
-    }
-}
-'''
+REPOSITORY = Path(__file__).resolve().parents[2]
 
 
 @unittest.skipUnless(os.name == "nt", "Windows command-line parsing is required")
@@ -43,28 +23,29 @@ class TestLauncherArguments(unittest.TestCase):
                          if (framework / bitness / "v4.0.30319/csc.exe").is_file()), None)
         if compiler is None:
             raise unittest.SkipTest("The .NET Framework C# compiler is unavailable")
-        cls.box = tempfile.TemporaryDirectory()
+        target = REPOSITORY / "target" / "launcher-args-tests"
+        target.mkdir(parents=True, exist_ok=True)
+        cls.box = tempfile.TemporaryDirectory(dir=target)
         cls.addClassCleanup(cls.box.cleanup)
         folder = Path(cls.box.name)
-        probe = folder / "args.cs"
-        probe.write_text(PROBE, encoding="utf-8")
         cls.executable = folder / "args.exe"
-        # Compile the complete production source into the probe assembly: Module.Quote is
-        # called directly, so a replacement algorithm in this test cannot mask a regression.
+        cls.echo = folder / "echo.py"
+        cls.echo.write_text("import json, sys\nprint(json.dumps(sys.argv[1:]))\n", encoding="utf-8")
+        # Compile the complete production source; no test implementation of Quote exists.
         subprocess.run([str(compiler), "/nologo", "/codepage:65001", "/target:exe",
-                        "/main:MorphbenchArgProbe", "/r:System.Windows.Forms.dll",
-                        "/r:System.Drawing.dll", "/r:System.Web.Extensions.dll",
+                        "/main:LauncherNativeChecks", "/r:System.Windows.Forms.dll",
                         "/out:" + str(cls.executable),
-                        str(ROOT / "launcher/morphbench.cs"), str(probe)],
-                       check=True, capture_output=True, text=True)
+                        str(REPOSITORY / "src/main/launcher/morphbench.cs"),
+                        str(REPOSITORY / "src/test/launcher_native.cs")],
+                       check=True, capture_output=True, text=True, timeout=30)
 
     def roundtrip(self, values):
         quoted = [subprocess.run([str(self.executable), "quote", value],
                                  check=True, capture_output=True, text=True,
-                                 encoding="utf-8").stdout for value in values]
-        command = subprocess.list2cmdline([str(self.executable), "echo"])
+                                 encoding="utf-8", timeout=10).stdout for value in values]
+        command = subprocess.list2cmdline([sys.executable, "-I", str(self.echo)])
         result = subprocess.run(command + " " + " ".join(quoted), check=True,
-                                capture_output=True, text=True, encoding="utf-8")
+                                capture_output=True, text=True, encoding="utf-8", timeout=10)
         self.assertEqual(json.loads(result.stdout), values)
 
     def test_directory_paths_and_switch_boundaries(self):
@@ -80,8 +61,8 @@ class TestLauncherArguments(unittest.TestCase):
             with self.subTest(value=value):
                 self.roundtrip([value, "--next"])
 
-    def test_empty_and_whitespace_arguments(self):
-        self.roundtrip(["", " ", "a\tb", "last"])
+    def test_empty_whitespace_and_shell_characters(self):
+        self.roundtrip(["", " ", "a\tb", "a\nb", "& | < > ^ %PATH% $(echo x)", "last"])
 
 
 if __name__ == "__main__":

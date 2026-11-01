@@ -1,15 +1,57 @@
 # Launcher and Application compatibility
 
-Launcher v2 is a deliberately small Windows host. Its native bytes include the window,
-process lifetime, bounded pipe readers and cancellation. Application owns the Python
-bootstrap, installation discovery, settings, translations and server adapters. Mesh,
-morph and plugin logic never belongs in the EXE.
+Launcher v3 is a fixed Windows-to-Python handoff: one class and two
+methods (entry point and Windows argument quoting). Application owns the window,
+discovery, settings, translations, diagnostics and server lifetime. Released v1/v2
+adapters remain supported; their native bytes are not changed.
 
-## Three independent versions
+## Minimal native host protocol 1 (Launcher v3)
+
+Only `python/python.exe` and `mb.py`, relative to the EXE, are native anchors. The
+host opens these files (MO2-safe), then starts without shell, console or redirected pipes:
+
+```text
+<launcher>/python/python.exe -I <launcher>/mb.py --launcher-host 1 --native-parent <PID> -- <original argv>
+```
+
+Every original argument, including empty values and future options, passes unchanged.
+Caller cwd and environment reach the shim. C# interprets no App option or setting,
+uses no PATH/registry discovery, reads no JSON and implements no HTTP client. It waits
+for Python to preserve MO2 running-program accounting and returns the child's exit code.
+Only failure before Python starts has a small native error dialog. The replaceable shim
+and Application report later failures.
+
+After discovering App using caller cwd/home hints, the shim restores the legacy launcher
+working directory: relative plugin/library settings keep their meaning. App config stays
+in App; `morphbench.launcher.json` and diagnostic output keep their launcher location.
+Flat layouts, explicit App and game-root/VFS discovery remain Python policy.
+`MORPHBENCH_PYTHON` no longer selects a native bootstrap interpreter; source development
+stages the same fixed bundled interpreter layout.
+
+`presenters.launcher` contains pure option/root/limit functions and `LauncherSession`,
+which owns an optional in-process `WebServer` and reuses `ServerLink` for other servers.
+Closing stops only its own server; explicit Stop can stop a separate server.
+`presenters.launcher_window` owns Windows controls, one serialized worker, bounded logs
+and the native-parent watch. Parent creation times reject recycled PIDs. There is no
+native controller subprocess supervision, pipe reader or server PID shutdown policy.
+
+A v3 Runtime declares `launcherHostProtocol: 1`; new Applications declare
+`launcherHostProtocols: [1]`. The updater refuses an App lacking the requested adapter
+before writing files. This capability is separate from native-library API/ABI and is not
+an exact version/hash pin. **Install the new Application before replacing v1/v2 with v3.**
+Application 0.8.7 introduces this adapter; Application 0.8.6 predates it. The new App
+still supports the v1/v2 adapters, so Application can be upgraded before the native host.
+
+Future UI, discovery, HTTP and lifecycle fixes update Application only. A correction to
+the fixed Python ABI/dependencies, handoff or quoting can still require a new native
+package; this boundary cannot guarantee that an EXE will never need replacement.
+
+## Independent contracts
 
 | Contract | Current value | Changes that require a new native package |
 |---|---|---|
 | Runtime/Application compatibility | API 1, `cp312-win_amd64` | native dependencies or interpreter actually change |
+| Minimal native handoff | host protocol 1 | fixed interpreter/shim invocation actually needs to change |
 | Native bootstrap and server adapter | protocol 1 | the frozen host cannot implement a required new native facility |
 | Browser plugin API | API 1 | none by itself; Application owns it |
 
@@ -25,7 +67,7 @@ never silently reinterpreted. Application 0.8.6 supports both v1 and v2; Applica
 0.8.5 must be updated before installing v2. The [installation guide](install-layout.md)
 describes the one-time transition using the new updater.
 
-## Native bootstrap protocol 1
+## Released v2 bootstrap protocol 1
 
 The entry filename `launcher/mb.py` and interpreter filename `launcher/python/python.exe`
 are stable native anchors. Both packages include the same Application-owned entry shim;
@@ -86,5 +128,5 @@ require rebuilding Application. Application updates contain no EXE/DLL/PYD files
 preserve user settings and plugins. This separation avoids reuploading unchanged native
 files for each Application update; every new native upload may still require Nexus review.
 
-Do not promise that v2 will never need replacement: a native defect, interpreter ABI
+Do not promise that v3 will never need replacement: a native defect, interpreter ABI
 upgrade or new native facility can require it. Keep such changes out of routine App work.

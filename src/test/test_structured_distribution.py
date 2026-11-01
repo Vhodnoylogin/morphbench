@@ -129,6 +129,67 @@ class TestStructuredDistribution(unittest.TestCase):
         self.helper.assert_code("layoutMismatch", lambda: dist.update(self.root, flat))
         self.assertEqual(snapshot(self.root), before)
 
+    @unittest.skipUnless(os.name == "nt", "requires Windows case-insensitive file paths")
+    def test_case_only_owned_rename_retains_one_file_and_supports_repeated_updates(self):
+        first, _ = self.package("1.0", {"docs/Guide.md": b"# old guide"})
+        dist.update(self.root, first)
+        notes = self.root / "app/docs/notes.md"
+        notes.write_bytes(b"user notes")
+        second, manifest = self.package("1.1", {"docs/guide.md": b"# new guide"})
+        before = snapshot(self.root)
+        checked = dist.update(self.root, second, check=True)
+        self.assertEqual(checked["removed"], [])
+        self.assertEqual(snapshot(self.root), before)
+        for _ in range(2):
+            result = dist.update(self.root, second)
+            self.assertEqual(result["removed"], [])
+            self.assertEqual((self.root / "app/docs/guide.md").read_bytes(), b"# new guide")
+            self.assertEqual(dist.read_json(self.root / dist.APP_MANIFEST), manifest)
+            self.assertEqual(notes.read_bytes(), b"user notes")
+            guides = [path.name for path in notes.parent.iterdir()
+                      if path.name.casefold() == "guide.md"]
+            self.assertEqual(guides, ["guide.md"])
+
+    @unittest.skipUnless(os.name == "nt", "requires Windows case-insensitive file paths")
+    def test_failed_case_only_rename_rolls_back_without_duplicate_backup_ownership(self):
+        first, _ = self.package("1.0", {"docs/Guide.md": b"# old guide"})
+        dist.update(self.root, first)
+        second, _ = self.package("1.1", {"docs/guide.md": b"# new guide"})
+        before = snapshot(self.root)
+        write = dist._write
+        failed = False
+
+        def fail_after_rename(path, data):
+            nonlocal failed
+            write(path, data)
+            if path == self.root / "app/docs/guide.md" and not failed:
+                failed = True
+                raise OSError("test interrupted case-only replacement")
+
+        with mock.patch.object(dist, "_write", side_effect=fail_after_rename):
+            with self.assertRaises(OSError):
+                dist.update(self.root, second)
+        self.assertTrue(failed)
+        self.assertEqual(snapshot(self.root), before)
+        self.assertFalse((self.root / dist.TRANSACTION).exists())
+
+    def test_parent_user_file_collision_refuses_check_and_apply_before_transaction(self):
+        first, _ = self.package("1.0")
+        dist.update(self.root, first)
+        collision = self.root / "app/locale/de"
+        collision.parent.mkdir()
+        collision.write_bytes(b"user-owned language notes")
+        second, _ = self.package("1.1", {"locale/de/new.json": b"{}"})
+        before = snapshot(self.root)
+        for check in (True, False):
+            with self.subTest(check=check), mock.patch.object(dist, "_write", wraps=dist._write) as write:
+                self.helper.assert_code("userCollision", lambda: dist.update(
+                    self.root, second, check=check))
+                write.assert_not_called()
+            self.assertEqual(snapshot(self.root), before)
+            self.assertEqual(collision.read_bytes(), b"user-owned language notes")
+            self.assertFalse((self.root / dist.TRANSACTION).exists())
+
     def test_native_and_renamed_binary_rejections_inside_app_prefix(self):
         for name, value in (("app/web/js/native.js", b"MZbad"),
                             ("app/morphbench/native.pyd", b"binary")):

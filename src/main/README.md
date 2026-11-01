@@ -18,17 +18,17 @@ The authoritative source is [Vhodnoylogin/morphbench](https://github.com/Vhodnoy
 branch `main`, with unfinished work on `experimental/body-slots`. Production source and
 authored resources live in `src/main/`; tests and reusable fixtures live in `src/test/`.
 From the checkout root, `python mb.py` and `python release.py` delegate to the maintained
-entry points. This full guide ships with the application; its `docs/` links describe the
-installed application and also work beside this file in `src/main/`.
+entry points. This source guide links to the installed application documentation under `docs/`.
+The packaged README is a separate brief installation guide.
 
 The project was extracted from Skyrim-Mods on 2026-10-02. All 42 retained history commits,
 the module contents and Git LFS were verified on 2026-10-03. The old local and remote
 `Skyrim-Mods/morphbench` branches were deleted after verification; historical checkouts remain.
 
-Version **0.8.6** includes visual capsule editing, bidirectional source-preserving
+Version **0.8.7** includes visual capsule editing, bidirectional source-preserving
 [PPB tuning editing](docs/ppb.md), the skeleton-only blank-page fix and browser add-ons with
 API v1. It distinguishes [native file visibility](docs/visibility.md) from the viewer's shape selection.
-Version **0.8.6** enables only **Morphs** and **Colliders**; Physics and Body Slots
+Version **0.8.7** enables only **Morphs** and **Colliders**; Physics and Body Slots
 are disabled in browser navigation. Their code and script APIs remain for development.
 See the [editing workspace](docs/workspace.md) and [changelog](CHANGELOG.md).
 
@@ -55,9 +55,11 @@ edited or fitted collision capsules, and edited physics configurations into new 
 ## What it needs
 
 **From a release — no separate Python or Blender installation.** Download
-**Application 0.8.6** and the separate required **Morphbench Launcher v2**.
+**Application 0.8.7** and the separate required **Morphbench Launcher v3**.
 Application contains the workbench's Python, browser assets, translations and documentation;
-Launcher contains the separately versioned native Runtime (`runtime-2-win64`). Their versions are independent.
+Launcher contains the separately versioned native Runtime (`runtime-3-win64`). Their versions are independent.
+Launcher v3 only starts bundled Python; the window, options, discovery and server lifecycle
+are updateable Application code. This keeps ordinary fixes out of the native package.
 
 Both archives start at `root/Morphbench/`. Merge their `Morphbench` directories into one
 writable tools folder or the game root. Run `Morphbench/launcher/morphbench.exe`.
@@ -110,9 +112,10 @@ elsewhere, the `pynifly` key in `morphbench.json` says where. morphbench has no 
 of its own and must not have one: PyNifly's modules are the same ones that write these files, so
 a second reading that could drift away from the first never appears.
 
-Application 0.8.6 accepts Launcher v1 and v2 through a stable Runtime API/ABI contract.
-For the first upgrade from 0.8.5, use the NEW extracted updater before installing v2;
-[transition steps](docs/install-layout.md). Compatible future Launcher versions do not
+Application 0.8.7 retains Launcher v1/v2 adapters and adds minimal host protocol 1 for v3.
+Update Application first, then replace the Launcher folder with v3 while preserving its
+settings. Application 0.8.6 cannot run the v3 host. From 0.8.5, use the NEW extracted
+updater; see [transition steps](docs/install-layout.md). Future compatible hosts do not
 require another Application build.
 
 ## Starting it
@@ -154,18 +157,20 @@ build in one tree — and that merged view exists **only inside processes MO2 st
 where the meshes of the build simply are not.
 
 So to look at the build's meshes, morphbench has to be launched **by** MO2. That is what
-`morphbench.exe` is for: it is a small window with the state of the server, the browse root, and
-buttons to start it, stop it and open the page. It computes nothing — every button is the same
-call `serve` makes. Started from MO2, it starts the server as its own child, and that server sees
-the merged `Data`.
+`morphbench.exe` is for: it starts bundled Python with MO2 filesystem access. Application
+shows the window with server state, browse root and Start/Stop/Open buttons, and owns the
+server in that same Python process. The window and HTTP clients use the same workbench.
+The native EXE only forwards arguments, waits and returns the exit code.
 
 1. A release already includes the window. From sources, build it once with
    `src\main\launcher\build.cmd` from the checkout root. Output is
    `target/launcher/morphbench.exe`.
 2. In MO2, add an executable: use the release's `Morphbench/launcher/morphbench.exe`;
    `--start` raises the server and opens the page. "Start in" is not needed for a release.
-   For a source build, use `target/launcher/morphbench.exe` and pass the absolute
-   `<checkout>/src/main` folder before `--start`, or set `MORPHBENCH_HOME` to that folder.
+   For a source build, stage the pinned Runtime's `python/` and `vendor/` plus the
+   Application-owned `src/main/launcher/mb.py` beside `target/launcher/morphbench.exe`.
+   Set `MORPHBENCH_APP` to absolute `<checkout>/src/main`; a bare v3 EXE does not
+   discover system Python. See [building](docs/building.md).
 3. Run that entry from MO2. The window reports whether it is under MO2, and the page will not step
    outside `Data`.
 
@@ -288,7 +293,7 @@ stays in the source repository and is not included in the end-user archive.
 
 ## Editing workspace
 
-The 0.8.6 viewer enables **Morphs** and **Colliders**, with mode tabs above the view, models
+The 0.8.7 viewer enables **Morphs** and **Colliders**, with mode tabs above the view, models
 on the left and an inspector on the right. Edit supported collision capsules, save a
 replayable workspace and export new files. **Physics** and **Slots** remain disabled in the
 browser. Experimental FSMP XML/CBPC TXT editing remains accessible through `mb.py workspace`
@@ -300,14 +305,14 @@ See [the workspace workflow](docs/workspace.md) for controls, automation and off
 Local preview variants add independent author → definition → variant inheritance. Session recipes preserve variants and edit targets; `mb.py slots --editor` recovers unfinished projects and exports unbound placement presets. Authored JSON and `.bslots` remain authored-only. See [the Slots workflow](docs/slots.md).
 
 Experimental Slots authoring remains available through `mb.py slots` and the local HTTP API;
-the browser tab is disabled in 0.8.6. The backend supports named skeleton-node placements,
+the browser tab is disabled in 0.8.7. The backend supports named skeleton-node placements,
 local transforms/access spheres, author defaults and temporary effective overrides, session
 recipes, Body Slots schema-v1 JSON and `.bslots` exports. It does not edit game saves,
 equipment or inventories. See [docs/slots.md](docs/slots.md) for the offline workflow and limits.
 
 ## Browser add-ons
 
-Application 0.8.6 includes a versioned local browser add-on host.
+Application 0.8.7 includes a versioned local browser add-on host.
 Install a ZIP, enable its inspector tab, and use API v1 to select models, read geometry,
 set existing morphs, control the view and save add-on state for the current browser tab.
 Installed add-ons can be explicitly updated while disabled. [Contract and workflow](docs/addons.md);

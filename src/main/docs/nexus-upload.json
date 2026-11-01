@@ -230,5 +230,71 @@
       "imageDividers": 7,
       "archiveReupload": false
     }
+  },
+  "preparedRelease": {
+    "status": "offline candidate; not uploaded or published",
+    "applicationVersion": "0.8.7",
+    "launcherVersion": "v3",
+    "runtimeId": "runtime-3-win64",
+    "sourceTag": "https://github.com/Vhodnoylogin/morphbench/tree/v0.8.7",
+    "githubRelease": "https://github.com/Vhodnoylogin/morphbench/releases/tag/v0.8.7",
+    "descriptionFile": "src/main/docs/nexus-description.bbcode",
+    "mainFiles": [
+      {
+        "name": "Morphbench Application",
+        "version": "0.8.7",
+        "primary": true,
+        "filename": "morphbench-application-0.8.7.zip",
+        "allowModManagerDownload": true,
+        "description": "The Morphbench workbench: morph previews, collider editing and add-ons."
+      },
+      {
+        "name": "Morphbench Launcher",
+        "version": "v3",
+        "primary": false,
+        "filename": "morphbench-runtime-3-win64.zip",
+        "allowModManagerDownload": true,
+        "description": "Starts Morphbench. Includes Python and the libraries needed to run it."
+      }
+    ],
+    "changelogs": [
+      {
+        "version": "0.8.7",
+        "entries": [
+          "Moved the launcher window, settings, discovery and server control into the updateable Application.",
+          "Improved session recovery and preserved fitted capsule geometry in saved recipes and skeleton exports.",
+          "Kept repeated edits within the recovery action limit.",
+          "Improved validation of capsule radii, add-on metadata and update destinations.",
+          "Refactored editing sessions and settings ownership. Settings and installed add-ons are preserved."
+        ]
+      },
+      {
+        "version": "v3",
+        "entries": [
+          "Reduced the native launcher to starting bundled Python and forwarding arguments and the exit code.",
+          "Moved the window and startup behavior into Application so routine fixes can reuse the same EXE.",
+          "Install Application 0.8.7 or a newer compatible Application before replacing Launcher."
+        ]
+      }
+    ],
+    "requirements": {
+      "method": "legacy",
+      "rootBuilderOptional": true,
+      "offSiteRequirements": [
+        {
+          "name": "Morphbench Launcher / Application compatibility",
+          "url": "https://github.com/Vhodnoylogin/morphbench/blob/v0.8.7/src/main/docs/install-layout.md",
+          "notes": "Install both Main files. Launcher v3 needs Application 0.8.7 or a compatible newer App. Update Application before replacing Launcher. Application 0.8.7 supports Launcher v1, v2 and v3. Root Builder is optional."
+        }
+      ]
+    },
+    "publicationNotes": [
+      "Keep historical tags, uploads and owner-authored posts unchanged.",
+      "Add each native version changelog once; keep file descriptions short.",
+      "Application is Primary Main and Launcher is another Main file.",
+      "New native Launcher v3 needs its own quarantine review; older review requests do not cover it.",
+      "No download quarantine-status banner in the mod description.",
+      "Verify final source is on main before publishing."
+    ]
   }
 }

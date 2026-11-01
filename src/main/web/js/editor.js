@@ -75,8 +75,15 @@ class EditorState {
     if(count>this.bench.settings.workspaceActionLimit)editorError("actions");
   }
   record(method,args,owners={}) {
-    const last=this.actions[this.actions.length-1];
-    const merge=method==="collider_set"&&last&&last.method===method&&last.args[0]===args[0]&&last.args[1]===args[1];
+    let last=null;
+    if(method==="collider_set")for(let index=this.actions.length-1;index>=0;index--){
+      const action=this.actions[index];if(action.args[0]!==args[0])continue;
+      // A topology edit changes child identities and material inheritance. Keep it
+      // and all geometry leading up to it; only independent numeric edits commute.
+      if(["collider_add","collider_remove"].includes(action.method))break;
+      if(action.method===method&&action.args[1]===args[1]){last=action;break;}
+    }
+    const merge=last!==null;
     this.checkRecipeSize({...owners,actionCount:this.actions.length+(merge?0:1)});
     if(merge) {
       Object.assign(last.args[2],editorClone(args[2]));return;

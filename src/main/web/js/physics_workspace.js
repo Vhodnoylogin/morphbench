@@ -71,13 +71,13 @@ class PhysicsWorkspaceMirror {
   }
   export_text() {
     if(!this._document)this._fail("physicsw.empty");
-    const edits=this._document.fields.filter((field)=>Object.prototype.hasOwnProperty.call(this._edits,field.id)).sort((a,b)=>b.start-a.start);
-    let source=this._source.slice();
+    const edits=this._document.fields.filter((field)=>Object.prototype.hasOwnProperty.call(this._edits,field.id)).sort((a,b)=>a.start-b.start);
+    const parts=[];let cursor=0;
     for(const field of edits) {
       const value=this._edits[field.id],replacement=Object.is(value,-0)?"-0":String(value);
-      source=source.slice(0,field.start).concat(Array.from(replacement),source.slice(field.end));
+      parts.push(this._source.slice(cursor,field.start).join(""),replacement);cursor=field.end;
     }
-    return source.join("");
+    parts.push(this._source.slice(cursor).join(""));return parts.join("");
   }
   _matrix(frame) {
     if(frame&&!Array.isArray(frame))frame=frame.matrix;

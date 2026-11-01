@@ -117,12 +117,16 @@ class EditorPanel {
   }
   async parsePPB(text) {
     try {
-      if(!this.bench.server)throw Error(T.edServer);
-      const response=await fetch("/api/physics/import",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({kind:"ppb",text})});
-      const parsed=await response.json();if(!response.ok)throw Error(parsed.error);
-      this.ppbRawDirty=false;this.ppbFieldSignature="";this.app.invoke("ppb_replace",parsed.document);
+      const document=await this._importDocument("ppb",text);
+      this.ppbRawDirty=false;this.ppbFieldSignature="";this.app.invoke("ppb_replace",document);
       this.ppbSettings.open=true;
     }catch(error){this.fail(error);}
+  }
+  async _importDocument(kind,text) {
+    if(!this.bench.server)throw Error(T.edServer);
+    const response=await fetch("/api/physics/import",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({kind,text})});
+    const parsed=await response.json();if(!response.ok)throw Error(parsed.error);
+    return parsed.document;
   }
   refreshPPB() {
     const state=this.bench.ppb_state(),capsules=state.capsules||[],signature=JSON.stringify(capsules.map((cap)=>[cap.id,cap.slot,cap.index]));
@@ -198,20 +202,16 @@ class EditorPanel {
         if(capsuleActions&&JSON.stringify(recipe.source)!==JSON.stringify(DATA.source))throw Error(T.edStale);
         this.app.invoke("workspace_replay",recipe.actions);return;
       }
-      if(!this.bench.server)throw Error(T.edServer);
       const kind=file.name.toLowerCase().endsWith(".xml")?"fsmp":this.kind.value;
-      const response=await fetch("/api/physics/import",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({kind,text})});
-      const parsed=await response.json();if(!response.ok)throw Error(parsed.error);
-      this.app.invoke("physics_replace",parsed.document);this.app.invoke("workspace_mode","physics");
+      const document=await this._importDocument(kind,text);
+      this.app.invoke("physics_replace",document);this.app.invoke("workspace_mode","physics");
       this.rawDirty=false;this.fieldSignature="";this.refresh();
     }catch(error){this.fail(error);}
   }
   async applySource() {
     try {
-      if(!this.bench.server)throw Error(T.edServer);
-      const response=await fetch("/api/physics/import",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({kind:this.kind.value,text:this.source.value})});
-      const parsed=await response.json();if(!response.ok)throw Error(parsed.error);
-      this.rawDirty=false;this.app.invoke("physics_replace",parsed.document);
+      const document=await this._importDocument(this.kind.value,this.source.value);
+      this.rawDirty=false;this.app.invoke("physics_replace",document);
     }catch(error){this.fail(error);}
   }
   refreshPhysics() {

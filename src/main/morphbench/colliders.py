@@ -731,7 +731,7 @@ class ColliderSet:
             radius = float(value)
         except (ValueError, OverflowError):
             raise ValueError(t("colliderEditor.radius")) from None
-        if not np.isfinite(radius) or radius < 0 or radius > np.finfo(np.float32).max:
+        if not np.isfinite(radius) or radius < 0 or radius > float(np.finfo(np.float32).max):
             raise ValueError(t("colliderEditor.radius"))
         return radius
 
@@ -799,9 +799,29 @@ class ColliderSet:
         radius = self._editor_radius(changes["radius"]) if "radius" in changes else cap.radius
         cap.p1, cap.p2, cap.radius = p1, p2, radius
         self.selected = (bone, int(index))
-        self.edit_actions.append({"method": "collider_set", "args": [bone, int(index),
-                                  {"p1": p1.tolist(), "p2": p2.tolist(), "radius": radius}]})
+        self._record_edit("collider_set", [bone, int(index),
+                          {"p1": p1.tolist(), "p2": p2.tolist(), "radius": radius}])
         return self._editor_row(cap)
+
+    def _record_edit(self, method, args):
+        """Keep final geometry between topology changes; retain structural provenance.
+
+        Geometry edits on different capsules commute. Add/remove operations on this
+        body are barriers: their child identities and inherited materials must survive.
+        """
+        if method == "collider_set":
+            for action in reversed(self.edit_actions):
+                previous = action["args"]
+                if previous[0] != args[0]:
+                    continue
+                if action["method"] in ("collider_add", "collider_remove"):
+                    break
+                if action["method"] == method and previous[1] == args[1]:
+                    previous[2].update(args[2])
+                    return
+        # Callers supply new lists/dicts made from validated capsule numbers;
+        # the public payload copies this private history before returning it.
+        self.edit_actions.append({"method": method, "args": args})
 
     def translate(self, bone: str, index: int, delta) -> dict:
         """Move both ends rigidly by a body-local displacement."""
@@ -935,7 +955,21 @@ class ColliderSet:
 
     def apply_fit(self, bone: str, capsules) -> list[Capsule]:
         """Replace the shape of a bone with one fitted capsule or with a bundle of several."""
-        return self.body(bone).refit(capsules)
+        body = self.body(bone)
+        count = len(body.capsules)
+        fitted = body.refit(capsules)
+        # Fitting replaces a body, so reconstruct it from its first existing child.
+        # Merely setting equal-count children would retain their old distinct materials,
+        # whereas refit inherits the first child's material for the fitted bundle.
+        for index in range(count - 1, 0, -1):
+            self._record_edit("collider_remove", [bone, index])
+        for index, cap in enumerate(fitted):
+            values = {"p1": cap.p1.tolist(), "p2": cap.p2.tolist(), "radius": cap.radius}
+            if index == 0:
+                self._record_edit("collider_set", [bone, 0, values])
+            else:
+                self._record_edit("collider_add", [bone, values["p1"], values["p2"], values["radius"]])
+        return fitted
 
     # ---- writing ----------------------------------------------------------------------
     def changed_bodies(self) -> list[str]:

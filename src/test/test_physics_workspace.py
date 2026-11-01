@@ -86,6 +86,31 @@ class TestLosslessDocuments(unittest.TestCase):
         reparsed = parse_document("fsmp", owner.export_text())
         self.assertEqual(len(reparsed["fields"]), len(document["fields"]))
 
+    def test_unordered_adjacent_spans_preserve_untouched_source(self):
+        prefix, suffix = "\ufeff# custom \U0001f600 999\r\n", "\r\nunknown=5.00 # retain\r\n"
+        source = prefix + "12|003.00|-4e+1" + suffix
+        start = len(prefix)
+        fields = [{"id": "first", "start": start, "end": start + 1, "value": 1},
+                  {"id": "second", "start": start + 1, "end": start + 2, "value": 2},
+                  {"id": "third", "start": start + 3, "end": start + 9, "value": 3},
+                  {"id": "untouched", "start": start + 10, "end": start + 15, "value": -40}]
+        edits = {"third": 0.5, "first": -20.125, "second": 3000}
+        for ordered in (fields, fields[::-1], fields[2:] + fields[:2]):
+            with self.subTest(order=[field["id"] for field in ordered]):
+                document = {"kind": "cbpc", "text": source, "fields": ordered,
+                            "vendor": {"unknown": ["preserve", 7]}}
+                owner = PhysicsWorkspace(document)
+                before = owner.state()
+                for ident, value in edits.items():
+                    owner.set(ident, value)
+                expected = prefix + "-20.1253000|0.5|-4e+1" + suffix
+                self.assertEqual(owner.export_text().encode("utf-8"), expected.encode("utf-8"))
+                self.assertEqual(owner.state()["document"], before["document"])
+                for ident, value in (("second", 2), ("third", 3), ("first", 1)):
+                    owner.set(ident, value)
+                self.assertEqual(owner.export_text().encode("utf-8"), source.encode("utf-8"))
+                self.assertFalse(owner.state()["dirty"])
+
     def test_cbpc_conditions_names_comments_and_unknown_lines_survive(self):
         document = parse_document("cbpc", CBPC)
         owner = PhysicsWorkspace(document)
@@ -229,6 +254,34 @@ class TestConfiguredGeometry(unittest.TestCase):
 
 
 class TestBrowserMirror(unittest.TestCase):
+    def test_reordered_spans_keep_unicode_source_and_match_python(self):
+        node = shutil.which("node")
+        if node is None:
+            self.skipTest("Node is unavailable for the optional browser parity check")
+        source = "\ufeff# \U0001f600\r\n12|003.00|-4e+1\r\nunknown=5.00\r\n"
+        start = source.index("12|")
+        fields = [{"id": "a", "start": start, "end": start + 1, "value": 1},
+                  {"id": "b", "start": start + 1, "end": start + 2, "value": 2},
+                  {"id": "c", "start": start + 3, "end": start + 9, "value": 3}]
+        cases, expected = [], []
+        for ordered in (fields, fields[::-1], fields[1:] + fields[:1]):
+            document = {"kind": "cbpc", "text": source, "fields": ordered}
+            owner = PhysicsWorkspace(document)
+            snapshots = [owner.export_text()]
+            edits = [("c", 1e-7), ("a", -20.125), ("b", 3000), ("b", 2), ("c", 3), ("a", 1)]
+            for ident, value in edits:
+                owner.set(ident, value)
+                snapshots.append(owner.export_text())
+            cases.append({"document": document, "edits": edits})
+            expected.append(snapshots)
+        script = (common.ROOT / "web/js/physics_workspace.js").read_text(encoding="utf-8")
+        code = script + "\nprocess.stdout.write(JSON.stringify(JSON.parse(process.argv[1]).map(item=>{" \
+               "const owner=new PhysicsWorkspaceMirror(item.document),out=[owner.export_text()];" \
+               "for(const [id,value] of item.edits){owner.set(id,value);out.push(owner.export_text());}return out;})));"
+        completed = subprocess.run([node, "-e", code, json.dumps(cases)], text=True, encoding="utf-8", capture_output=True)
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertEqual(json.loads(completed.stdout), expected)
+
     def test_owner_export_and_geometry_match_python(self):
         node = shutil.which("node")
         if node is None:

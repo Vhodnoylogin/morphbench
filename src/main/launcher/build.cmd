@@ -1,5 +1,5 @@
 @echo off
-rem Builds morphbench.exe - the launch window of the server, the entry point for Mod Organizer
+rem Builds morphbench.exe - the minimal native host, the entry point for Mod Organizer
 rem 2 - with the stock .NET Framework compiler, which every Windows has. Nothing to install.
 rem Outputs go to target/launcher, outside maintained source and Git.
 rem The icon comes from morphbench.ico. make-icon.py draws it - it is a product as well, and
@@ -23,9 +23,8 @@ if not exist "%CSC%" (
     exit /b 2
 )
 "%CSC%" /nologo /optimize+ /codepage:65001 /target:winexe /platform:anycpu ^
-    /r:System.Windows.Forms.dll /r:System.Drawing.dll /r:System.Web.Extensions.dll ^
+    /r:System.Windows.Forms.dll ^
     /win32manifest:"%~dp0morphbench.manifest" ^
-    /resource:"%BUILD_OUT%\morphbench.ico",morphbench.ico ^
     /win32icon:"%BUILD_OUT%\morphbench.ico" ^
     /out:"%BUILD_OUT%\morphbench.exe" "%~dp0morphbench.cs"
 if errorlevel 1 exit /b %errorlevel%

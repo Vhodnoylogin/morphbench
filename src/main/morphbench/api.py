@@ -52,12 +52,11 @@ from .morphs import MorphSet
 from .ragdoll import RagdollMap
 from .view import ViewState
 from .placements import Placements
-from .workspace import WorkspaceMixin
+from .workspace import WorkspaceMixin, workspace_edit
 from .addon_session import AddonSessionMixin
-from .addon_state import AddonStateMixin
 
 
-class MorphBench(WorkspaceMixin, AddonSessionMixin, AddonStateMixin):
+class MorphBench(WorkspaceMixin, AddonSessionMixin):
     """The open pair - a mesh and its morphs - and everything that can be done with it."""
 
     def __init__(self, config: Config | None = None):
@@ -235,11 +234,11 @@ class MorphBench(WorkspaceMixin, AddonSessionMixin, AddonStateMixin):
         if (standalone and rig is not None and skeleton == path
                 and not (rig.bodies or rig.bumper or rig.unsupported or len(rig.matrices) > 1)):
             rig = None                       # a valid root-only NIF, without a skeleton
-        candidate = copy.copy(self)
+        edit = self.edit_session()
+        candidate = edit.candidate
         candidate.model, candidate.rig, candidate.morph_set = model, rig, morph_set
         candidate.analyzer = candidate._analyzer() if morph_set else None
         candidate._sliders = {}
-        candidate.view = copy.deepcopy(self.view)
         candidate.view.focus_all()
         if standalone:
             candidate.view = ViewState(self.cfg)
@@ -248,7 +247,7 @@ class MorphBench(WorkspaceMixin, AddonSessionMixin, AddonStateMixin):
             candidate.workspace_mode("colliders" if rig is not None else "morphs")
         summary = candidate.summary()
         candidate._ppb_binding = None
-        self.__dict__.update(candidate.__dict__)
+        edit.commit()
         return summary
 
     def _skeleton_beside(self, nif: Path) -> Path | None:
@@ -269,15 +268,15 @@ class MorphBench(WorkspaceMixin, AddonSessionMixin, AddonStateMixin):
                rig: ColliderSet | None = None) -> dict:
         """Open objects already built instead of files: this is how the tests put a tiny body
         together in memory and ask the facade about it exactly as about a real one."""
-        candidate = copy.copy(self)
+        edit = self.edit_session()
+        candidate = edit.candidate
         candidate.model, candidate.rig, candidate.morph_set = model, rig, morph_set
         candidate.analyzer = candidate._analyzer() if morph_set is not None else None
         candidate._sliders = {}
-        candidate.view = copy.deepcopy(self.view)
         candidate.view.focus_all()
         summary = candidate.summary()
         candidate._ppb_binding = None
-        self.__dict__.update(candidate.__dict__)
+        edit.commit()
         return summary
 
     def _analyzer(self) -> Analyzer:
@@ -493,8 +492,9 @@ class MorphBench(WorkspaceMixin, AddonSessionMixin, AddonStateMixin):
             shape = self.model.shape(name)
             dom = shape.dominant_bone()
             bones = list(shape.bones)
+            counts = np.bincount(dom[dom >= 0], minlength=len(bones))
             for i, bone in enumerate(bones):
-                n = int((dom == i).sum())
+                n = int(counts[i])
                 out.setdefault(bone, {})
                 if n:
                     out[bone][name] = n
@@ -891,6 +891,9 @@ class MorphBench(WorkspaceMixin, AddonSessionMixin, AddonStateMixin):
                 rig.apply_fit(bone, fitted)
             out.append(row)
         if apply:
+            candidate = copy.copy(self)
+            candidate.rig, candidate._ppb_binding = rig, None
+            candidate._workspace_check_recipe()
             self.rig = rig
             self._ppb_binding = None
         return out
@@ -912,6 +915,7 @@ class MorphBench(WorkspaceMixin, AddonSessionMixin, AddonStateMixin):
         self._require_rig()
         return self.rig.select(bone, index)
 
+    @workspace_edit
     def collider_set(self, bone: str, index: int = 0, changes: dict | None = None,
                      p1=None, p2=None, radius: float | None = None) -> dict:
         """Atomically edit endpoints/radius in the body's frame; keyword fields remain valid."""
@@ -929,6 +933,7 @@ class MorphBench(WorkspaceMixin, AddonSessionMixin, AddonStateMixin):
             return self._ppb_edit_collider(bone, index, changes=values)
         return self.rig.set_capsule(bone, index, values)
 
+    @workspace_edit
     def collider_translate(self, bone: str, index: int, delta) -> dict:
         """Translate both endpoints by one body-local displacement."""
         self._require_rig()
@@ -936,6 +941,7 @@ class MorphBench(WorkspaceMixin, AddonSessionMixin, AddonStateMixin):
             return self._ppb_edit_collider(bone, index, delta=delta)
         return self.rig.translate(bone, index, delta)
 
+    @workspace_edit
     def collider_add(self, bone: str, p1, p2, radius: float) -> dict:
         """Add a capsule to an existing supported body, with explicit local geometry."""
         self._require_rig()
@@ -943,6 +949,7 @@ class MorphBench(WorkspaceMixin, AddonSessionMixin, AddonStateMixin):
         self._ppb_binding = None
         return result
 
+    @workspace_edit
     def collider_remove(self, bone: str, index: int = 0) -> dict:
         """Remove a bundle member while retaining at least one shape on the body."""
         self._require_rig()
@@ -950,6 +957,7 @@ class MorphBench(WorkspaceMixin, AddonSessionMixin, AddonStateMixin):
         self._ppb_binding = None
         return result
 
+    @workspace_edit
     def collider_reset(self) -> dict:
         """Discard edits and fitting since this skeleton was loaded."""
         self._require_rig()

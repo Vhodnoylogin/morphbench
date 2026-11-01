@@ -9,9 +9,13 @@ build folder. Released source belongs on `main`; unfinished Application work rem
 
 Build with `src\main\launcher\build.cmd`. It uses the installed .NET Framework compiler;
 Pillow draws the generated icon. Output is `target/launcher/morphbench.exe`.
-Launcher v2 is assembly version 2.0.0.0 and speaks bootstrap/server protocol 1.
-[The frozen native contract](launcher-protocol.md) separates process/window code from the
-Application-owned discovery, settings and adapters. Existing user flags remain supported.
+Launcher v3 is assembly version 3.0.0.0 and speaks minimal host protocol 1.
+[The native contract](launcher-protocol.md) leaves only fixed bundled Python/shim startup,
+argv quoting and wait/exit code in C#. Source execution requires staging the pinned
+Runtime's python/ and vendor/ plus the App-owned launcher/mb.py beside the built EXE;
+set MORPHBENCH_APP to absolute src/main. A bare EXE no longer searches system Python.
+Existing App options remain supported by the shim/controller. Released v1/v2 adapters
+remain available. A v3 Runtime also requests launcherHostProtocol 1; update App first.
 
 `runtime-lock.json` is an exact **build dependency pin**, not a runtime compatibility rule.
 Application schema 2 declares API/ABI compatibility; a compatible future Runtime can have
@@ -24,8 +28,8 @@ Download the exact archive URL in `src/main/runtime-lock.json`, verify its SHA25
 extract `root/Morphbench/launcher`. Do not modify its inventoried files. Package it with:
 
 ```text
-python release.py --package runtime --runtime-from <extracted-launcher> --runtime-version 2 --out <output>
-python release.py --package application --runtime <extracted-launcher>/runtime-manifest.json --version 0.8.6 --out <output>
+python release.py --package runtime --runtime-from <extracted-launcher> --runtime-version 3 --out <output>
+python release.py --package application --runtime <extracted-launcher>/runtime-manifest.json --version 0.8.7 --out <output>
 ```
 
 The builder checks Runtime ID, content hash and Python version against the source pin.
@@ -42,7 +46,7 @@ with the new EXE, `python/`, `vendor/`, licence/notices/dependency statement and
 stating its actual Python. Keep the old seed unchanged. Commit the source first, then:
 
 ```text
-python release.py --package runtime --new-runtime --runtime-from <fresh-seed> --runtime-version 2 --source-commit <exact-40-hex-commit> --out <output>
+python release.py --package runtime --new-runtime --runtime-from <fresh-seed> --runtime-version <new-runtime-version> --source-commit <exact-40-hex-commit> --out <output>
 ```
 
 `--new-runtime` refuses the frozen v1 ID and the current source lock's identity. It is
@@ -91,10 +95,14 @@ half/Miniball notices ship with the DLL. Minimality does not waive source obliga
 
 ## Qualification and publication
 
-Run `python src/test/run.py`. Native tests compile the actual C# and exercise failures,
-deadlines, inherited pipes, cancellation, ownership and callback races. Also verify the
+Run `python src/test/run.py`. Native tests compile the actual minimal C# host and
+exercise argv/cwd/environment, fixed interpreter, startup failures, waiting and exit
+codes without showing windows. Python session/hidden Win32 tests cover ownership,
+close races, parent death/PID reuse and controls without desktop interaction. Also verify the
 assembled archives using their bundled interpreter: imports, CLI/HTTP, native window,
-NIF/TRI/PNG, v1-to-v2 App migration, repeated updates and preserved settings/plugins.
+NIF/TRI/PNG, legacy v1/v2 adapters, App-first migration to v3, repeated updates and
+preserved settings/plugins. Keep Morphs and Colliders active; Physics and Body Slots
+remain disabled. Record actual final archive hashes and source commits before publication.
 Actual MO2/usvfs qualification is a separate observation; synthetic discovery is not it.
 
 Publish corresponding source on `main` and output as GitHub/Nexus downloads. Preserve

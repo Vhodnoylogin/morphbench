@@ -10,6 +10,9 @@ validate every member before publication. Immutable generation directories are s
 by one atomic state-file replacement, so readers see the old or new complete package.
 Previous generations and legacy packages/id directories are retained; failed writes
 remove only this transaction's new directory. Reads validate installed files again.
+
+Session-state codecs below are pure, bounded JSON operations with explicit limits.
+They know no facade, browser storage key, persistence lifetime or mesh state.
 """
 from __future__ import annotations
 
@@ -68,6 +71,73 @@ class AddonError(ValueError):
     def __init__(self, code: str, message: str):
         super().__init__(message)
         self.code = code
+
+
+def state_limits(max_bytes: int, max_depth: int) -> dict:
+    limits = {"maxBytes": max_bytes, "maxDepth": max_depth}
+    if any(type(value) is not int or value <= 0 for value in limits.values()):
+        raise AddonError("invalidLimits", t("err.addonLimits"))
+    return limits
+
+
+def validate_state(value, *, max_bytes: int, max_depth: int):
+    """Validate structure/depth and detach; decode_state bounds exact wire bytes."""
+    limits = state_limits(max_bytes, max_depth)
+    ancestors = set()
+
+    def check(item, depth):
+        if depth > limits["maxDepth"]:
+            raise AddonError("limitExceeded", t("err.addonParams"))
+        if item is None or type(item) in (str, bool):
+            return
+        if type(item) in (int, float):
+            try:
+                if math.isfinite(item):
+                    return
+            except OverflowError:
+                pass
+        if type(item) in (list, dict) and id(item) not in ancestors:
+            ancestors.add(id(item))
+            try:
+                if type(item) is dict:
+                    if any(type(key) is not str for key in item):
+                        raise AddonError("invalidState", t("err.addonParams"))
+                    children = item.values()
+                else:
+                    children = item
+                for child in children:
+                    check(child, depth + 1)
+                return
+            finally:
+                ancestors.remove(id(item))
+        raise AddonError("invalidState", t("err.addonParams"))
+
+    try:
+        check(value, 0)
+        data = json.dumps(value, ensure_ascii=False, allow_nan=False,
+                          separators=(",", ":")).encode("utf-8")
+    except (ValueError, UnicodeError, RecursionError) as error:
+        if isinstance(error, AddonError):
+            raise
+        raise AddonError("invalidState", t("err.addonParams")) from None
+    return json.loads(data)
+
+
+def decode_state(data: str, *, max_bytes: int, max_depth: int):
+    """Bound and decode the exact JSON text, independent of encoder formatting."""
+    if type(data) is not str:
+        raise AddonError("invalidState", t("err.addonParams"))
+    try:
+        size = len(data.encode("utf-8"))
+    except UnicodeError:
+        raise AddonError("invalidState", t("err.addonParams")) from None
+    if size > state_limits(max_bytes, max_depth)["maxBytes"]:
+        raise AddonError("limitExceeded", t("err.addonParams"))
+    try:
+        value = json.loads(data)
+    except (ValueError, RecursionError):
+        raise AddonError("invalidState", t("err.addonParams")) from None
+    return validate_state(value, max_bytes=max_bytes, max_depth=max_depth)
 
 
 def _path(value: str) -> str:
@@ -300,6 +370,10 @@ class AddonRegistry:
                     raise ValueError()
             if "description" in manifest and not isinstance(manifest["description"], str):
                 raise ValueError()
+            # JSON permits isolated UTF-16 surrogates, but HTTP metadata must be UTF-8.
+            for value in manifest.values():
+                if isinstance(value, str):
+                    value.encode("utf-8")
             entry = _path(manifest["entry"])
             if Path(entry).suffix.lower() != ".html":
                 raise ValueError()

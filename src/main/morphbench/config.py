@@ -19,6 +19,7 @@ program, this run works from them, and what happened is noted for the journal.
 from __future__ import annotations
 
 import json
+import copy
 import os
 from pathlib import Path
 
@@ -90,11 +91,14 @@ DEFAULTS = {
     # The page with the list of meshes: address and port of the local server.
     "serveHost": "127.0.0.1",
     "servePort": 8767,
-    # Native launcher bootstrap fallbacks match these values before App is located.
+    # Desktop policy is Application-owned; CLI timeout remains for v1/v2 adapters.
     "launcherCliTimeoutMs": 30000,
     "launcherHttpTimeoutMs": 30000,
     "launcherStopWaitMs": 5000,
     "launcherLogMaxChars": 200000,
+    "launcherWindowWidth": 760,
+    "launcherWindowHeight": 480,
+    "launcherWindowPollMs": 100,
     # The server journal. What gets written is decided by the level of the record (debug,
     # info, warn, error), where it goes - by the sinks: the pipe back to whoever started the
     # server (the launcher window or a console) and a file next to these settings. Their
@@ -260,7 +264,7 @@ class Config:
         if not self.path.exists():
             self._write(DEFAULTS)
         raw = self._read()
-        self._values = {**DEFAULTS, **(raw or {})}
+        self._values = {**copy.deepcopy(DEFAULTS), **(raw or {})}
         # The language of the messages is applied here: the settings are read by everyone who
         # does anything at all, and this is the earliest point at which the language is known.
         # Before the rewrite below on purpose - a failure of that write is a message too, and

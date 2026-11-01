@@ -159,7 +159,7 @@
       ],
       "status": "published Main files; Launcher scanning",
       "applicationStatus": "available; public SHA256 link matches final App archive",
-      "launcherStatus": "virus scan in progress; not yet downloadable at last public observation",
+      "launcherStatus": "quarantined; confirmed on public file830285 after owner review",
       "requirementsUpdated": true,
       "requirementsMethod": "legacy",
       "rootBuilderOptional": true,
@@ -183,9 +183,11 @@
       }
     },
     "moderation": {
-      "emailSent": false,
-      "ownerGate": "Owner explicitly requires personally checking this release before any support reply is sent.",
-      "lastLauncherObservation": "Virus scanning in progress, not yet downloadable; no quarantine verdict claimed."
+      "emailSent": true,
+      "reviewRequested": true,
+      "fileId": 830285,
+      "lastLauncherObservation": "quarantined; review requested after owner checked release",
+      "clearanceGranted": false
     }
   },
   "contentUpdate": {

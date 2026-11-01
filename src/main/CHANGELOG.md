@@ -13,6 +13,7 @@ go in a major release, and nowhere else.
 
 ## [0.8.7] — 2026-11-01
 
+- Restore Morphbench window/taskbar icons and report incomplete launcher arguments instead of silently exiting.
 - Introduce Launcher v3: the native EXE only starts bundled Python, forwards arguments,
   waits and returns its exit code. Move the window, options, diagnostics, discovery and
   server ownership into the updateable Application. Retain released v1/v2 adapters.

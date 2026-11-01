@@ -265,7 +265,8 @@
           "Improved session recovery and preserved fitted capsule geometry in saved recipes and skeleton exports.",
           "Kept repeated edits within the recovery action limit.",
           "Improved validation of capsule radii, add-on metadata and update destinations.",
-          "Refactored editing sessions and settings ownership. Settings and installed add-ons are preserved."
+          "Refactored editing sessions and settings ownership. Settings and installed add-ons are preserved.",
+          "Restored Morphbench window and taskbar icons. Incomplete launcher arguments now produce a diagnostic instead of silently exiting."
         ]
       },
       {

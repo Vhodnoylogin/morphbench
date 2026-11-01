@@ -4,7 +4,7 @@
   "contentHash": "4fbe50ae1a4fc022744728bb034bd69cd420402d88f983466d93ffdfae1f92d1",
   "python": "3.12.8",
   "archive": "https://github.com/Vhodnoylogin/morphbench/releases/download/v0.8.7/morphbench-runtime-3-win64.zip",
-  "archiveSha256": "c6b3eff2c9ab1530422d27222ac2449afc64d4051dfe1a4faed608920da8dac9",
+  "archiveSha256": "529514b50d752b0dbfea7dfb23fc8dbfcc37c42e58cbfa85d435853417627960",
   "manifestPath": "root/Morphbench/launcher/runtime-manifest.json",
   "sourceCommit": "ac15b242dbe1013d2c46a521fb6fad1f03161b52",
   "applicationApi": 1,

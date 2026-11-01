@@ -1,19 +1,20 @@
 {
   "schemaVersion": 1,
-  "id": "runtime-2-win64",
-  "contentHash": "33e727848a29f940ed5f6ad9352a5f8bb36858163978de2b655ec402752a1349",
+  "id": "runtime-3-win64",
+  "contentHash": "4fbe50ae1a4fc022744728bb034bd69cd420402d88f983466d93ffdfae1f92d1",
   "python": "3.12.8",
-  "archive": "https://github.com/Vhodnoylogin/morphbench/releases/download/v0.8.6/morphbench-runtime-2-win64.zip",
-  "archiveSha256": "74903f814fe9e1642cc07f4a053e118e707fbb8eeb33b12823fc4d74380b2a99",
+  "archive": "https://github.com/Vhodnoylogin/morphbench/releases/download/v0.8.7/morphbench-runtime-3-win64.zip",
+  "archiveSha256": "c6b3eff2c9ab1530422d27222ac2449afc64d4051dfe1a4faed608920da8dac9",
   "manifestPath": "root/Morphbench/launcher/runtime-manifest.json",
-  "sourceCommit": "172e6d2b73f5505ef77b17f21a96d1f222bdc60f",
+  "sourceCommit": "ac15b242dbe1013d2c46a521fb6fad1f03161b52",
   "applicationApi": 1,
   "pythonAbi": "cp312-win_amd64",
   "launcherProtocol": 1,
   "correspondingNativeSource": {
-    "archive": "https://github.com/Vhodnoylogin/morphbench/releases/download/v0.8.6/morphbench-nifly-corresponding-source.zip",
+    "archive": "https://github.com/Vhodnoylogin/morphbench/releases/download/v0.8.7/morphbench-nifly-corresponding-source.zip",
     "sha256": "eac96bd45bc26a5bb0031d73d3e52695340cd417506ee1b51a26454b7fe7daff"
   },
   "note": "Exact native build dependency pin; installed Application schema 2 checks API/ABI compatibility independently of Runtime ID/content hash. Keep each published Runtime inventory immutable.",
-  "nativeLauncherSourceCommit": "5440a09c58192e336d73f822dd0e1f87034f236b"
+  "nativeLauncherSourceCommit": "ac15b242dbe1013d2c46a521fb6fad1f03161b52",
+  "launcherHostProtocol": 1
 }

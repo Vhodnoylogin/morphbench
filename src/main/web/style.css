@@ -90,6 +90,10 @@ section h3 { margin: 12px 0 6px; font-size: 12px; font-weight: 600; }
 .current > span { display: block; }
 .model-panel section > select { width: 100%; margin-bottom: 10px; }
 .mesh-browser { padding: 4px; font-size: 12px; min-height: 158px; }
+.mesh-search-label { display:block; margin:0 0 5px; color:var(--muted); font-size:11px; }
+.mesh-search { width:100%; min-width:0; min-height:32px; background:#141d23; color:var(--text);
+  border:1px solid var(--line); border-radius:5px; padding:5px 8px; }
+.mesh-count { margin:5px 0 8px; }
 .mesh-browser optgroup { color: #9db2be; padding: 6px 2px; font-size: 11px; }
 .mesh-browser option { color: var(--text); padding: 5px 6px; font-size: 12px; border-radius: 3px; }
 .model-panel .row input.wide { width: 100%; min-width: 90px; }

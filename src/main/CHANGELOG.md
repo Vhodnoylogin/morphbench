@@ -13,6 +13,7 @@ go in a major release, and nowhere else.
 
 ## Unreleased — generic plugin hosting
 
+- Search meshes by filename/path in the left sidebar, with live filtering and Enter to open a unique match.
 - Distinct workspace tabs and stable per-plugin colours, shared with the inspector and separate Plugins menu.
 - Model selection stays on the left, including during independent plugin previews.
 - Automatically discover and enable new compatible folders/ZIPs in Morphbench/plugins; keep explicit disabled state across restarts.

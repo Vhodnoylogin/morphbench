@@ -250,6 +250,48 @@ console.log(JSON.stringify({requests,outcomes,refreshes}));
                 self.assertEqual(outcome["value"], "")
                 self.assertEqual(outcome["error"], "ZIP rejected" if outcome["phase"] == "uploadFailure" else "Refresh rejected")
 
+    def test_mesh_search_filters_without_navigation_and_opens_only_a_unique_result(self):
+        result = self.run_js(r'''
+const entries=[
+ {name:'actors/a/body.nif',file:'body.nif',folder:'actors/a',nif:'C:/Data/actors/a/body.nif',kind:'TRIP'},
+ {name:'actors/b/body.nif',file:'body.nif',folder:'actors/b',nif:'C:/Data/actors/b/body.nif',kind:'TRIP'},
+ {name:'Звери/волк+тест&%.nif',file:'волк+тест&%.nif',folder:'Звери',nif:'C:/Data/Звери/волк+тест&%.nif',kind:null}];
+global.window={location:{href:'http://localhost/?meshSearch=BODY'}};
+const panel=Object.create(Panel.prototype);
+panel.bench={names:{},summary:{nif:entries[0].nif},server:{root:'C:/Data',catalog:entries,withMorphs:false},
+ workspace_state:()=>({mode:'colliders',tab:'edit'})};
+panel.app={addons:{active:'inspector'}};panel.buildModel();
+const snapshot=()=>({count:panel.modelCount.textContent,selected:panel.modelSelect.value,disabled:panel.modelSelect.disabled,
+ names:panel.modelSelect.children.filter(node=>node.tag==='optgroup').flatMap(node=>node.children.map(option=>option.attrs.value))});
+const enter=(isComposing=false)=>panel.modelSearch.events.keydown({key:'Enter',isComposing,preventDefault(){}});
+const search=value=>{panel.modelSearch.value=value;panel.modelSearch.events.input();return snapshot();};
+const initial=snapshot();enter();const ambiguous={focused:document.activeElement===panel.modelSelect,href:window.location.href};
+const none=search('missing');enter();const afterNone=window.location.href;
+const unique=search('ACTORS\\B  BODY');enter(true);const composing=window.location.href;enter();
+const opened=new URL(window.location.href,'http://localhost');
+const special=search('ЗВЕРИ волк+тест&%');enter();const encoded=new URL(window.location.href,'http://localhost');
+window.location.href=encoded.href;panel.buildModel();const restored=panel.modelSearch.value;
+const cleared=search('');
+console.log(JSON.stringify({initial,ambiguous,none,afterNone,unique,composing,opened:Object.fromEntries(opened.searchParams),
+ special,encoded:Object.fromEntries(encoded.searchParams),restored,cleared}));
+''')
+        initial_url = "http://localhost/?meshSearch=BODY"
+        self.assertEqual(result["initial"]["names"], ["actors/a/body.nif", "actors/b/body.nif"])
+        self.assertEqual(result["ambiguous"], {"focused": True, "href": initial_url})
+        self.assertEqual(result["none"]["names"], [])
+        self.assertEqual(result["none"]["selected"], "")
+        self.assertTrue(result["none"]["disabled"])
+        self.assertEqual(result["afterNone"], initial_url)
+        self.assertEqual(result["composing"], initial_url)
+        self.assertEqual(result["unique"]["names"], ["actors/b/body.nif"])
+        self.assertEqual(result["opened"], {"name": "actors/b/body.nif", "root": "C:/Data", "mode": "colliders",
+                                            "tab": "edit", "meshSearch": "ACTORS\\B  BODY", "addon": "inspector", "all": "1"})
+        self.assertEqual(result["special"]["names"], ["Звери/волк+тест&%.nif"])
+        self.assertEqual(result["encoded"]["name"], "Звери/волк+тест&%.nif")
+        self.assertEqual(result["restored"], "ЗВЕРИ волк+тест&%")
+        self.assertEqual(len(result["cleared"]["names"]), 3)
+        self.assertFalse(result["cleared"]["disabled"])
+
     def test_document_import_controls_preserve_text_target_and_effect_order(self):
         texts = {"ppb": "\ufeff# source\r\n" + block(), "fsmp": XML, "cbpc": CBPC}
         documents = {kind: parse_document(kind, text) for kind, text in texts.items()}

@@ -19,6 +19,11 @@ refresh and restart. **Refresh folder** finds newly copied packages without rest
 The model picker stays on the left even while a plugin opens independent previews.
 A plugin's selection does not change the model's core mode or expose withheld tools.
 
+Use **Search meshes** above the left model list to filter by part of a filename or path.
+Search ignores case, accepts either slash direction and matches all space-separated words.
+Typing does not open a file. Enter opens a unique match; otherwise choose from the filtered
+list. Clear the field to restore the catalogue. The query survives opening another model.
+
 Colliders has **Edit capsules** and **Display** tabs. Skeleton geometry and PPB settings use
 the same capsule editor; PPB is a source of settings, not a separate editing mode. Old links
 and saved recipes that select the former PPB tab open Edit capsules while retaining their data.

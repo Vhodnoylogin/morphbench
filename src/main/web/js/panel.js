@@ -129,6 +129,16 @@ class WorkspaceUI {
   }
 }
 
+// Search catalogue labels only; opening still uses the exact catalogue identity.
+function filterModels(entries, query) {
+  const normalize = (text) => text.toLowerCase().replace(/\\/g, "/");
+  const terms = normalize(query).trim().split(/\s+/).filter(Boolean);
+  return entries.filter((entry) => {
+    const label = normalize([entry.name, entry.file, entry.folder].join(" "));
+    return terms.every((term) => label.includes(term));
+  });
+}
+
 // ---- side panel ----------------------------------------------------------------------------
 class Panel {
   constructor(app, root) {
@@ -336,25 +346,27 @@ class Panel {
     // the mesh list: grouped by the folder below the root, each line is the file and the morph format
     this.modelSelect = el("select", { class: "mesh-browser", size: "8", "aria-label": T.chooseMesh,
       on: { change: () => this.onModel() } });
-    this.modelSelect.appendChild(el("option", { value: "",
-      text: srv.catalog.length ? T.pickMesh + srv.catalog.length + T.pickMeshEnd : T.noMeshesUnderRoot }));
-    const groups = new Map();
-    const same = (a, b) => !!a && !!b && a.replace(/\\/g, "/").toLowerCase() === b.replace(/\\/g, "/").toLowerCase();
-    let currentName = "";
-    for (const e of srv.catalog) {
-      let g = groups.get(e.folder);
-      if (!g) { g = el("optgroup", { label: e.folder || "." }); groups.set(e.folder, g); this.modelSelect.appendChild(g); }
-      g.appendChild(el("option", { value: e.name, text: e.file + " · " + (e.kind || T.withoutMorphs) }));
-      if (bench.summary && same(e.nif, bench.summary.nif)) currentName = e.name;
-    }
-    this.modelSelect.value = currentName;
+    this.modelSearch = el("input", { type: "search", class: "mesh-search", id: "mesh-search",
+      placeholder: T.meshSearchHint, "aria-label": T.meshSearch,
+      on: { input: () => this.refreshModelList(), keydown: (event) => {
+        if (event.key !== "Enter" || event.isComposing) return;
+        event.preventDefault();
+        const matches = filterModels(srv.catalog, this.modelSearch.value);
+        if (matches.length === 1) { this.modelSelect.value = matches[0].name; this.onModel(); }
+        else this.modelSelect.focus();
+      } } });
+    this.modelSearch.value = new URL(window.location.href).searchParams.get("meshSearch") || "";
+    this.modelCount = el("div", { class: "mesh-count muted", role: "status", "aria-live": "polite" });
+    this.refreshModelList();
     // the browse folder, and the sweep that takes meshes without morphs as well
     this.rootInput = el("input", { type: "text", class: "wide", value: srv.root || "", title: T.browseFolder,
       "aria-label": T.browseFolder });
     this.allBox = el("input", { type: "checkbox", on: { change: () => this.go({ root: this.rootInput.value }) } });
     this.allBox.checked = !srv.withMorphs;
     this.skeletonInput=el("input",{type:"text",class:"wide",value:bench.summary&&bench.summary.skeleton||"","aria-label":T.edSkeletonPath});
-    return el("section", null, [el("h2", { text: T.secModel }), current, this.modelSelect,
+    return el("section", null, [el("h2", { text: T.secModel }), current,
+      el("label", { class: "mesh-search-label", for: "mesh-search", text: T.meshSearch }),
+      this.modelSearch, this.modelCount, this.modelSelect,
       el("div", { class: "row", style: "margin-top:6px" }, [this.rootInput,
         el("button", { text: T.btnBrowse, on: { click: () => this.go({ root: this.rootInput.value }) } })]),
       el("div", { class: "row" }, [el("label", null, [this.allBox, T.lblWithoutMorphs])]),
@@ -362,12 +374,31 @@ class Panel {
         el("button",{text:T.edLoad,on:{click:()=>this.go({root:srv.root,skeleton:this.skeletonInput.value})}})])]),
       envLine, el("div", { class: "err", text: srv.error || "" })]);
   }
+  refreshModelList() {
+    const srv = this.bench.server, matches = filterModels(srv.catalog, this.modelSearch.value);
+    this.modelSelect.textContent = "";
+    this.modelSelect.appendChild(el("option", { value: "", text: matches.length
+      ? T.pickMesh + matches.length + T.pickMeshEnd : srv.catalog.length ? T.meshNoResults : T.noMeshesUnderRoot }));
+    const groups = new Map(), current = this.bench.summary && this.bench.summary.nif;
+    const same = (a, b) => !!a && !!b && a.replace(/\\/g, "/").toLowerCase() === b.replace(/\\/g, "/").toLowerCase();
+    let selected = "";
+    for (const entry of matches) {
+      let group = groups.get(entry.folder);
+      if (!group) { group = el("optgroup", { label: entry.folder || "." }); groups.set(entry.folder, group); this.modelSelect.appendChild(group); }
+      group.appendChild(el("option", { value: entry.name, text: entry.file + " · " + (entry.kind || T.withoutMorphs) }));
+      if (same(entry.nif, current)) selected = entry.name;
+    }
+    this.modelSelect.value = selected;
+    this.modelSelect.disabled = !matches.length;
+    this.modelCount.textContent = say(T.meshSearchCount, { found: matches.length, total: srv.catalog.length });
+  }
   // Going to the same server with another body or another root: the page holds one body, so
   // changing the model is a reload with a different query, not a second set of geometry.
   go(params) {
     const workspace = this.bench.workspace_state();
     params.mode = workspace.mode;
     params.tab = workspace.tab;
+    if (this.modelSearch && this.modelSearch.value) params.meshSearch = this.modelSearch.value;
     if(this.app.addons&&this.app.addons.active&&params.addon===undefined)params.addon=this.app.addons.active;
     if(params.skeleton===undefined&&this.bench.summary&&this.bench.summary.skeleton)params.skeleton=this.bench.summary.skeleton;
     const q = [];

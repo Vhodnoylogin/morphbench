@@ -92,8 +92,11 @@ class AddonPreviewHost {
     if(this.host.app.draw)this.host.app.draw();
   }
   async create(params,identity,receivedAt) {
-    this.host.params(params,["name"],["name"]);
+    this.host.params(params,["name","before"],["name"]);
     if(typeof params.name!=="string"||!params.name)throw this.host.failure("invalidParams");
+    if(Object.hasOwn(params,"before")&&(typeof params.before!=="string"||!params.before))
+      throw this.host.failure("invalidParams");
+    const before=Object.hasOwn(params,"before")?this.target(params.before):null;
     const limits=this.limits(),deadline=receivedAt+limits.loadTimeoutMs;
     const remaining=deadline-Date.now();
     if(remaining<=0)throw this.host.failure("previewTimeout",T.addonPreviewTimeout);
@@ -118,12 +121,17 @@ class AddonPreviewHost {
       this.requireCurrent(scope);
       if(this.pending.get(item.id)!==token||Date.now()>=deadline)
         throw this.host.failure("previewTimeout",T.addonPreviewTimeout);
+      if(before)this.target(before.id);
       this.ensureStage();
       item.surface=new AddonPreviewSurface(this.stage,payload,{
         onCameraChange:(state,method)=>this.cameraChanged(item,state,method)
       });
       this.requireCurrent(scope);
       if(Date.now()>=deadline)throw this.host.failure("previewTimeout",T.addonPreviewTimeout);
+      // Staged replacement keeps its original screen position. The opaque
+      // anchor is checked again after loading and surface construction; closing
+      // it while pending never reorders another preview or publishes a late one.
+      if(before)this.stage.insertBefore(item.surface.element,this.target(before.id).surface.element);
       this.items.set(item.id,item);this.changed(item,"previews.create");
       return this.descriptor(item);
     } catch(error) {

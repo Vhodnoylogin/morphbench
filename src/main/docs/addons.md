@@ -242,6 +242,7 @@ before changing the preview. A zero morph value removes that name from the nonze
 | `state.reset` | `{}` | `{value:null}` after deleting the add-on's saved value |
 | `models.list` | `{}` | `{root:string\|null, entries:[catalogEntry,...]}`; includes models without TRI |
 | `models.open` | `{name:catalogRelativeName}` | `{navigating:true}`, then the current viewer reloads |
+| `models.selection.subscribe` | `{enabled:boolean}` | `{enabled:boolean}`; opt this frame into sidebar selection events |
 | `morphs.get` | `{}` | `{names:[string,...], values:{name:nonzeroNumber,...}}` |
 | `morphs.set` | `{values:{name:finiteNumber,...}}` | The same shape as `morphs.get` after merging the complete batch |
 | `morphs.reset` | `{}` | The same shape as `morphs.get`, with `values:{}` |
@@ -258,6 +259,41 @@ method against an older v1 host. Catalogue entries have
 The response is emitted before navigation. Model selection retains the active add-on and uses
 the full catalogue (`all=1`). It resets unsaved morph, view and workspace preview changes exactly
 like normal model selection. Save work through the host's usual controls before switching models.
+
+### Sidebar model selection
+
+An independent-preview plugin can opt into the host's left model browser without reloading
+its frame. Check the additive `models.selection.subscribe` capability first, register a
+`models.selected` handler, then enable the subscription:
+
+```javascript
+const host = await MorphbenchAddon.connect();
+if (host.capabilities.includes("models.selection.subscribe")) {
+  MorphbenchAddon.on("models.selected", ({ root, name }) => {
+    // Update your resource selection. The plugin decides the resource's role
+    // and whether to replace a preview; the host does not infer body families.
+  });
+  await MorphbenchAddon.request("models.selection.subscribe", { enabled: true });
+}
+```
+
+While subscribed, selecting an exact catalogue entry in the sidebar emits
+`models.selected` with `{root,name}` to the current plugin instead of navigating. The
+host keeps the plugin frame, independent previews, unsaved controls and main scene intact;
+it does not change the main scene's name in the URL or apply morphs. The plugin owns
+validation of its resource family, replacement previews and user-facing status.
+
+The subscription belongs only to the enabled current frame, package generation and
+catalogue root. Frame reload, closing or switching plugins clears it; reopening requires
+another explicit subscription. Invalid catalogue names are ignored. A changed root or
+stale frame cannot receive selections under an old subscription. Registry refreshes and
+normal SDK authorization detect external disable/replacement as described below; the
+subscription does not add background polling or promise instant external invalidation.
+
+Request `{enabled:false}` to restore ordinary sidebar navigation. Plugins that never
+subscribe, older hosts and the core workspaces retain their existing model selection.
+Explicit SDK `models.open` always keeps its documented navigation behavior, even while
+subscribed. Folder, skeleton and catalogue-filter reloads are separate host operations.
 
 Morph names must already exist in `names`; v1 does not author morphs. `morphs.set` merges rather
 than replacing other slider values. If any name or value is invalid, none of that batch applies.
@@ -344,7 +380,7 @@ published previews, not pending loads. Limits are per active add-on frame.
 
 | Method | Parameters | Result |
 |---|---|---|
-| `previews.create` | `{name:catalogRelativeName}` | `{preview:string,name:string}` |
+| `previews.create` | `{name:catalogRelativeName,before?:previewHandle}` | `{preview:string,name:string}` |
 | `previews.list` | `{}` | `{previews:[{preview:string,name:string},...]}` |
 | `previews.close` | `{preview}` | `{closed:true}` |
 | `previews.scene.get` | `{preview}` | The `scene.get` schema for this preview |
@@ -358,6 +394,21 @@ published previews, not pending loads. Limits are per active add-on frame.
 | `previews.unlink` | `{}` | `{previews:[],properties:[]}` |
 
 `previews.create` accepts the exact `name` from `models.list`, not an arbitrary filesystem path.
+The optional `before` parameter is available only when `host.info.capabilities` includes
+the feature flag **`previews.create.before`**. It is not a separate RPC method. Pass a live
+preview handle owned by this frame to insert the new surface immediately before that
+surface. This lets a plugin stage a replacement in the same screen position, validate it,
+and then close its old preview without swapping the other panel. Creation itself never
+closes or edits the anchor or counterpart. Without `before`, the new surface is appended
+as before; omit the parameter on hosts without the flag.
+
+The anchor is checked before loading and again before publication. An unknown, closed or
+foreign handle fails with `unknownPreview`; malformed values fail with `invalidParams`.
+Usual frame/generation authorization still applies. If the anchor closes while loading,
+the candidate is discarded and existing previews remain unchanged apart from the explicit
+anchor closure. Staging still consumes normal preview capacity; a full host returns
+`previewLimit`, without closing a model to make room.
+
 This first preview surface requires a model with renderable mesh triangles. A body NIF without
 TRI is supported; a mesh-less skeleton or node-only NIF is refused with `noMesh` before GPU
 allocation. Use the main Colliders workspace for skeleton-only inspection.
@@ -367,7 +418,7 @@ the existing facade and source/root checks. This endpoint leaves the server's ma
 unchanged; it is distinct from the state-changing `/api/payload` route. The add-on calls
 `previews.create` through the SDK, since its CSP still prohibits direct `fetch` requests.
 HTTP automation can also select by `index` instead of `name`, with optional `root` and
-`all=1` under the normal source checks. The SDK accepts only `name` and uses the host's
+`all=1` under the normal source checks. The SDK selects the model only by `name` and uses the host's
 current server root; it cannot select another root. The HTTP route does not itself create
 an SDK handle or a persistent server session.
 

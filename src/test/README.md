@@ -117,7 +117,12 @@ writer-lock contention. One installed-symlink case skips when Windows denies sym
 creation; archive symlink rejection still executes. `test_addon_integration.py` exercises
 the facade, CLI, binary HTTP upload, origin/iframe guards, enabled asset serving, Python
 and actual-JS scene/morph/view parity, detached snapshots, atomic rejection, sender/API
-validation, disabled frames and stale deferred navigation.
+validation, disabled frames and stale deferred navigation. Opt-in sidebar selection checks
+preserve the frame, independent previews and unsaved state while rejecting stale scopes;
+core selection and explicit `models.open` retain their navigation behavior.
+`test_addon_previews.py` also checks optional insertion before a live owned preview,
+stable replacement screen positions, malformed/expired anchors and anchor closure
+during loading or construction, with rollback that preserves the counterpart.
 
 `test_addon_update.py` checks explicit same-ID replacement of disabled packages, opaque version
 labels, duplicate-install refusal, missing/enabled targets, repair of disabled damaged packages,

@@ -12,6 +12,7 @@ function pluginTone(identifier) {
 class AddonHost {
   constructor(app) {
     this.app=app;this.active=null;this.generation=null;this.frame=null;this.entries=[];this.opened=false;
+    this.modelSelection=null;
     this.panel=el("aside",{id:"addon-panel",class:"inspector",role:"tabpanel",hidden:"hidden"});
     document.querySelector(".workspace").appendChild(this.panel);
     this.nav=document.getElementById("mode-nav");this.tabs=new Map();
@@ -134,6 +135,7 @@ class AddonHost {
     }
   }
   destroyFrame() {
+    this.modelSelection=null;
     if(this.frameLoad)this.frameLoad.abort();this.frameLoad=null;
     if(this.previewHost)this.previewHost.reset();if(this.exportHost)this.exportHost.reset();if(this.frame)this.frame.remove();this.frame=null;
   }
@@ -220,6 +222,18 @@ class AddonHost {
     const entries=root?await this.json("/api/catalog?"+new URLSearchParams({root,all:"1"})):[];
     return {root,entries};
   }
+  offerModelSelection(name) {
+    // A plugin may explicitly own sidebar selections without replacing its frame.
+    // The catalogue identifies the resource; only the plugin knows its role.
+    const subscription=this.modelSelection,server=this.app.bench.server;
+    if(!subscription||!this.opened||this.frame!==subscription.frame
+      ||this.active!==subscription.identifier||this.generation!==subscription.generation
+      ||server?.root!==subscription.root
+      ||!this.entries.some(row=>row.id===subscription.identifier&&row.enabled&&row.compatible
+        &&row.generation===subscription.generation))return false;
+    if(typeof name!=="string"||!server.catalog.some(row=>row.name===name))return false;
+    this.notify("models.selected",{root:server.root,name});return true;
+  }
   sessionState(method,identifier,params) {
     // The host owns the namespace. The opaque frame never receives a storage handle
     // and cannot name another add-on. sessionStorage survives same-tab navigation.
@@ -263,7 +277,7 @@ class AddonHost {
         case "host.info":
           this.params(params,[]);
           reply.result={apiVersion:1,addon:{id:entry.id,name:entry.name,version:entry.version},language:document.documentElement.lang,
-            capabilities:["host.info","models.list","models.open","morphs.get","morphs.set","morphs.reset","scene.get","scene.geometry","view.get","view.set","state.get","state.set","state.reset",...ADDON_PREVIEW_METHODS,...ADDON_EXPORT_METHODS],previewLimits:this.previewManager().limits(),exportLimits:this.exportManager().limits(),scope:"browser-session",
+            capabilities:["host.info","models.list","models.open","models.selection.subscribe","morphs.get","morphs.set","morphs.reset","scene.get","scene.geometry","view.get","view.set","state.get","state.set","state.reset",...ADDON_PREVIEW_METHODS,"previews.create.before",...ADDON_EXPORT_METHODS],previewLimits:this.previewManager().limits(),exportLimits:this.exportManager().limits(),scope:"browser-session",
             stateScope:"tab-session",stateLimits:bench.addon_state_limits()};break;
         case "exports.prepare":case "exports.cancel":
           reply.result=this.exportManager().request(request.method,params,
@@ -271,6 +285,12 @@ class AddonHost {
         case "state.get":case "state.set":case "state.reset":
           reply.result=this.sessionState(request.method,entry.id,params);break;
         case "models.list":this.params(params,[]);reply.result=await this.models();break;
+        case "models.selection.subscribe":
+          this.params(params,["enabled"],["enabled"]);
+          if(typeof params.enabled!=="boolean")throw this.failure("invalidParams");
+          this.modelSelection=params.enabled?{frame:this.frame,identifier:entry.id,
+            generation:this.generation,root:bench.server?.root}:null;
+          reply.result={enabled:params.enabled};break;
         case "models.open":{
           this.params(params,["name"],["name"]);
           if(typeof params.name!=="string"||!(await this.models()).entries.some((row)=>row.name===params.name))throw this.failure("invalidParams");

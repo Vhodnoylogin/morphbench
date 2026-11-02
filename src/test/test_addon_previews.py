@@ -19,7 +19,9 @@ class Element {
   constructor(tag){this.tag=tag;this.children=[];this.hidden=false;this.parentNode=null;
     this.classes=new Set();this.classList={add:(name)=>this.classes.add(name),remove:(name)=>this.classes.delete(name)};}
   setAttribute(name,value){this[name]=value;}
-  appendChild(node){node.parentNode=this;this.children.push(node);return node;}
+  appendChild(node){if(node.parentNode)node.remove();node.parentNode=this;this.children.push(node);return node;}
+  insertBefore(node,before){if(!this.children.includes(before))throw Error('missing DOM anchor');
+    if(node.parentNode)node.remove();node.parentNode=this;this.children.splice(this.children.indexOf(before),0,node);return node;}
   remove(){if(this.parentNode)this.parentNode.children=this.parentNode.children.filter(node=>node!==this);this.parentNode=null;}
 }
 const viewport=new Element('viewport'),mainCanvas=new Element('canvas'),alreadyHidden=new Element('hidden');
@@ -168,6 +170,105 @@ console.log(JSON.stringify({codes,unchanged:before===snapshot(),noEvents:events=
         self.assertEqual(result["codes"], ["unknownPreview", "unknownShape"] + ["invalidParams"] * 11)
         self.assertTrue(result["unchanged"])
         self.assertTrue(result["noEvents"])
+        self.assertTrue(result["mainUnchanged"])
+
+    def test_staged_replacements_keep_both_screen_positions_and_counterpart_state(self):
+        result = self.run_js(r"""
+const c=setup(),a=await c.create(HUMAN),b=await c.create(WOLF);
+await c.request('previews.morphs.set',{preview:b,values:{Wide:.5,WolfOnly:.25}});
+await c.request('previews.view.set',{preview:b,yaw:31,pitch:10,zoom:2,pan:[3,4]});
+const kept=c.manager.target(b).surface,old=c.manager.target(a).surface;
+const wolf=JSON.stringify({m:kept.bench.addon_morphs(),v:kept.bench.addon_view(),g:kept.bench.addon_geometry('body')});
+const next=(await c.request('previews.create',{name:HUMAN,before:a})).result.preview;
+const replacement=c.manager.target(next).surface;
+const staged=c.manager.stage.children.map(node=>node===replacement.element?'new-human':node===old.element?'old-human':'wolf');
+await c.request('previews.close',{preview:a});
+const afterHuman=c.manager.stage.children.map(node=>node===replacement.element?'human':'wolf');
+const wolf2=(await c.request('previews.create',{name:WOLF,before:b})).result.preview;
+const replacementWolf=c.manager.target(wolf2).surface;
+const beforeWolfClose=c.manager.stage.children.map(node=>node===replacement.element?'human':node===replacementWolf.element?'new-wolf':'old-wolf');
+await c.request('previews.close',{preview:b});
+const final=c.manager.stage.children.map(node=>node===replacement.element?'human':'wolf');
+console.log(JSON.stringify({staged,afterHuman,beforeWolfClose,final,
+  kept:!kept.disposed||kept.disposals===1,
+  untouchedBeforeClose:wolf===JSON.stringify({m:kept.bench.addon_morphs(),v:kept.bench.addon_view(),g:kept.bench.addon_geometry('body')}),
+  newHuman:replacement.bench.addon_morphs().values,newWolf:replacementWolf.bench.addon_morphs().values,
+  mainUnchanged:c.before===c.snapshot()}));
+""")
+        self.assertEqual(result["staged"], ["new-human", "old-human", "wolf"])
+        self.assertEqual(result["afterHuman"], ["human", "wolf"])
+        self.assertEqual(result["beforeWolfClose"], ["human", "new-wolf", "old-wolf"])
+        self.assertEqual(result["final"], ["human", "wolf"])
+        self.assertTrue(result["kept"])
+        self.assertTrue(result["untouchedBeforeClose"])
+        self.assertEqual(result["newHuman"], {})
+        self.assertEqual(result["newWolf"], {})
+        self.assertTrue(result["mainUnchanged"])
+
+    def test_before_requires_a_live_owned_handle_and_absence_still_appends(self):
+        result = self.run_js(r"""
+const c=setup(),a=await c.create(HUMAN),b=await c.create(WOLF);
+const before=JSON.stringify([...c.manager.items.values()].map(item=>({id:item.id,m:item.surface.bench.addon_morphs(),v:item.surface.bench.addon_view()})));
+const loads=c.requests.filter(path=>path.startsWith('/api/preview-payload?')).length,codes=[];
+for(const anchor of [null,true,1,{},[],'','missing','foreign-frame-preview'])
+  codes.push((await c.request('previews.create',{name:HUMAN,before:anchor})).error?.code);
+const preserved=before===JSON.stringify([...c.manager.items.values()].map(item=>({id:item.id,m:item.surface.bench.addon_morphs(),v:item.surface.bench.addon_view()})));
+const rejectedBeforeLoad=loads===c.requests.filter(path=>path.startsWith('/api/preview-payload?')).length;
+await c.request('previews.close',{preview:a});
+const retired=(await c.request('previews.create',{name:HUMAN,before:a})).error?.code;
+const appended=await c.create(HUMAN),order=c.manager.stage.children.map(node=>node===c.manager.target(b).surface.element?'wolf':'appended');
+const flag=(await c.request('host.info')).result.capabilities.includes('previews.create.before');
+const notAMethod=(await c.request('previews.create.before',{})).error?.code;
+console.log(JSON.stringify({codes,preserved,rejectedBeforeLoad,retired,order,flag,notAMethod,mainUnchanged:c.before===c.snapshot()}));
+""")
+        self.assertEqual(result["codes"], ["invalidParams"] * 6 + ["unknownPreview"] * 2)
+        self.assertTrue(result["preserved"])
+        self.assertTrue(result["rejectedBeforeLoad"])
+        self.assertEqual(result["retired"], "unknownPreview")
+        self.assertEqual(result["order"], ["wolf", "appended"])
+        self.assertTrue(result["flag"])
+        self.assertEqual(result["notAMethod"], "unknownMethod")
+        self.assertTrue(result["mainUnchanged"])
+
+    def test_closing_anchor_during_load_rejects_candidate_without_touching_counterpart(self):
+        result = self.run_js(r"""
+const c=setup(),a=await c.create(HUMAN),b=await c.create(WOLF),gate=deferred(),started=deferred();
+const counterpart=c.manager.target(b).surface,snapshot=JSON.stringify(counterpart.bench.addon_scene());
+c.load=async()=>{started.resolve();return gate.promise;};
+const pending=c.request('previews.create',{name:HUMAN,before:a});await started.promise;
+await c.request('previews.close',{preview:a});gate.resolve(DATA);const reply=await pending;
+console.log(JSON.stringify({code:reply.error?.code,items:[...c.manager.items.keys()],surfaces:surfaces.length,
+  pending:c.manager.pending.size,stage:c.manager.stage.children.length,
+  sameCounterpart:c.manager.target(b).surface===counterpart&&!counterpart.disposed,
+  unchanged:snapshot===JSON.stringify(counterpart.bench.addon_scene()),b,mainUnchanged:c.before===c.snapshot()}));
+""")
+        self.assertEqual(result["code"], "unknownPreview")
+        self.assertEqual(result["items"], [result["b"]])
+        self.assertEqual(result["surfaces"], 2)
+        self.assertEqual(result["pending"], 0)
+        self.assertEqual(result["stage"], 1)
+        self.assertTrue(result["sameCounterpart"])
+        self.assertTrue(result["unchanged"])
+        self.assertTrue(result["mainUnchanged"])
+
+    def test_anchor_closed_during_surface_construction_rolls_back_only_new_surface(self):
+        result = self.run_js(r"""
+const c=setup(),a=await c.create(HUMAN),b=await c.create(WOLF),counterpart=c.manager.target(b).surface;
+surfaceHook=()=>c.manager.close(a);
+const reply=await c.request('previews.create',{name:HUMAN,before:a});
+console.log(JSON.stringify({code:reply.error?.code,items:[...c.manager.items.keys()],b,
+  pending:c.manager.pending.size,stage:c.manager.stage.children.length,
+  counterpart:!counterpart.disposed,disposed:surfaces.map(surface=>surface.disposed),
+  created:c.events('previews.changed').filter(row=>row.data.method==='previews.create').length,
+  mainUnchanged:c.before===c.snapshot()}));
+""")
+        self.assertEqual(result["code"], "unknownPreview")
+        self.assertEqual(result["items"], [result["b"]])
+        self.assertEqual(result["pending"], 0)
+        self.assertEqual(result["stage"], 1)
+        self.assertTrue(result["counterpart"])
+        self.assertEqual(result["disposed"], [True, False, True])
+        self.assertEqual(result["created"], 2)
         self.assertTrue(result["mainUnchanged"])
 
     def test_orientation_link_uses_canonical_angles_without_pan_zoom_or_echoes(self):

@@ -408,7 +408,9 @@ class Panel {
   }
   onModel() {
     const name = this.modelSelect.value;
-    if (name) this.go({ name: name, root: this.bench.server.root });
+    if (!name || !this.bench.server.catalog.some(entry=>entry.name===name)) return;
+    if (this.app.addons?.offerModelSelection?.(name)) return;
+    this.go({ name: name, root: this.bench.server.root });
   }
 
   // --- what the panel does: every action calls a method of the facade mirror ---

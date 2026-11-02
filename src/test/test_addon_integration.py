@@ -164,7 +164,8 @@ class TestAddonWorkspaces(unittest.TestCase):
         self.bench = common.bench(self.tmp.name, common.sample_model(), common.sample_morphs())
 
     def run_ui(self, scenario, **values):
-        code = (ROOT / "web/js/addons.js").read_text(encoding="utf8")
+        code = "\n".join((ROOT / "web/js" / name).read_text(encoding="utf8")
+                         for name in ("addon_session.js", "addons.js", "panel.js"))
         return run_browser(self, self.tmp.name, WebPage(self.bench).payload(), code + r"""
 class Node {
   constructor(tag){this.tag=tag;this.children=[];this.listeners={};this.attrs={};this.hidden=false;
@@ -232,6 +233,105 @@ host.close();
         self.assertTrue(unavailable["menuOpen"])
         self.assertTrue(unavailable["error"])
         self.assertIsNone(unavailable["frame"])
+
+    def test_sidebar_selection_subscription_preserves_pair_and_unsaved_frame_state(self):
+        result = self.run_ui(r"""
+host.select('example');await host.frameReady;
+const frame=host.frame,messages=[],navigations=[];let resets=0;
+frame.unsavedMatrix={gain:.25};frame.contentWindow.postMessage=message=>messages.push(message);
+const previews=new Map([['human',{morphs:{Biceps:2}}],['wolf',{morphs:{Biceps:.5}}]]);
+host.previewHost={items:previews,limits:()=>({maxPreviews:4,loadTimeoutMs:8000}),reset(){resets++;}};
+document.documentElement={lang:'en'};
+const panel=Object.create(Panel.prototype);
+bench.server.catalog=[{name:'other/body.nif'}];
+Object.assign(panel,{app,bench,modelSelect:{value:'other/body.nif'},error:{textContent:''},
+  go:params=>navigations.push(params)});app.panel=panel;
+const scene=JSON.stringify([bench.summary,bench.sliders(),bench.view_state()]),url=window.location.href;
+let id=0;
+const request=async(method,params={})=>{await host.receive({source:frame.contentWindow,data:{
+  type:'morphbench-addon:request',apiVersion:1,id:String(++id),method,params}});
+  return messages.filter(message=>message.type==='morphbench-addon:response').at(-1);};
+const capabilities=(await request('host.info')).result.capabilities;
+const subscribed=(await request('models.selection.subscribe',{enabled:true})).result;
+panel.onModel();
+const selected=messages.filter(message=>message.event==='models.selected');
+const kept={frame:host.frame===frame,previews:host.previewHost.items===previews,
+  matrix:frame.unsavedMatrix,scene:JSON.stringify([bench.summary,bench.sliders(),bench.view_state()])===scene,
+  url:window.location.href===url,navigations:navigations.length,resets};
+const invalid=[];
+for(const params of [{enabled:'true'},{enabled:null},{},{enabled:true,name:'other/body.nif'}])
+  invalid.push((await request('models.selection.subscribe',params)).error?.code);
+panel.modelSelect.value='missing.nif';panel.onModel();
+const missing={events:messages.filter(message=>message.event==='models.selected').length,navigations:navigations.length};
+await request('models.selection.subscribe',{enabled:false});panel.modelSelect.value='other/body.nif';panel.onModel();
+host.modelSelection={frame,identifier:'example',generation:'g1',root:'/external'};
+host.destroyFrame();const cleared=host.modelSelection===null;
+console.log(JSON.stringify({capabilities,subscribed,selected,kept,invalid,missing,navigations,cleared}));
+""")
+        self.assertIn("models.selection.subscribe", result["capabilities"])
+        self.assertEqual(result["subscribed"], {"enabled": True})
+        self.assertEqual(result["selected"], [{"type": "morphbench-addon:event", "apiVersion": 1,
+                                               "event": "models.selected",
+                                               "data": {"root": "/external", "name": "other/body.nif"}}])
+        self.assertEqual(result["kept"], {"frame": True, "previews": True, "matrix": {"gain": .25},
+                                          "scene": True, "url": True, "navigations": 0, "resets": 0})
+        self.assertEqual(result["invalid"], ["invalidParams"] * 4)
+        self.assertEqual(result["missing"], {"events": 1, "navigations": 0})
+        self.assertEqual(result["navigations"], [{"name": "other/body.nif", "root": "/external"}])
+        self.assertTrue(result["cleared"])
+
+    def test_sidebar_subscription_rejects_stale_frame_generation_root_and_disabled_plugin(self):
+        result = self.run_ui(r"""
+host.select('example');await host.frameReady;const frame=host.frame,messages=[];
+frame.contentWindow.postMessage=message=>messages.push(message);
+bench.server.catalog=[{name:'body.nif'}];
+await host.receive({source:frame.contentWindow,data:{type:'morphbench-addon:request',apiVersion:1,
+  id:'subscribe',method:'models.selection.subscribe',params:{enabled:true}}});
+const rejected=[];
+host.frame=new Node('iframe');rejected.push(host.offerModelSelection('body.nif'));host.frame=frame;
+host.generation='g2';rejected.push(host.offerModelSelection('body.nif'));host.generation='g1';
+host.active='other';rejected.push(host.offerModelSelection('body.nif'));host.active='example';
+bench.server.root='/another-root';rejected.push(host.offerModelSelection('body.nif'));bench.server.root='/external';
+entries[0].enabled=false;rejected.push(host.offerModelSelection('body.nif'));entries[0].enabled=true;
+entries[0].compatible=false;rejected.push(host.offerModelSelection('body.nif'));entries[0].compatible=true;
+entries[0].generation='g2';rejected.push(host.offerModelSelection('body.nif'));entries[0].generation='g1';
+host.opened=false;rejected.push(host.offerModelSelection('body.nif'));host.opened=true;
+rejected.push(host.offerModelSelection('missing.nif'));rejected.push(host.offerModelSelection({name:'body.nif'}));
+const accepted=host.offerModelSelection('body.nif');
+host.select('example',true);await host.frameReady;
+const afterReload=host.offerModelSelection('body.nif');
+console.log(JSON.stringify({rejected,accepted,afterReload,events:messages.filter(message=>message.event==='models.selected')}));
+host.close();
+""")
+        self.assertEqual(result["rejected"], [False] * 10)
+        self.assertTrue(result["accepted"])
+        self.assertFalse(result["afterReload"])
+        self.assertEqual(len(result["events"]), 1)
+
+    def test_unsubscribed_sidebar_and_legacy_models_open_still_navigate(self):
+        result = self.run_ui(r"""
+host.select('example');await host.frameReady;const frame=host.frame,messages=[],navigations=[];
+frame.contentWindow.postMessage=message=>messages.push(message);
+bench.server.catalog=[{name:'body.nif'}];
+const panel=Object.create(Panel.prototype);
+Object.assign(panel,{app,bench,modelSelect:{value:'body.nif'},error:{textContent:''},
+  go:params=>navigations.push(params)});app.panel=panel;
+panel.onModel();
+host.modelSelection={frame,identifier:'example',generation:'g1',root:'/external'};
+host.models=async()=>({root:'/external',entries:bench.server.catalog});
+let deferred;global.setTimeout=callback=>{deferred=callback;};
+await host.receive({source:frame.contentWindow,data:{type:'morphbench-addon:request',apiVersion:1,
+  id:'open',method:'models.open',params:{name:'body.nif'}}});
+const response=messages.find(message=>message.id==='open');await deferred();
+panel.app={};panel.onModel();
+console.log(JSON.stringify({response,navigations,events:messages.filter(message=>message.event==='models.selected')}));
+host.close();
+""")
+        self.assertEqual(result["response"]["result"], {"navigating": True})
+        self.assertEqual(result["navigations"], [{"name": "body.nif", "root": "/external"},
+                                                 {"name": "body.nif", "root": "/external", "addon": "example", "all": "1"},
+                                                 {"name": "body.nif", "root": "/external"}])
+        self.assertEqual(result["events"], [])
 
     def test_failed_asset_is_not_mounted_and_reload_timeout_and_stale_load_are_bounded(self):
         result = self.run_ui(r"""

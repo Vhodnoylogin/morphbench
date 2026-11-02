@@ -1,7 +1,7 @@
-"""Local, inert add-on packages and their enabled state.
+"""Local browser plugin packages and their enabled state.
 
-The registry owns only its explicit state directory. A package is a ZIP containing a
-root addon.json and a small allowlist of browser assets; Python, native libraries and
+The registry owns only its explicit state directory. A package contains a root
+addon.json and a small allowlist of browser assets; Python, native libraries and
 installer hooks are never loaded or executed. Presenters obtain bytes through the
 facade, which can separately isolate the browser document from the workbench.
 
@@ -10,6 +10,10 @@ validate every member before publication. Immutable generation directories are s
 by one atomic state-file replacement, so readers see the old or new complete package.
 Previous generations and legacy packages/id directories are retained; failed writes
 remove only this transaction's new directory. Reads validate installed files again.
+
+Discovery imports new direct plugin folders/ZIPs into immutable generations and enables
+them once. An explicit disabled state survives discovery and restart. Loading a folder
+uses the same archive validation boundary; original files are never modified or served.
 
 Session-state codecs below are pure, bounded JSON operations with explicit limits.
 They know no facade, browser storage key, persistence lifetime or mesh state.
@@ -465,6 +469,108 @@ class AddonRegistry:
         """Replace an existing disabled ID from a validated ZIP, leaving it disabled."""
         return self._from_path(path, update=True)
 
+    def load(self, path) -> dict:
+        """Load a new local folder or ZIP into owned storage and enable it atomically."""
+        return self._publish_bytes(self._source_archive(path), update=False, enabled=True)
+
+    def _source_archive(self, path) -> bytes:
+        """Snapshot a bounded, link-free local directory through the ZIP boundary."""
+        if not isinstance(path, (str, os.PathLike)) or not str(path) or not Path(path).is_absolute():
+            raise AddonError("invalidParams", t("err.addonParams"))
+        source_path = Path(path)
+        try:
+            info = _no_link(source_path)
+            if stat.S_ISREG(info.st_mode):
+                with source_path.open("rb") as source:
+                    opened = os.fstat(source.fileno())
+                    if not stat.S_ISREG(opened.st_mode) or not os.path.samestat(info, opened):
+                        raise AddonError("unsafePath", t("err.addonPath", path=source_path.name))
+                    self._limit("maxArchiveBytes", opened.st_size)
+                    data = source.read(self.limits["maxArchiveBytes"] + 1)
+                self._limit("maxArchiveBytes", len(data))
+                return data
+            if not stat.S_ISDIR(info.st_mode):
+                raise AddonError("unsafePath", t("err.addonPath", path=source_path.name))
+            manifest, entries = self._directory(source_path)
+            self._compatible(manifest)
+            buffer = io.BytesIO()
+            total = 0
+            with zipfile.ZipFile(buffer, "w", compression=zipfile.ZIP_STORED) as archive:
+                for name, is_dir, item in entries.values():
+                    if is_dir:
+                        archive.writestr(name + "/", b"")
+                        continue
+                    before = _no_link(item)
+                    with item.open("rb") as source:
+                        if not os.path.samestat(before, os.fstat(source.fileno())):
+                            raise AddonError("unsafePath", t("err.addonPath", path=name))
+                        data = source.read(self.limits["maxFileBytes"] + 1)
+                    self._limit("maxFileBytes", len(data))
+                    total += len(data)
+                    self._limit("maxTotalBytes", total)
+                    archive.writestr(name, data)
+                    self._limit("maxArchiveBytes", buffer.tell())
+            self._limit("maxArchiveBytes", buffer.tell())
+            return buffer.getvalue()
+        except AddonError:
+            raise
+        except (OSError, ValueError, TypeError):
+            raise AddonError("invalidArchive", t("err.addonArchive", path=str(path))) from None
+
+    def discover(self) -> list[dict]:
+        """Import new direct drops, preserving every recorded enable/disable decision.
+
+        Called at startup or by explicit rescan, not by routine SDK authorization.
+        Reserved registry directories and unreferenced generations are never candidates.
+        A bad drop is reported independently and cannot hide another healthy plugin.
+        """
+        errors = []
+        with self._lock:
+            try:
+                self._storage()
+                state = self._state()
+                known = self._identifiers(state)
+                sources = sorted(self.folder.iterdir())
+            except OSError:
+                raise AddonError("storageError", t("err.addonStorage")) from None
+            for identifier in sorted(known - set(state["enabled"])):
+                try:
+                    self._set_enabled(identifier, True, initial=True)
+                except AddonError as error:
+                    errors.append({"path": str(self._package_folder(identifier, state)),
+                                   "code": error.code, "message": str(error)})
+            for source_path in sources:
+                if source_path.name in {"packages", "generations"} or source_path.name.startswith("."):
+                    continue
+                try:
+                    info = source_path.lstat()
+                    directory = stat.S_ISDIR(info.st_mode)
+                    if source_path.suffix.lower() != ".zip" and not directory:
+                        continue
+                    # An unrelated directory is not a plugin. Never traverse links
+                    # merely to decide whether the source has a manifest.
+                    _no_link(source_path)
+                    if directory and not (source_path / "addon.json").exists():
+                        continue
+                    data = self._source_archive(source_path)
+                    with zipfile.ZipFile(io.BytesIO(data)) as archive:
+                        manifest, _ = self._archive(archive)
+                    if manifest["id"] in known:
+                        continue
+                    try:
+                        self._publish_bytes(data, update=False, enabled=True)
+                    except AddonError as error:
+                        if error.code != "alreadyInstalled":
+                            raise
+                    known.add(manifest["id"])
+                except (AddonError, OSError, zipfile.BadZipFile, RuntimeError,
+                        NotImplementedError, EOFError, zlib.error) as error:
+                    if not isinstance(error, AddonError):
+                        error = AddonError("invalidArchive", t("err.addonArchive", path=str(source_path)))
+                    errors.append({"path": str(source_path), "code": error.code,
+                                   "message": str(error)})
+        return errors
+
     def _from_path(self, path, *, update: bool) -> dict:
         try:
             with open(path, "rb") as source:
@@ -484,7 +590,7 @@ class AddonRegistry:
         """Explicit same-ID update; version strings have no ordering semantics."""
         return self._publish_bytes(data, update=True)
 
-    def _publish_bytes(self, data: bytes, *, update: bool) -> dict:
+    def _publish_bytes(self, data: bytes, *, update: bool, enabled=False) -> dict:
         if not isinstance(data, bytes):
             raise AddonError("invalidArchive", t("err.addonArchive", path=""))
         self._limit("maxArchiveBytes", len(data))
@@ -538,12 +644,12 @@ class AddonRegistry:
                     stage.rename(destination)
                     stage = None
                     published = destination
-                    state["enabled"][identifier] = False
+                    state["enabled"][identifier] = enabled
                     state["generations"][identifier] = generation
                     self._write_state(state)
                     published = None
-                    return dict(manifest, generation=generation, enabled=False,
-                                compatible=True, status="disabled")
+                    return dict(manifest, generation=generation, enabled=enabled,
+                                compatible=True, status="enabled" if enabled else "disabled")
             except AddonError:
                 raise
             except (zipfile.BadZipFile, RuntimeError, NotImplementedError, EOFError, zlib.error):
@@ -578,11 +684,20 @@ class AddonRegistry:
     def _installed(self, identifier: str, state: dict) -> tuple[dict, dict]:
         identifier = _identifier(identifier)
         folder = self._package_folder(identifier, state)
+        manifest, entries = self._directory(folder)
+        if manifest["id"] != identifier:
+            raise AddonError("invalidManifest", t("err.addonManifest"))
+        return manifest, entries
+
+    def _directory(self, folder: Path) -> tuple[dict, dict]:
+        """Validate one directory; shared by installed reads and immutable imports."""
         if not stat.S_ISDIR(_no_link(folder).st_mode):
             raise AddonError("invalidManifest", t("err.addonManifest"))
         records = []
         total = 0
-        for current, dirs, files in os.walk(folder, followlinks=False):
+        def unreadable(error):
+            raise error
+        for current, dirs, files in os.walk(folder, followlinks=False, onerror=unreadable):
             for name in dirs + files:
                 path = Path(current) / name
                 info = _no_link(path)
@@ -600,8 +715,6 @@ class AddonRegistry:
             raise AddonError("invalidManifest", t("err.addonManifest"))
         with manifest_info[2].open("rb") as source:
             manifest = self._manifest(source.read(self.limits["maxManifestBytes"] + 1))
-        if manifest["id"] != identifier:
-            raise AddonError("invalidManifest", t("err.addonManifest"))
         entry = entries.get(manifest["entry"].casefold())
         if not entry or entry[1] or entry[0] != manifest["entry"]:
             raise AddonError("invalidManifest", t("err.addonManifest"))
@@ -641,10 +754,18 @@ class AddonRegistry:
     def set_enabled(self, identifier: str, enabled: bool) -> dict:
         if type(enabled) is not bool:
             raise AddonError("invalidEnabled", t("err.addonEnabled"))
+        return self._set_enabled(identifier, enabled)
+
+    def _set_enabled(self, identifier: str, enabled: bool, *, initial=False) -> dict:
         identifier = _identifier(identifier)
         with self._lock, self._writer():
             try:
                 state = self._state()
+                # Discovery's earlier directory snapshot is only a candidate list.
+                # Another process may have persisted a deliberate decision since it
+                # was read. First activation is conditional under this writer lock.
+                if initial and identifier in state["enabled"]:
+                    return self._entry(identifier, state)
                 if enabled:
                     manifest, _ = self._installed(identifier, state)
                     self._compatible(manifest)

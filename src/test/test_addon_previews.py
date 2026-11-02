@@ -226,7 +226,7 @@ const aBefore=c.manager.target(a).surface.bench.addon_view();c.manager.target(b)
 const independent=JSON.stringify(aBefore)===JSON.stringify(c.manager.target(a).surface.bench.addon_view());
 await c.request('previews.link',{previews:[a,b],properties:['orientation']});
 await c.request('previews.close',{preview:a});const remaining=(await c.request('previews.list')).result;
-const firstClose={links:c.manager.links.size,stage:!!c.manager.stage,active:c.host.app.previewStageActive};
+const firstClose={links:c.manager.links.size,stage:!!c.manager.stage,active:c.host.app.previewStageActive,modelPanelVisible:!modelPanel.hidden};
 const closedReply=await c.request('previews.close',{preview:a});
 await c.request('previews.close',{preview:b});
 console.log(JSON.stringify({a,b,codes,listed,unlinked,independent,remaining,firstClose,closedCode:closedReply.error?.code,
@@ -238,7 +238,7 @@ console.log(JSON.stringify({a,b,codes,listed,unlinked,independent,remaining,firs
         self.assertEqual(result["unlinked"], {"previews": [], "properties": []})
         self.assertTrue(result["independent"])
         self.assertEqual(result["remaining"]["previews"], [{"preview": result["b"], "name": "meshes/wolf/body_0.nif"}])
-        self.assertEqual(result["firstClose"], {"links": 0, "stage": True, "active": True})
+        self.assertEqual(result["firstClose"], {"links": 0, "stage": True, "active": True, "modelPanelVisible": True})
         self.assertEqual(result["closedCode"], "unknownPreview")
         self.assertTrue(result["clean"])
         self.assertIsNone(result["stage"])

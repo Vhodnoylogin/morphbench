@@ -79,8 +79,6 @@ class AddonPreviewHost {
     app.previewStageActive=true;
     this.hidden=Array.from(viewport.children).map(node=>({node,hidden:node.hidden}));
     for(const {node} of this.hidden)node.hidden=true;
-    const modelPanel=document.getElementById("model-panel");
-    if(modelPanel){this.hidden.push({node:modelPanel,hidden:modelPanel.hidden});modelPanel.hidden=true;}
     this.stage=el("div",{class:"addon-preview-grid"});
     viewport.classList.add("has-addon-previews");viewport.appendChild(this.stage);
   }

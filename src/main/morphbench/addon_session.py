@@ -32,11 +32,21 @@ class AddonSessionMixin:
         from .addons import AddonRegistry
         if not hasattr(self, "_addon_registry"):
             directory = self.cfg.addon_directory()
-            self._addon_registry = AddonRegistry(Path(directory), self.cfg["addonLimits"])
+            registry = AddonRegistry(Path(directory), self.cfg["addonLimits"])
+            errors = registry.discover()
+            self._addon_registry = registry
+            self._addon_discovery_errors = errors
         return self._addon_registry
 
-    def addons(self) -> dict:
-        return {"apiVersion": 1, "addons": self._addon_packages().list()}
+    def addons(self, *, rescan=False) -> dict:
+        registry = self._addon_packages()
+        if rescan:
+            self._addon_discovery_errors = registry.discover()
+        return {"apiVersion": 1, "addons": registry.list(), "directory": str(registry.folder),
+                "discoveryErrors": copy.deepcopy(self._addon_discovery_errors)}
+
+    def addon_load(self, path) -> dict:
+        return self._addon_packages().load(path)
 
     def addon_install(self, path) -> dict:
         return self._addon_packages().install(path)

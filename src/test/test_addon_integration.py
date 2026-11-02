@@ -173,14 +173,18 @@ class Node {
   getAttribute(key){return this.attrs[key];}
   addEventListener(name,handler){this.listeners[name]=handler;}
   appendChild(node){this.children.push(node);node.parentNode=this;return node;}
+  showModal(){this.open=true;}
+  close(){this.open=false;}
+  click(){if(!this.disabled)this.listeners.click?.();}
   remove(){this.removed=true;if(this.parentNode)this.parentNode.children=this.parentNode.children.filter(node=>node!==this);}
   set textContent(value){this.text=value;this.children=[];}
   get textContent(){return this.text||'';}
   querySelector(selector){return this.children.find(node=>'.'+node.attrs.class===selector)||null;}
   querySelectorAll(){return [];}
 }
-const nav=new Node('nav'),core=new Node('button'),panel=new Node('aside'),workspace=new Node('div');nav.appendChild(core);
-document.getElementById=id=>({'mode-nav':nav,panel}[id]);document.querySelector=()=>workspace;
+const nav=new Node('nav'),core=new Node('button'),panel=new Node('aside'),workspace=new Node('div'),menuSlot=new Node('div');nav.appendChild(core);
+document.body=new Node('body');
+document.getElementById=id=>({'mode-nav':nav,'plugin-menu-slot':menuSlot,panel}[id]);document.querySelector=()=>workspace;
 document.createElement=tag=>new Node(tag);document.createTextNode=text=>({textContent:text});
 const url='http://localhost/?mode=morphs&tab=sliders'+(input.wanted?'&addon='+input.wanted:'');
 global.window={location:{href:url},history:{replaceState(a,b,url){window.location.href=String(url);}},addEventListener(){}};
@@ -209,7 +213,7 @@ console.log(JSON.stringify({coreKept:nav.children.includes(core),tabs:[...app.wo
 host.close();
 """)
         self.assertTrue(result["coreKept"])
-        self.assertEqual(result["tabs"], [None, "example"])
+        self.assertEqual(result["tabs"], ["example"])
         self.assertTrue(result["kept"])
         self.assertTrue(result["replaced"])
         self.assertTrue(result["removed"])
@@ -222,9 +226,10 @@ host.close();
     def test_navigation_restores_enabled_plugin_and_reports_unavailable_plugin(self):
         restored = self.run_ui("await host.frameReady;console.log(JSON.stringify({active:host.active,src:host.frame?.attrs.src}));", wanted="example")
         self.assertEqual(restored, {"active": "example", "src": "/addon-assets/example/g1/index.html"})
-        unavailable = self.run_ui("console.log(JSON.stringify({active:host.active,opened:host.opened,error:host.managerError?.textContent,frame:host.frame}));", wanted="removed")
+        unavailable = self.run_ui("console.log(JSON.stringify({active:host.active,opened:host.opened,menuOpen:host.menu.open,error:host.managerError?.textContent,frame:host.frame}));", wanted="removed")
         self.assertIsNone(unavailable["active"])
-        self.assertTrue(unavailable["opened"])
+        self.assertFalse(unavailable["opened"])
+        self.assertTrue(unavailable["menuOpen"])
         self.assertTrue(unavailable["error"])
         self.assertIsNone(unavailable["frame"])
 
@@ -251,6 +256,71 @@ console.log(JSON.stringify({failed,recovered,stale,timedOut:host.frame===null,
         self.assertTrue(result["stale"])
         self.assertTrue(result["timedOut"])
         self.assertTrue(result["timeoutError"])
+
+    def test_plugin_menu_is_separate_and_preserves_active_frame_and_tab_color(self):
+        result = self.run_ui(r"""
+host.select('example');await host.frameReady;const frame=host.frame,tab=host.tabs.get('example');
+host.manager.click();
+const content=host.managerPanel.children[0],card=content.children.find(node=>node.className==='plugin-card');
+const menuState={open:host.menu.open,active:host.active,frameKept:host.frame===frame,
+  managerOutsideTabs:!nav.children.includes(host.manager)&&menuSlot.children.includes(host.manager),
+  managerRole:host.manager.attrs.role||null,tabs:[...host.tabs.keys()],
+  color:[tab.attrs['data-plugin-tone'],card.attrs['data-plugin-tone'],host.panel.attrs['data-plugin-tone']]};
+host.menu.close();await host.refresh();
+console.log(JSON.stringify({menuState,closed:!host.menu.open,frameKept:host.frame===frame,
+  stableColor:host.tabs.get('example').attrs['data-plugin-tone']===menuState.color[0],
+  differentIdTone:pluginTone('example')!==pluginTone('second-example')}));host.close();
+""")
+        self.assertEqual(result["menuState"]["active"], "example")
+        self.assertTrue(result["menuState"]["open"])
+        self.assertTrue(result["menuState"]["frameKept"])
+        self.assertTrue(result["menuState"]["managerOutsideTabs"])
+        self.assertIsNone(result["menuState"]["managerRole"])
+        self.assertEqual(result["menuState"]["tabs"], ["example"])
+        self.assertEqual(len(set(result["menuState"]["color"])), 1)
+        self.assertTrue(result["closed"])
+        self.assertTrue(result["frameKept"])
+        self.assertTrue(result["stableColor"])
+        self.assertTrue(result["differentIdTone"])
+
+    def test_path_load_retry_and_disable_enable_refresh_keep_explicit_lifecycle(self):
+        result = self.run_ui(r"""
+const requests=[],walk=node=>[node,...(node.children||[]).flatMap(walk)];let failLoad=true;
+host.json=async(path,options={})=>{
+  const body=options.body?JSON.parse(options.body):null;requests.push({path,body});
+  if(path==='/api/addons/load'){
+    if(failLoad)throw Error('Path rejected');
+    entries.push({id:'external',name:'External',version:'1',generation:'g2',enabled:true,compatible:true,entry:'index.html'});
+    return entries[1];
+  }
+  if(path==='/api/addons/enabled')entries.find(row=>row.id===body.id).enabled=body.enabled;
+  return {addons:entries,directory:'/synthetic/plugins'};
+};
+host.select('example');await host.frameReady;const original=host.frame;
+host.openManager();let content=host.managerPanel.children[0],form=content.children.find(node=>node.tag==='form');
+const inputPath=walk(form).find(node=>node.tag==='input'),load=walk(form).find(node=>node.attrs?.type==='submit');
+inputPath.value='   ';await form.listeners.submit({preventDefault(){}});const emptyIgnored=requests.length===0;
+inputPath.value=' /external/plugin.zip ';await form.listeners.submit({preventDefault(){}});
+const failed={error:host.managerError.textContent,retry:!load.disabled,path:inputPath.value,frameKept:host.frame===original};
+failLoad=false;await form.listeners.submit({preventDefault(){}});
+const loaded={tabs:[...host.tabs.keys()],frameKept:host.frame===original,menuOpen:host.menu.open};
+content=host.managerPanel.children[0];let checkbox=walk(content).find(node=>node.tag==='input'&&node.attrs['aria-label']==='Example');
+checkbox.checked=false;await checkbox.listeners.change();const disabled={tabs:[...host.tabs.keys()],frame:host.frame,opened:host.opened};
+content=host.managerPanel.children[0];checkbox=walk(content).find(node=>node.tag==='input'&&node.attrs['aria-label']==='Example');
+checkbox.checked=true;await checkbox.listeners.change();
+console.log(JSON.stringify({emptyIgnored,failed,loaded,disabled,reenabled:{tabs:[...host.tabs.keys()],frame:host.frame},requests}));
+""")
+        self.assertTrue(result["emptyIgnored"])
+        self.assertEqual(result["failed"], {"error": "Path rejected", "retry": True,
+                         "path": " /external/plugin.zip ", "frameKept": True})
+        self.assertEqual(result["loaded"], {"tabs": ["example", "external"], "frameKept": True, "menuOpen": True})
+        self.assertEqual(result["disabled"], {"tabs": ["external"], "frame": None, "opened": False})
+        self.assertEqual(result["reenabled"], {"tabs": ["example", "external"], "frame": None})
+        self.assertEqual([row for row in result["requests"] if row["path"] == "/api/addons/load"],
+                         [{"path": "/api/addons/load", "body": {"path": "/external/plugin.zip"}}] * 2)
+        self.assertEqual([row["body"] for row in result["requests"] if row["path"] == "/api/addons/enabled"],
+                         [{"id": "example", "enabled": False}, {"id": "example", "enabled": True}])
+        self.assertEqual(sum(row["path"] == "/api/addons?rescan=1" for row in result["requests"]), 3)
 
 
 class TestAddonHTTP(unittest.TestCase):

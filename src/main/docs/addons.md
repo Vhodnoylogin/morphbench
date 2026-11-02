@@ -1,4 +1,4 @@
-# Browser add-ons
+# Browser plugins
 
 Russian: [addons.ru.md](addons.ru.md).
 
@@ -20,15 +20,27 @@ add-on against the public interface without adding that mod's formats or calcula
 
 ## Install, update, enable and disable
 
-Use the viewer's add-on manager to upload a ZIP, inspect its metadata, and explicitly enable it.
-Open **Add-ons** in the shared workspace navigation, choose **Install ZIP**, enable the
-installed package's checkbox, then choose **Open workspace** or its new **Plugin** tab.
+Place a compatible plugin folder (with `addon.json` inside) or ZIP directly in
+`Morphbench/plugins`. New packages are discovered and enabled when the host first reads
+its plugin registry. Open **Plugins** in the header for the separate management menu:
+**Refresh folder** discovers new drops, and **Load and enable** accepts the full path to
+a folder or ZIP anywhere on the machine. It copies a validated snapshot into managed
+storage; later edits to the source do not silently update it. The menu also offers ZIP
+upload and an explicit update control. Files are never opened in a native file dialog
+unless you choose the optional upload control yourself.
+
+Each enabled compatible plugin has a coloured **Plugin** workspace tab. The same stable
+colour marks its inspector and menu entry. Select **Open workspace** or its tab to use it.
+Opening the menu preserves the current frame and its unsaved controls. Model selection
+remains on the left, including during independent plugin previews.
 Reselecting the current tab preserves its iframe and unsaved controls. **Reload plugin**
 explicitly recreates the frame and its previews. Model changes still reload the host page;
 the selected plugin is restored if its generation is enabled and compatible. A missing or
 disabled plugin opens the manager with a visible diagnostic instead of an empty workspace.
-Installation always leaves the package **disabled**. Enabled compatible packages have their own
-inspector tabs. Selecting an add-on tab loads its entry page; disabling the active package in
+Automatic discovery, path loading and the menu's new-package ZIP upload enable the new
+package. An explicitly disabled plugin stays disabled after a rescan or restart. Low-level
+`--install`/binary install requests retain their disabled-by-default contract; successful
+explicit updates stay disabled too. Selecting a plugin tab loads its entry page; disabling the active package in
 that viewer unloads the frame and removes its tab. Closing an add-on tab's inspector does not
 undo changes already applied to the main preview. Independent previews described below are
 disposed with their owning frame.
@@ -60,6 +72,7 @@ use `python mb.py`; from a structured release's `Morphbench` directory, substitu
 
 ```text
 python mb.py addons --json
+python mb.py addons --load <full-path-to-plugin-folder-or-zip> --json
 python mb.py addons --install <package-folder>/scene-inspector.zip --json
 python mb.py addons --enable scene-inspector --json
 python mb.py addons --disable scene-inspector --json
@@ -67,13 +80,15 @@ python mb.py addons --update <package-folder>/scene-inspector.zip --json
 python mb.py addons --enable scene-inspector --json
 ```
 
-`--install`, `--update`, `--enable` and `--disable` are mutually exclusive; use separate commands.
+`--load`, `--install`, `--update`, `--enable` and `--disable` are mutually exclusive; use separate commands.
 
 For an existing local server:
 
 | Request | Body | Result |
 |---|---|---|
-| `GET /api/addons` | — | `{apiVersion:1, addons:[...]}` |
+| `GET /api/addons` | — | `{apiVersion:1, addons:[...], directory, discoveryErrors}` |
+| `GET /api/addons?rescan=1` | — | Discover new direct folders/ZIPs and return the same envelope |
+| `POST /api/addons/load` | JSON `{path:"<absolute-folder-or-zip>"}` | Validate, snapshot and enable a new plugin |
 | `POST /api/addons/install` | Raw ZIP bytes, `Content-Type: application/zip` | Installed package entry, initially disabled |
 | `POST /api/addons/update` | Raw ZIP bytes, `Content-Type: application/zip` | Replacement package entry, still disabled |
 | `POST /api/addons/enabled` | JSON `{id:"scene-inspector", enabled:true}` | `{apiVersion:1, addons:[...]}` after the change |

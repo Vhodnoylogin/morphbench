@@ -314,10 +314,15 @@ local transforms/access spheres, author defaults and temporary effective overrid
 recipes, Body Slots schema-v1 JSON and `.bslots` exports. It does not edit game saves,
 equipment or inventories. See [docs/slots.md](docs/slots.md) for the offline workflow and limits.
 
-## Browser add-ons
+## Browser plugins
 
 Application 0.8.7 includes a versioned local browser add-on host.
 Install a ZIP, enable its inspector tab, and use API v1 to select models, read geometry,
 set existing morphs, control the view and save add-on state for the current browser tab.
 Installed add-ons can be explicitly updated while disabled. [Contract and workflow](docs/addons.md);
 [neutral source example](https://github.com/Vhodnoylogin/morphbench/tree/main/src/main/examples/scene-inspector).
+
+The development workspace keeps model selection on the left, including during plugin
+previews. Plugins have distinct coloured tabs and a separate **Plugins** menu with
+folder/ZIP path loading and enable/disable controls. New compatible packages placed in
+`Morphbench/plugins` are discovered and enabled automatically; a manual disable persists.

@@ -13,7 +13,10 @@ go in a major release, and nowhere else.
 
 ## Unreleased — generic plugin hosting
 
-- Plugins share the workspace navigation, with keyboard selection and an explicit install/enable/open workflow.
+- Distinct workspace tabs and stable per-plugin colours, shared with the inspector and separate Plugins menu.
+- Model selection stays on the left, including during independent plugin previews.
+- Automatically discover and enable new compatible folders/ZIPs in Morphbench/plugins; keep explicit disabled state across restarts.
+- Load plugins by folder/ZIP path through the menu, CLI or HTTP; refresh the folder without restarting.
 - Reopening the active workspace preserves its frame; explicit reload, bounded asset checks and stale-frame guards improve loading recovery.
 - Removed the built-in Body Slots tab and experimental entry branding; its future UI belongs in a plugin.
 - Browser API v1 and preview linkage remain unchanged. No CLAW-specific controls are included.

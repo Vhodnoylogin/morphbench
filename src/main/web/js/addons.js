@@ -1,17 +1,29 @@
 "use strict";
 
-// Packages live in opaque-origin frames. Only this explicit, versioned message door
-// can touch the current preview; installing a package does not execute it.
+// Plugin packages live in opaque-origin frames. Discovery enables their tabs;
+// only opening a tab mounts its frame and exposes this versioned message door.
+function pluginTone(identifier) {
+  const tones=["violet","amber","blue","rose","green","cyan"];
+  let hash=0;
+  for(const character of identifier)hash=(Math.imul(hash,31)+character.codePointAt(0))>>>0;
+  return tones[hash%tones.length];
+}
+
 class AddonHost {
   constructor(app) {
     this.app=app;this.active=null;this.generation=null;this.frame=null;this.entries=[];this.opened=false;
     this.panel=el("aside",{id:"addon-panel",class:"inspector",role:"tabpanel",hidden:"hidden"});
     document.querySelector(".workspace").appendChild(this.panel);
     this.nav=document.getElementById("mode-nav");this.tabs=new Map();
-    this.manager=el("button",{id:"addon-manager-tab",class:"mode-button addon-workspace-tab",type:"button",
-      "aria-controls":"addon-panel",text:T.addonTitle,on:{click:()=>this.select(null)}});
-    this.tabs.set(null,this.manager);
-    this.nav.appendChild(this.manager);
+    this.manager=el("button",{id:"plugin-menu-button",class:"plugin-menu-button",type:"button",
+      "aria-haspopup":"dialog","aria-controls":"plugin-menu",text:T.addonTitle,on:{click:()=>this.openManager()}});
+    document.getElementById("plugin-menu-slot").appendChild(this.manager);
+    this.menu=el("dialog",{id:"plugin-menu",class:"plugin-menu","aria-labelledby":"plugin-menu-title"});
+    this.menu.appendChild(el("div",{class:"plugin-menu-heading"},[
+      el("h2",{id:"plugin-menu-title",text:T.addonTitle}),
+      el("button",{type:"button",text:T.pluginClose,on:{click:()=>this.menu.close()}})]));
+    this.managerPanel=el("div",{class:"plugin-menu-content"});this.menu.appendChild(this.managerPanel);
+    document.body.appendChild(this.menu);
     if(app.workspace)app.workspace.setAddonTabs(this.tabs);
     if(!app.bench.server){this.manager.disabled=true;this.manager.title=T.addonServer;return;}
     this.listener=(event)=>this.receive(event);
@@ -20,11 +32,10 @@ class AddonHost {
       const wanted=new URL(window.location.href).searchParams.get("addon");
       if(wanted&&!this.opened){
         if(this.entries.some((row)=>row.id===wanted&&row.enabled&&row.compatible))this.select(wanted);
-        else{this.select(null);this.managerError.textContent=T.addonDisabled;}
+        else this.openManager(T.addonDisabled);
       }
     }).catch((error)=>{
-      this.manager.title=String(error.message||error);this.select(null);
-      this.managerError.textContent=this.manager.title;
+      this.manager.title=String(error.message||error);this.openManager(this.manager.title);
     });
   }
   previewManager() {
@@ -44,32 +55,35 @@ class AddonHost {
     return data;
   }
   async refresh() {
-    const data=await this.json("/api/addons");this.entries=data.addons;
-    for(const [identifier,node] of this.tabs)if(identifier!==null)node.remove();
-    this.tabs=new Map([[null,this.manager]]);
+    const data=await this.json("/api/addons?rescan=1");this.entries=data.addons;
+    this.directory=data.directory||"";this.discoveryErrors=data.discoveryErrors||[];
+    for(const node of this.tabs.values())node.remove();
+    this.tabs=new Map();
     for(const row of this.entries.filter((entry)=>entry.enabled&&entry.compatible)){
       const button=el("button",{id:"addon-tab-"+row.id,class:"mode-button addon-workspace-tab",type:"button",
         "aria-controls":"addon-panel","data-addon":row.id,on:{click:()=>this.select(row.id)}},
         [el("span",{text:row.name}),el("span",{class:"mode-badge plugin-badge",text:T.wsPlugin})]);
+      button.setAttribute("data-plugin-tone",pluginTone(row.id));
       this.nav.appendChild(button);this.tabs.set(row.id,button);
     }
     if(this.app.workspace)this.app.workspace.setAddonTabs(this.tabs);
     if(this.active&&!this.entries.some((entry)=>entry.id===this.active&&entry.enabled&&entry.compatible&&entry.generation===this.generation))this.close();
     this.paintNav();
-    if(this.opened&&!this.active)this.showManager();
+    this.manager.textContent=T.addonTitle+" · "+this.entries.filter(row=>row.enabled&&row.compatible).length;
+    if(this.menu.open)this.showManager();
   }
   paintNav() {
     if(this.app.workspace){this.app.workspace.refresh();return;}
-    this.manager.classList.toggle("on",this.opened&&!this.active);
-    this.manager.setAttribute("aria-pressed",String(this.opened&&!this.active));
     for(const node of this.nav.querySelectorAll("[data-addon]")){
       const selected=this.opened&&node.getAttribute("data-addon")===this.active;
       node.classList.toggle("on",selected);node.setAttribute("aria-pressed",String(selected));
     }
   }
   select(identifier,reload=false) {
+    if(!identifier){this.openManager();return;}
     const entry=identifier&&this.entries.find((row)=>row.id===identifier&&row.enabled&&row.compatible);
     if(identifier&&!entry)return;
+    if(this.menu.open)this.menu.close();
     // Selecting the current workspace is not a request to discard its iframe,
     // independent previews or unsaved controls. Reload is an explicit action.
     if(!reload&&this.opened&&this.active===identifier&&(!entry||this.frame&&this.generation===entry.generation)){
@@ -77,19 +91,23 @@ class AddonHost {
     }
     this.destroyFrame();this.opened=true;this.active=identifier;this.generation=entry?entry.generation:null;
     document.getElementById("panel").hidden=true;this.panel.hidden=false;this.panel.textContent="";
-    this.panel.setAttribute("aria-labelledby",identifier?"addon-tab-"+identifier:"addon-manager-tab");
-    this.panel.appendChild(el("h2",{text:entry?entry.name:T.addonTitle}));
-    this.panel.appendChild(el("button",{type:"button",text:T.addonReturn,on:{click:()=>this.close()}}));
+    this.panel.setAttribute("aria-labelledby","addon-tab-"+identifier);
+    this.panel.setAttribute("data-plugin-tone",pluginTone(identifier));
+    this.panel.appendChild(el("div",{class:"plugin-workspace-heading"},[
+      el("span",{class:"plugin-dot","aria-hidden":"true"}),el("h2",{text:entry.name}),
+      el("span",{class:"mode-badge plugin-badge",text:T.wsPlugin})]));
+    this.panel.appendChild(el("div",{class:"row plugin-workspace-actions"},[
+      el("button",{type:"button",text:T.addonReturn,on:{click:()=>this.close()}}),
+      el("button",{type:"button",text:T.addonFrameReload,on:{click:()=>this.select(identifier,true)}})]));
     if(entry){
       const status=el("p",{class:"muted",role:"status",text:T.addonFrameLoading});
-      this.panel.appendChild(el("button",{type:"button",text:T.addonFrameReload,on:{click:()=>this.select(identifier,true)}}));
       this.panel.appendChild(status);
       const frame=el("iframe",{class:"addon-frame",title:entry.name,sandbox:"allow-scripts",
         referrerpolicy:"no-referrer"});
       frame.addEventListener("load",()=>{if(this.frame===frame)status.hidden=true;});
       this.frame=frame;
       this.frameReady=this.loadFrame(frame,"/addon-assets/"+encodeURIComponent(entry.id)+"/"+encodeURIComponent(entry.generation)+"/"+entry.entry.split("/").map(encodeURIComponent).join("/"),status);
-    }else this.showManager();
+    }
     const url=new URL(window.location.href);
     if(identifier)url.searchParams.set("addon",identifier);else url.searchParams.delete("addon");
     window.history.replaceState(null,"",url);this.paintNav();
@@ -125,24 +143,50 @@ class AddonHost {
     const url=new URL(window.location.href);url.searchParams.delete("addon");window.history.replaceState(null,"",url);
     this.paintNav();
   }
+  openManager(message="") {
+    this.showManager();
+    this.managerError.textContent=message;
+    if(!this.menu.open)this.menu.showModal();
+  }
   showManager() {
-    let content=this.panel.querySelector(".addon-manager");
-    if(content)content.remove();content=el("div",{class:"addon-manager"});this.panel.appendChild(content);
+    this.managerPanel.textContent="";
+    const content=el("div",{class:"addon-manager"});this.managerPanel.appendChild(content);
     content.appendChild(el("p",{text:T.addonInstallNote}));
-    content.appendChild(el("p",{text:T.addonReadyNote}));
+    content.appendChild(el("p",{class:"plugin-directory",text:this.directory||T.pluginDefaultDirectory}));
     const error=el("p",{class:"error",role:"status"});content.appendChild(error);
     this.managerError=error;
+    for(const failure of this.discoveryErrors||[])
+      content.appendChild(el("p",{class:"error",text:(failure.path?failure.path+": ":"")+(failure.error?.message||failure.message||T.addonFailure)}));
+    const pathInput=el("input",{type:"text",class:"wide","aria-label":T.pluginPath,placeholder:T.pluginPathHint,required:"required"});
+    const load=el("button",{type:"submit",class:"primary",text:T.pluginLoad});
+    const form=el("form",{class:"plugin-path-form"},[
+      el("label",null,[T.pluginPath,pathInput]),el("div",{class:"row"},[load,
+        el("button",{type:"button",text:T.pluginRescan,on:{click:async()=>{
+          try{await this.refresh();}catch(exc){error.textContent=String(exc.message||exc);}
+        }}})])]);
+    form.addEventListener("submit",async(event)=>{
+      event.preventDefault();if(!pathInput.value.trim())return;
+      load.disabled=true;error.textContent="";
+      try{await this.json("/api/addons/load",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({path:pathInput.value.trim()})});await this.refresh();}
+      catch(exc){error.textContent=String(exc.message||exc);load.disabled=false;}
+    });
+    content.appendChild(form);
     const zipInput=(label,path)=>{
       const input=el("input",{type:"file",accept:".zip,application/zip","aria-label":label});
       input.addEventListener("change",async()=>{
         if(!input.files.length)return;input.disabled=true;
-        try{await this.json(path,{method:"POST",headers:{"Content-Type":"application/zip"},body:input.files[0]});await this.refresh();}
+        try{
+          const installed=await this.json(path,{method:"POST",headers:{"Content-Type":"application/zip"},body:input.files[0]});
+          if(path==="/api/addons/install")await this.json("/api/addons/enabled",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id:installed.id,enabled:true})});
+          await this.refresh();
+        }
         catch(exc){error.textContent=String(exc.message||exc);input.disabled=false;input.value="";}
       });return input;
     };
-    content.appendChild(el("label",null,[T.addonInstall,zipInput(T.addonInstall,"/api/addons/install")]));
-    content.appendChild(el("p",{text:T.addonUpdateNote}));
-    content.appendChild(el("label",null,[T.addonUpdate,zipInput(T.addonUpdate,"/api/addons/update")]));
+    content.appendChild(el("details",{class:"plugin-zip-controls"},[el("summary",{text:T.pluginZipOptions}),
+      el("label",null,[T.addonInstall,zipInput(T.addonInstall,"/api/addons/install")]),
+      el("p",{text:T.addonUpdateNote}),
+      el("label",null,[T.addonUpdate,zipInput(T.addonUpdate,"/api/addons/update")])]));
     if(!this.entries.length)content.appendChild(el("p",{text:T.addonEmpty}));
     for(const row of this.entries){
       const toggle=el("input",{type:"checkbox","aria-label":row.name||row.id});toggle.checked=row.enabled;
@@ -152,8 +196,10 @@ class AddonHost {
         try{await this.json("/api/addons/enabled",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id:row.id,enabled:toggle.checked})});await this.refresh();}
         catch(exc){error.textContent=String(exc.message||exc);toggle.checked=row.enabled;toggle.disabled=!row.compatible;}
       });
-      content.appendChild(el("section",null,[el("label",null,[toggle," "+(row.name||row.id)+" "+(row.version||"")]),
-        el("p",{class:"muted",text:row.enabled?T.addonEnabled:T.addonDisabledState}),
+      content.appendChild(el("section",{class:"plugin-card","data-plugin-tone":pluginTone(row.id)},[
+        el("div",{class:"plugin-card-heading"},[el("span",{class:"plugin-dot","aria-hidden":"true"}),
+          el("strong",{text:row.name||row.id}),el("span",{class:"muted",text:row.version||""})]),
+        el("label",{class:"plugin-toggle"},[toggle,row.enabled?T.addonEnabled:T.addonDisabledState]),
         el("button",{type:"button",text:T.addonOpen,...(!row.enabled||!row.compatible?{disabled:"disabled"}:{}),
           on:{click:()=>this.select(row.id)}}),
         el("p",{class:"muted",text:row.description||""}),row.error?el("p",{class:"error",text:row.error.message}):null]));

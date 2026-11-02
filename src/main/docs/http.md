@@ -176,7 +176,9 @@ API v1 includes these local add-on routes:
 
 | Request | Body | Result |
 |---|---|---|
-| `GET /api/addons` | — | `{apiVersion:1, addons:[...]}`; entries include opaque `generation` |
+| `GET /api/addons` | — | `{apiVersion:1, addons:[...], directory, discoveryErrors}`; entries include opaque `generation` |
+| `GET /api/addons?rescan=1` | — | Discover new direct plugin folders/ZIPs, preserving explicit disabled state |
+| `POST /api/addons/load` | JSON `{path}`, `Content-Type: application/json` | Load an absolute plugin folder/ZIP into an enabled immutable generation |
 | `POST /api/addons/install` | Raw ZIP, `Content-Type: application/zip` | Installed entry, disabled; existing ID returns `alreadyInstalled` |
 | `POST /api/addons/update` | Raw ZIP, `Content-Type: application/zip` | Replacement entry, disabled; manifest `id` selects an existing disabled target |
 | `POST /api/addons/enabled` | JSON `{id,enabled}`, `Content-Type: application/json` | The updated list envelope |

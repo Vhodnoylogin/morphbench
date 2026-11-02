@@ -11,8 +11,13 @@ mode. Experimental physics and [placement](slots.md) code, documents and scripte
 retained for further development; they are not offered as release UI features.
 
 Enabled plugins are full workspace tabs in the same top navigation, marked **Plugin**.
-The **Add-ons** tab manages installation and activation. A plugin has its own inspector;
-its selection does not change the underlying model's core mode or expose withheld tools.
+Their persistent colours also identify their inspector and their entry in the separate
+**Plugins** menu in the header. The menu loads a plugin by its full folder/ZIP path and
+toggles installed plugins; it does not replace the active workspace. Compatible packages
+placed in `Morphbench/plugins` load and enable automatically. A manual disable survives
+refresh and restart. **Refresh folder** finds newly copied packages without restarting.
+The model picker stays on the left even while a plugin opens independent previews.
+A plugin's selection does not change the model's core mode or expose withheld tools.
 
 Colliders has **Edit capsules** and **Display** tabs. Skeleton geometry and PPB settings use
 the same capsule editor; PPB is a source of settings, not a separate editing mode. Old links

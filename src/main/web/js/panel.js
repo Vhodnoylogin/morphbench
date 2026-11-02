@@ -120,7 +120,7 @@ class WorkspaceUI {
     }
     document.body.setAttribute("data-workspace-mode", mode.id);
     document.body.setAttribute("data-workspace-addon", String(addonOpen));
-    document.getElementById("workspace-context").textContent = addonOpen ? T.addonTitle : T.wsModels;
+    document.getElementById("workspace-context").textContent = T.wsModels;
     document.getElementById("workspace-description").textContent = addonOpen ? addon && addon.description || T.addonReadyNote : mode.note;
     document.getElementById("workspace-status").textContent = addonOpen ? T.wsPlugin : this.bench.is_open() ? T.wsReady : T.wsNoMesh;
     document.getElementById("viewport-mode").textContent = addonOpen ? addon && addon.name || T.addonTitle : mode.label;

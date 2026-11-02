@@ -363,13 +363,19 @@ class WebServer:
                                   max_fields=int(self.cfg["physicsMaxFields"]))
         return {"document": document}
 
-    def api_addons(self, body=None):
+    def api_addons(self, body=None, *, rescan=False):
         with self.lock:
             if body is not None:
                 if not isinstance(body, dict) or set(body) != {"id", "enabled"}:
                     raise ValueError(t("err.addonParams"))
                 self.bench.addon_enable(body["id"], body["enabled"])
-            return self.bench.addons()
+            return self.bench.addons(rescan=rescan)
+
+    def api_addon_load(self, body):
+        if not isinstance(body, dict) or set(body) != {"path"} or not isinstance(body["path"], str):
+            raise ValueError(t("err.addonParams"))
+        with self.lock:
+            return self.bench.addon_load(body["path"])
 
     def api_addon_install(self, data):
         with self.lock:
@@ -626,7 +632,7 @@ class _Handler(BaseHTTPRequestHandler):
             elif url.path == "/api/workspace":
                 self._send_json(owner.api_workspace())
             elif url.path == "/api/addons":
-                self._send_json(owner.api_addons())
+                self._send_json(owner.api_addons(rescan=query.flag("rescan")))
             elif url.path == "/api/shutdown":
                 if (guarded_shutdown and "pid" in query.values
                         and query.get("pid") != str(os.getpid())):
@@ -674,7 +680,7 @@ class _Handler(BaseHTTPRequestHandler):
         try:
             path = urlsplit(self.path).path
             if path not in ("/api/physics/import", "/api/workspace", "/api/workspace/skeleton",
-                            "/api/addons/install", "/api/addons/update", "/api/addons/enabled"):
+                            "/api/addons/install", "/api/addons/update", "/api/addons/enabled", "/api/addons/load"):
                 raise RequestError(404, t("serve.noSuchPath", path=path))
             uploading = path in ("/api/addons/install", "/api/addons/update")
             if (self._foreign_origin() or self.headers.get_content_type() !=
@@ -700,6 +706,8 @@ class _Handler(BaseHTTPRequestHandler):
                 self._send_json(self.owner.api_physics_import(body))
             elif path == "/api/addons/enabled":
                 self._send_json(self.owner.api_addons(body))
+            elif path == "/api/addons/load":
+                self._send_json(self.owner.api_addon_load(body))
             elif path == "/api/workspace":
                 self._send_json(self.owner.api_workspace(body))
             else:

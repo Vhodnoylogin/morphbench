@@ -664,10 +664,12 @@ def cmd_workspace(args) -> int:
 def cmd_addons(args) -> int:
     bench = MorphBench()
     if sum(bool(getattr(args, name, None))
-           for name in ("install", "update", "enable", "disable")) > 1:
+           for name in ("install", "load", "update", "enable", "disable")) > 1:
         raise ValueError(t("err.addonParams"))
     if args.install:
         bench.addon_install(args.install)
+    if getattr(args, "load", None):
+        bench.addon_load(args.load)
     if getattr(args, "update", None):
         bench.addon_update(args.update)
     if args.enable or args.disable:
@@ -912,6 +914,7 @@ VIEW_ARGS = (
 COMMANDS = (
     Command("addons", "cli.cmd.addons", cmd_addons, mesh=MESH_NONE, args=(
         Arg("--install", default=None, help_key="cli.opt.addons.install"),
+        Arg("--load", default=None, help_key="cli.opt.addons.load"),
         Arg("--update", default=None, help_key="cli.opt.addons.update"),
         Arg("--enable", default=None, help_key="cli.opt.addons.enable"),
         Arg("--disable", default=None, help_key="cli.opt.addons.disable"),

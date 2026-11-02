@@ -179,7 +179,9 @@ API v1 включает следующие маршруты локальных �
 
 | Запрос | Тело | Результат |
 |---|---|---|
-| `GET /api/addons` | — | `{apiVersion:1, addons:[...]}`; записи содержат непрозрачную `generation` |
+| `GET /api/addons` | — | `{apiVersion:1, addons:[...], directory, discoveryErrors}`; записи содержат непрозрачную `generation` |
+| `GET /api/addons?rescan=1` | — | Обнаружить новые папки/ZIP, сохраняя ручное выключение плагинов |
+| `POST /api/addons/load` | JSON `{path}`, `Content-Type: application/json` | Загрузить папку/ZIP по абсолютному пути в новое включённое поколение |
 | `POST /api/addons/install` | Байты ZIP, `Content-Type: application/zip` | Установленная запись, отключена; существующий ID возвращает `alreadyInstalled` |
 | `POST /api/addons/update` | Байты ZIP, `Content-Type: application/zip` | Заменяющая запись, отключена; `id` манифеста выбирает существующий отключённый пакет |
 | `POST /api/addons/enabled` | JSON `{id,enabled}`, `Content-Type: application/json` | Обновлённый список с обёрткой |

@@ -212,18 +212,19 @@ document.querySelectorAll=()=>[];document.body=new ControlElement("body");
                            + "\n(async()=>{\n" + code
                            + "\n})().catch(error=>{console.error(error);process.exitCode=1;});", **values)
 
-    def test_zip_controls_keep_order_endpoint_bytes_and_retry_behavior(self):
+    def test_zip_controls_keep_endpoint_bytes_activation_and_retry_behavior(self):
         result = self.run_js(r'''
 const host=Object.create(AddonHost.prototype),requests=[],outcomes=[];let phase,refreshes=0,expectedFile;
-host.panel=new ControlElement("aside");host.entries=[];
+host.managerPanel=new ControlElement("div");host.entries=[];
 host.json=async(path,options)=>{
   requests.push({path,method:options.method,type:options.headers["Content-Type"],same:options.body===expectedFile});
   if(phase==="uploadFailure")throw Error("ZIP rejected");
+  return {id:"example"};
 };
 host.refresh=async()=>{refreshes++;if(phase==="refreshFailure")throw Error("Refresh rejected");};
-host.showManager();const content=host.panel.children[0],error=host.managerError;
-const order=content.children.map(node=>node.tag==="label"?node.children[0].textContent:node.textContent);
-for(const control of content.children.flatMap(node=>node.children).filter(node=>node.tag==="input")) {
+host.showManager();const content=host.managerPanel.children[0],error=host.managerError;
+const walk=node=>[node,...node.children.flatMap(walk)];
+for(const control of walk(content).filter(node=>node.tag==="input"&&node.attrs.type==="file")) {
   await control.events.change();
   for(phase of ["success","uploadFailure","refreshFailure"]) {
     expectedFile={name:"package.zip"};control.files=[expectedFile];control.value="selected.zip";control.disabled=false;
@@ -231,13 +232,13 @@ for(const control of content.children.flatMap(node=>node.children).filter(node=>
     outcomes.push({phase,pending,disabled:control.disabled,value:control.value,error:error.textContent});
   }
 }
-console.log(JSON.stringify({order,expectedOrder:[T.addonInstallNote,T.addonReadyNote,"",T.addonInstall,T.addonUpdateNote,T.addonUpdate,T.addonEmpty],
- requests,outcomes,refreshes}));
+console.log(JSON.stringify({requests,outcomes,refreshes}));
 ''')
-        self.assertEqual(result["order"], result["expectedOrder"])
-        self.assertEqual(result["requests"], [
+        self.assertEqual([row for row in result["requests"] if row["type"] == "application/zip"], [
             {"path": "/api/addons/" + operation, "method": "POST", "type": "application/zip", "same": True}
             for operation in ("install", "update") for _ in range(3)])
+        self.assertEqual([row for row in result["requests"] if row["type"] == "application/json"], [
+            {"path": "/api/addons/enabled", "method": "POST", "type": "application/json", "same": False}] * 2)
         self.assertEqual(result["refreshes"], 4)
         for outcome in result["outcomes"]:
             self.assertTrue(outcome["pending"])
@@ -329,27 +330,23 @@ console.log(JSON.stringify({legacy,display,morphs,calls,modes:[...ui.modeButtons
 const bench=new BenchMirror(DATA),calls=[],addons={opened:false,active:null,entries:[{id:'inspector',name:'Inspector',description:'Inspect this pair'}]};
 let ui;const app={bench,addons,invoke(method,...args){calls.push([method,...args]);addons.opened=false;return bench[method](...args);}};
 ui=new WorkspaceUI(app);
-const manager=el('button',{id:'addon-manager-tab',class:'mode-button addon-workspace-tab',on:{click(){addons.opened=true;addons.active=null;ui.refresh();}}});
 const plugin=el('button',{id:'addon-tab-inspector',class:'mode-button addon-workspace-tab',on:{click(){addons.opened=true;addons.active='inspector';ui.refresh();}}});
-ui.modeNav.appendChild(manager);ui.modeNav.appendChild(plugin);ui.setAddonTabs(new Map([[null,manager],['inspector',plugin]]));
+ui.modeNav.appendChild(plugin);ui.setAddonTabs(new Map([['inspector',plugin]]));
 const snapshot=()=>({selected:[...ui.modeButtons,...ui.addonButtons].filter(([,button])=>button.attrs['aria-selected']==='true').map(([id])=>id),
   focused:[...ui.modeButtons,...ui.addonButtons].find(([,button])=>button===document.activeElement)?.[0],
   tabsHidden:ui.tabNav.hidden,context:document.getElementById('viewport-mode').textContent,mode:bench.workspace_state().mode});
 app.invoke('workspace_mode','colliders');ui.refresh();ui.modeButtons.get('colliders').focus();
-ui.modeNav.events.keydown({key:'ArrowRight',preventDefault(){}});const managerState=snapshot();
 ui.modeNav.events.keydown({key:'ArrowRight',preventDefault(){}});const pluginState=snapshot();
 ui.modeNav.events.keydown({key:'Home',preventDefault(){}});ui.refresh();const coreState=snapshot();
-console.log(JSON.stringify({managerState,pluginState,coreState,roles:[...ui.modeButtons.values(),...ui.addonButtons.values()].map(button=>button.attrs.role),
+console.log(JSON.stringify({pluginState,coreState,roles:[...ui.modeButtons.values(),...ui.addonButtons.values()].map(button=>button.attrs.role),
   count:ui.modeNav.children.length,navRole:ui.modeNav.attrs.role,calls}));
 ''')
-        self.assertEqual(result["managerState"], {"selected": [None], "focused": None,
-                         "tabsHidden": True, "context": "Add-ons", "mode": "colliders"})
         self.assertEqual(result["pluginState"], {"selected": ["inspector"], "focused": "inspector",
                          "tabsHidden": True, "context": "Inspector", "mode": "colliders"})
         self.assertEqual(result["coreState"], {"selected": ["morphs"], "focused": "morphs",
                          "tabsHidden": False, "context": "Morphs", "mode": "morphs"})
-        self.assertEqual(result["roles"], ["tab"] * 5)
-        self.assertEqual(result["count"], 5)
+        self.assertEqual(result["roles"], ["tab"] * 4)
+        self.assertEqual(result["count"], 4)
         self.assertEqual(result["navRole"], "tablist")
         self.assertEqual(result["calls"], [["workspace_mode", "colliders"], ["workspace_mode", "morphs"]])
 

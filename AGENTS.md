@@ -1,11 +1,13 @@
 # Morphbench
 
-GitHub's recommended user download is one combined structured ZIP containing Launcher
-and Application. Build it from the verified split archives without changing their bytes.
-Nexus continues to publish Application and Launcher separately. Keep existing published
-component assets available where immutable source pins or moderation requests refer to
-them; identify them as component mirrors rather than the recommended GitHub installation.
-Matching native dependency source stays a separate optional developer download.
+GitHub publishes Application and Launcher in separate releases with independent versions.
+Application releases use tags such as v0.8.8; Launcher releases use tags such as launcher-v3.
+Cross-link both releases and make clear that a first installation needs both packages;
+ordinary Application updates reuse the installed compatible Launcher. Launcher releases
+must identify the exact source that built their unchanged native package. Preserve existing
+published assets referenced by immutable build pins or moderation requests. Nexus also
+publishes Application and Launcher separately. Matching native dependency source stays a
+separate optional developer download.
 
 Repository: https://github.com/Vhodnoylogin/morphbench
 Default branch: main

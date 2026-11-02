@@ -57,23 +57,25 @@ edited or fitted collision capsules, and edited physics configurations into new 
 ## What it needs
 
 **From a release — no separate Python or Blender installation.** On GitHub, download
-**morphbench-0.8.8-win64.zip**, which includes **Application 0.8.8** and
-**Morphbench Launcher v3**. On Nexus, download the two separate Main files.
+**morphbench-application-0.8.8.zip** from [Application 0.8.8](https://github.com/Vhodnoylogin/morphbench/releases/tag/v0.8.8)
+and **morphbench-launcher-v3-win64.zip** from [Launcher v3](https://github.com/Vhodnoylogin/morphbench/releases/tag/launcher-v3).
+These are separate releases with independent versions. On Nexus, download the two Main files.
+If Launcher v3 is already installed, this update only needs Application.
 Application contains the workbench's Python, browser assets, translations and documentation;
 Launcher contains the separately versioned native Runtime (`runtime-3-win64`). Their versions are independent.
 Launcher v3 only starts bundled Python; the window, options, discovery and server lifecycle
 are updateable Application code. This keeps ordinary fixes out of the native package.
 
-Both distribution formats start at `root/Morphbench/`. Copy `Morphbench` into one
-writable tools folder or the game root; merge the two folders when using Nexus packages.
+Both packages start at `root/Morphbench/`. Copy their `Morphbench` folders into one
+writable tools folder or the game root and merge them.
 Run `Morphbench/launcher/morphbench.exe`.
 The result has `launcher/`, `app/` and `plugins/` under one `Morphbench` directory.
 Do not copy the literal `root` folder into the game or place its contents in `Data`.
 
 For installation through MO2, optionally use
 [Kezyma's Root Builder](https://www.nexusmods.com/skyrimspecialedition/mods/31720).
-Install the GitHub ZIP as one enabled mod, keeping `root/Morphbench`. For Nexus's two
-ZIPs, use separate enabled mods and give Application higher priority than Launcher.
+Install both ZIPs as separate enabled mods, keeping `root/Morphbench` and giving
+Application higher priority than Launcher.
 Build the root deployment. Register the deployed
 `Morphbench/launcher/morphbench.exe` in MO2. A manual external installation also works
 through MO2 and does not require Root Builder. On Nexus, both downloads are Main Files,

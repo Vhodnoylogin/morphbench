@@ -34,8 +34,10 @@ The source layout does not change installed packages: they retain
 
 Released downloads are [GitHub release assets](https://github.com/Vhodnoylogin/morphbench/releases)
 and [Nexus files](https://www.nexusmods.com/skyrimspecialedition/mods/194795).
-On GitHub, download **morphbench-0.8.8-win64.zip**: it includes Application 0.8.8
-and Launcher v3. Nexus keeps the two components as separate downloads.
+GitHub has separate releases for [Application 0.8.8](https://github.com/Vhodnoylogin/morphbench/releases/tag/v0.8.8)
+and [Launcher v3](https://github.com/Vhodnoylogin/morphbench/releases/tag/launcher-v3).
+Download both for a first installation; existing Launcher v3 users only need the Application
+update. Nexus also keeps the two components as separate downloads.
 The optional `morphbench-nifly-corresponding-source.zip` is the matching C/C++ source
 of the bundled Nifly/PyNifly dependency, not an installation package. Those third-party
 sources are not vendored in this repository; its pins and build recipe refer to them.

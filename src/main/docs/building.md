@@ -43,18 +43,21 @@ Application-owned. Application contains no native binaries and accepts compatibl
 `--layout flat` remains available for existing flat installations; the normal published
 format is structured. Do not perform in-place cross-layout updates.
 
-For GitHub, combine the verified structured components into one user download:
+On GitHub, publish the verified structured components in separate releases:
 
-```text
-python release.py --package combined --runtime-from <runtime.zip> --application-from <application.zip> --out <output>
-```
+- [Application 0.8.8](https://github.com/Vhodnoylogin/morphbench/releases/tag/v0.8.8)
+  supplies `morphbench-application-0.8.8.zip` from its exact Application source commit.
+- [Launcher v3](https://github.com/Vhodnoylogin/morphbench/releases/tag/launcher-v3)
+  supplies the unchanged native package as `morphbench-launcher-v3-win64.zip`, tagged at the exact native
+  source commit `ac15b242dbe1013d2c46a521fb6fad1f03161b52`.
 
-This creates `morphbench-<Application-version>-win64.zip` with both components under
-`root/Morphbench/`. It verifies inventories and compatibility, keeps manifests and file
-bytes, and takes the Application-owned shim/translation overlay from Application.
-No compiler or dependency download is involved. Nexus retains the two separate files.
-Preserve already-published component mirrors used by immutable pins and review requests;
-the GitHub release points ordinary users to the combined ZIP.
+Cross-link both release descriptions. A first installation requires both packages;
+ordinary Application updates reuse the compatible installed Launcher. Nexus retains its
+separate Application and Launcher files. Keep historical assets used by immutable build
+pins and moderation requests available, including the older Runtime download URL in
+`runtime-lock.json`. Do not rebuild or relabel that native archive for an App-only update.
+The combined-package builder remains available for compatibility with older distributions;
+a combined ZIP is not the current GitHub publication format.
 
 ## Deliberately create a new Runtime
 
@@ -113,7 +116,7 @@ half/Miniball notices ship with the DLL. Minimality does not waive source obliga
 
 These are the dependency's C/C++ sources, not duplicate Morphbench sources. Morphbench
 Git tracks the pins and build recipe, not those upstream source trees. Users only need
-the combined GitHub ZIP (or both Nexus files); this source asset is for rebuilding and
+both Application and Launcher packages from GitHub or Nexus; this source asset is for rebuilding and
 auditing the bundled DLL and preserves access to its matching source separately.
 
 Upstream source and licence: [PyNifly at the wrapper commit](https://github.com/BadDogSkyrim/PyNifly/tree/934fbbfbb41b63ed636d44afa957ec98d7fb0803)

@@ -57,24 +57,25 @@ morphbench измеряет выбранные файлы меша, морфов
 ## Что нужно
 
 **Из выпуска — отдельная установка Python или Blender не нужна.** На GitHub скачайте
-**morphbench-0.8.8-win64.zip**: он содержит **Application 0.8.8** и
-**Morphbench Launcher v3**. На Nexus скачайте два отдельных Main-файла.
+**morphbench-application-0.8.8.zip** из релиза [Application 0.8.8](https://github.com/Vhodnoylogin/morphbench/releases/tag/v0.8.8)
+и **morphbench-launcher-v3-win64.zip** из релиза [Launcher v3](https://github.com/Vhodnoylogin/morphbench/releases/tag/launcher-v3).
+Это отдельные релизы с независимыми версиями. На Nexus скачайте два Main-файла.
+Если Launcher v3 уже установлен, для этого обновления достаточно Application.
 Application содержит Python-код верстака, браузер, переводы и документацию;
 Launcher — отдельно версионируемый нативный Runtime (`runtime-3-win64`). Их версии независимы.
 Launcher v3 только запускает комплектный Python; окно, параметры, поиск установки и
 управление сервером — обновляемый код Application. Обычные исправления не затрагивают EXE.
 
-Оба формата начинаются с `root/Morphbench/`. Перенесите `Morphbench` в папку инструментов
-с правом записи или корень игры; для пакетов Nexus объедините две папки.
+Оба пакета начинаются с `root/Morphbench/`. Перенесите их папки `Morphbench` в одну папку
+инструментов с правом записи или корень игры и объедините их.
 Запускайте `Morphbench/launcher/morphbench.exe`.
 Внутри `Morphbench` находятся `launcher/`, `app/` и `plugins/`. Саму папку `root`
 не копируйте в игру; её содержимое также не предназначено для `Data`.
 
 Для установки через MO2 можно использовать необязательный
 [Kezyma's Root Builder](https://www.nexusmods.com/skyrimspecialedition/mods/31720).
-Установите ZIP с GitHub одним включённым модом, сохранив `root/Morphbench`. Для двух
-ZIP с Nexus используйте отдельные моды и дайте Application больший приоритет, чем
-Launcher. Соберите корневое развёртывание.
+Установите оба ZIP отдельными включёнными модами, сохранив `root/Morphbench`, и дайте
+Application больший приоритет, чем Launcher. Соберите корневое развёртывание.
 Добавьте `Morphbench/launcher/morphbench.exe` из развёртывания в MO2. Ручная внешняя
 установка тоже запускается через MO2 и не требует Root Builder. На Nexus оба пакета —
 Main Files, Application — Primary; доступны Manual и Mod manager download.

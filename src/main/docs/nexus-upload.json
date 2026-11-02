@@ -1,15 +1,15 @@
 {
-  "version": "0.8.5",
-  "launcherVersion": "v1",
-  "runtimeId": "runtime-1-win64",
+  "version": "0.8.8",
+  "launcherVersion": "v3",
+  "runtimeId": "runtime-3-win64",
   "modId": 194795,
   "page": "https://www.nexusmods.com/skyrimspecialedition/mods/194795",
   "title": "Morphbench - Mesh Morph and Collider Workbench",
   "author": "Vhodnoylogin",
-  "summary": "Windows x64 NIF/TRI workbench: morphs, bounds and editable skeleton capsules, NIF/PPB exports, CLI/HTTP and browser add-ons. Application 0.8.5 + Launcher v1 use Morphbench/launcher, app and plugins. Install manually or through MO2 with optional Root Builder.",
+  "summary": "Inspect Skyrim NIF meshes and TRI morphs, edit skeleton collision capsules and extend the workbench with plugins. Includes mesh search, a browser viewer, command-line tools and a local HTTP API.",
   "descriptionFile": "src/main/docs/nexus-description.bbcode",
-  "sourceTag": "https://github.com/Vhodnoylogin/morphbench/tree/v0.8.5",
-  "githubRelease": "https://github.com/Vhodnoylogin/morphbench/releases/tag/v0.8.5",
+  "sourceTag": "https://github.com/Vhodnoylogin/morphbench/tree/v0.8.8",
+  "githubRelease": "https://github.com/Vhodnoylogin/morphbench/releases/tag/v0.8.8",
   "archivePrefix": "root/Morphbench/",
   "layout": [
     "launcher",
@@ -18,30 +18,27 @@
   ],
   "mainFiles": [
     {
-      "nexusFileId": 829572,
-      "name": "Morphbench Application 0.8.5",
-      "version": "0.8.5",
+      "name": "Morphbench Application",
+      "version": "0.8.8",
       "primary": true,
-      "filename": "morphbench-application-0.8.5.zip",
-      "bytes": 617678,
-      "sha256": "c24ab0f44431b4bff0d3ed5f708ede4a30523f724bed96c5d42e894383b10f19",
-      "nativeBinaries": false,
-      "filesIncludingManifest": 153,
+      "filename": "morphbench-application-0.8.8.zip",
       "allowModManagerDownload": true,
-      "requiresLauncher": "v1"
+      "description": "The Morphbench workbench: mesh viewing, morphs, colliders and plugins.",
+      "nativeBinaries": false,
+      "nexusFileId": 831063,
+      "bytes": 613205,
+      "sha256": "a2ea63d0dec24558182b846b208ba6ffcd96ed0fd9e4d2d85ad1c4e9a7bf8ebc"
     },
     {
-      "nexusFileId": 829573,
-      "name": "Morphbench Launcher v1",
-      "version": "v1",
+      "name": "Morphbench Launcher",
+      "version": "v3",
       "primary": false,
-      "filename": "morphbench-runtime-1-win64.zip",
-      "bytes": 29809251,
-      "sha256": "bb0dd7ac499aa2764fb7c954780b01fb26c503402b7999216da810df061b5624",
-      "inventoriedRuntimeFilesUnchanged": 1018,
-      "filesIncludingManifestAndOverlay": 1022,
+      "nexusFileId": 830285,
+      "filename": "morphbench-runtime-3-win64.zip",
       "allowModManagerDownload": true,
-      "exeSha256": "cda1b18bdc2610a53daffcbbd3df333f1d78baf3a23313b9921efe96fa38b5fa"
+      "description": "Starts Morphbench. Includes Python and the libraries needed to run it.",
+      "reusePublishedFile": true,
+      "githubFilename": "morphbench-launcher-v3-win64.zip"
     }
   ],
   "optionalNexusMods": [
@@ -56,7 +53,7 @@
     "manual": "Merge Morphbench folders from inside root; run Morphbench/launcher/morphbench.exe.",
     "mo2": "Separate enabled Launcher/Application mods, Application higher priority, optional Root Builder deployment; register the game-root executable.",
     "migration": "Retain flat 0.8.0 installation; migrate settings and complete add-on registry into a new structured folder.",
-    "updates": "Close server/launcher; update App-owned files with exact Runtime check, preserving settings/plugins/native Runtime."
+    "updates": "Close server/launcher; use the new Application updater, preserving settings/plugins and compatible native Runtime."
   },
   "archivedSupersededFiles": [
     829155,
@@ -72,9 +69,9 @@
     "screenshots": "Existing authentic 0.8.0 Morphs/Colliders captures remain representative; no game/model assets are bundled."
   },
   "addonDistribution": "CLAW add-on is a separate Nexus mod and is not bundled in either package.",
-  "historicalPublicationEvidence": "Top-level 0.8.5 metadata and prior delivery records are historical provenance; currentPublication records the last verified upload, preparedRelease is the next publication plan.",
+  "historicalPublicationEvidence": "Previous publication receipts and original metadata are retained in publicationHistory/contentUpdate.",
   "requirementsMethod": "legacy",
-  "optionalRequirementDisclosure": "Root Builder is optional for MO2 root deployment; manual/external installation needs no Root Builder. Launcher v1 is required.",
+  "optionalRequirementDisclosure": "Root Builder is optional for MO2 root deployment; install both Application and a compatible Launcher for a first installation.",
   "pluginAuthoring": {
     "supported": true,
     "kind": "sandboxed browser HTML/JavaScript/CSS plugins",
@@ -86,64 +83,49 @@
     "source": "docs/nexus-architecture-post-0.8.5.bbcode"
   },
   "currentPublication": {
-    "applicationVersion": "0.8.7",
+    "status": "published; App available on Nexus, existing Launcher v3 remains quarantined there",
+    "applicationVersion": "0.8.8",
     "launcherVersion": "v3",
     "runtimeId": "runtime-3-win64",
-    "sourceCommit": "e8e0ea7c460948e68fb84139dfb4d98289b26dcf",
-    "nativeLauncherSourceCommit": "ac15b242dbe1013d2c46a521fb6fad1f03161b52",
-    "githubRelease": "https://github.com/Vhodnoylogin/morphbench/releases/tag/v0.8.7",
-    "applicationFileId": 830284,
-    "githubCombinedArchive": {
-      "name": "morphbench-0.8.7-win64.zip",
-      "bytes": 30179461,
-      "sha256": "3b95233f73e1588e1e9639c160ed4f051f7df951625a5231bd9118bc01fdc2bb",
-      "packagingCommit": "7bf060f",
-      "files": 1157,
-      "payloadBytesUnchanged": true,
-      "githubDigestVerified": true,
-      "componentAssetsPreserved": true,
-      "nexusFilesUnchanged": true,
-      "evidence": "D:/Skyrim VR Modding/Builds/morphbench-github-combined-20261101/publication.json"
-    },
-    "launcherFileId": 830285,
-    "applicationVersionId": "7318625102668",
-    "launcherVersionId": "7318625102669",
+    "sourceTag": "https://github.com/Vhodnoylogin/morphbench/tree/v0.8.8",
+    "githubRelease": "https://github.com/Vhodnoylogin/morphbench/releases/tag/v0.8.8",
+    "descriptionFile": "src/main/docs/nexus-description.bbcode",
     "mainFiles": [
       {
         "name": "Morphbench Application",
-        "version": "0.8.7",
+        "version": "0.8.8",
         "primary": true,
-        "filename": "morphbench-application-0.8.7.zip",
+        "filename": "morphbench-application-0.8.8.zip",
         "allowModManagerDownload": true,
-        "description": "The Morphbench workbench: morph previews, collider editing and add-ons."
+        "description": "The Morphbench workbench: mesh viewing, morphs, colliders and plugins.",
+        "nativeBinaries": false,
+        "nexusFileId": 831063,
+        "bytes": 613205,
+        "sha256": "a2ea63d0dec24558182b846b208ba6ffcd96ed0fd9e4d2d85ad1c4e9a7bf8ebc"
       },
       {
         "name": "Morphbench Launcher",
         "version": "v3",
         "primary": false,
+        "nexusFileId": 830285,
         "filename": "morphbench-runtime-3-win64.zip",
         "allowModManagerDownload": true,
-        "description": "Starts Morphbench. Includes Python and the libraries needed to run it."
+        "description": "Starts Morphbench. Includes Python and the libraries needed to run it.",
+        "reusePublishedFile": true,
+        "githubFilename": "morphbench-launcher-v3-win64.zip"
       }
     ],
     "changelogs": [
       {
-        "version": "0.8.7",
+        "version": "0.8.8",
         "entries": [
-          "Moved the launcher window, settings, discovery and server control into the updateable Application.",
-          "Improved session recovery and preserved fitted capsule geometry in saved recipes and skeleton exports.",
-          "Kept repeated edits within the recovery action limit.",
-          "Improved validation of capsule radii, add-on metadata and update destinations.",
-          "Refactored editing sessions and settings ownership. Settings and installed add-ons are preserved.",
-          "Restored Morphbench window and taskbar icons. Incomplete launcher arguments now produce a diagnostic instead of silently exiting."
-        ]
-      },
-      {
-        "version": "v3",
-        "entries": [
-          "Reduced the native launcher to starting bundled Python and forwarding arguments and the exit code.",
-          "Moved the window and startup behavior into Application so routine fixes can reuse the same EXE.",
-          "Install Application 0.8.7 or a newer compatible Application before replacing Launcher."
+          "Search meshes by filename or path in the left sidebar; press Enter to open a unique match.",
+          "Keep model selection visible during plugin previews and distinguish core and plugin workspace tabs.",
+          "Manage plugins in a separate menu: load a folder/ZIP by path, refresh discovery, and enable or disable plugins.",
+          "Automatically discover and enable new compatible packages in Morphbench/plugins; preserve manually disabled plugins across restarts.",
+          "Use stable plugin colours across tabs, inspector and menu; preserve the active plugin frame when reopening its workspace.",
+          "Remove the built-in Body Slots tab; keep Physics disabled. Body Slots is intended for a separate plugin.",
+          "Reuse Launcher v3 unchanged. Application updates preserve settings and installed plugins."
         ]
       }
     ],
@@ -153,54 +135,60 @@
       "offSiteRequirements": [
         {
           "name": "Morphbench Launcher / Application compatibility",
-          "url": "https://github.com/Vhodnoylogin/morphbench/blob/v0.8.7/src/main/docs/install-layout.md",
-          "notes": "Install both Main files. Launcher v3 needs Application 0.8.7 or a compatible newer App. Update Application before replacing Launcher. Application 0.8.7 supports Launcher v1, v2 and v3. Root Builder is optional."
+          "url": "https://github.com/Vhodnoylogin/morphbench/blob/v0.8.8/src/main/docs/install-layout.md",
+          "notes": "First install: both Main files. Application 0.8.8 supports Launcher v1/v2/v3. Existing v3 can be retained. Launcher v3 needs Application 0.8.7 or newer compatible App. Update Application first. Root Builder is optional."
         }
       ]
     },
+    "publicationNotes": [
+      "Publish corresponding source on main and record exact final archive hashes and source commit.",
+      "GitHub publishes morphbench-application-0.8.8.zip under v0.8.8 and unchanged morphbench-runtime-3-win64.zip under launcher-v3; cross-link both separate releases.",
+      "Nexus: upload Application as Primary Main; retain existing Launcher v3 Main file without reupload.",
+      "Put 0.8.8 changelog into the native Version changelog, keep file descriptions short, and compatibility details in Off-site requirements.",
+      "Keep Root Builder optional and preserve historical tags, assets, owner-authored posts and verified publication records.",
+      "No quarantine-status download banner in the mod description."
+    ],
+    "githubLauncherRelease": "https://github.com/Vhodnoylogin/morphbench/releases/tag/launcher-v3",
+    "githubDistribution": "separate releases with cross-links; Application marked Latest",
+    "applicationFileId": 831063,
+    "applicationVersionId": "7318625103447",
+    "launcherFileId": 830285,
+    "launcherVersionId": "7318625102669",
+    "sourceCommit": "c6ccedb823096b4d28af6079766e767b2397b676",
+    "nativeLauncherSourceCommit": "ac15b242dbe1013d2c46a521fb6fad1f03161b52",
+    "githubLauncherTag": "launcher-v3",
+    "githubApplicationTag": "v0.8.8",
+    "runtimeNativeBytesUnchanged": true,
     "verification": {
-      "modId": 194795,
-      "applicationFileId": 830284,
-      "launcherFileId": 830285,
-      "applicationVersionId": "7318625102668",
-      "launcherVersionId": "7318625102669",
-      "descriptionUpdated": true,
-      "nativeVersionChangelogs": [
-        "0.8.7",
-        "v3"
-      ],
-      "status": "published Main files; Launcher scanning",
-      "applicationStatus": "available; public SHA256 link matches final App archive",
-      "launcherStatus": "quarantined; confirmed on public file830285 after owner review",
-      "requirementsUpdated": true,
-      "requirementsMethod": "legacy",
-      "rootBuilderOptional": true,
-      "versionFreeFileNames": true,
-      "fileDescriptionsShort": true,
+      "checks": 903,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 1,
+      "finalPackageUpdatePreservesState": true,
+      "nativeInventoryUnchanged": true,
+      "nativeDiagnosticExit": 0,
+      "githubDigestsVerified": true,
       "sourceCommitOnMain": true,
-      "proof": "nexus-files-proof.png"
+      "nexusApplicationAvailable": true,
+      "nexusLauncherQuarantined": true,
+      "shortFileDescriptions": true,
+      "nativeVersionChangelogVerified": true,
+      "requirementsMethod": "legacy",
+      "optionalRootBuilder": true,
+      "offSiteRequirementsVerifiedAfterReload": true,
+      "descriptionReadbackMatches": true
     },
     "archives": {
-      "morphbench-application-0.8.7.zip": {
-        "bytes": 602664,
-        "sha256": "fca08bcd797837ee9acfb3c4f58e5d27296ec211b62ee842ffc925299c24a80f"
+      "morphbench-application-0.8.8.zip": {
+        "bytes": 613205,
+        "sha256": "a2ea63d0dec24558182b846b208ba6ffcd96ed0fd9e4d2d85ad1c4e9a7bf8ebc"
       },
-      "morphbench-nifly-corresponding-source.zip": {
-        "bytes": 3035127,
-        "sha256": "eac96bd45bc26a5bb0031d73d3e52695340cd417506ee1b51a26454b7fe7daff"
-      },
-      "morphbench-runtime-3-win64.zip": {
+      "morphbench-launcher-v3-win64.zip": {
         "bytes": 29584284,
         "sha256": "529514b50d752b0dbfea7dfb23fc8dbfcc37c42e58cbfa85d435853417627960"
       }
     },
-    "moderation": {
-      "emailSent": true,
-      "reviewRequested": true,
-      "fileId": 830285,
-      "lastLauncherObservation": "quarantined; review requested after owner checked release",
-      "clearanceGranted": false
-    }
+    "evidence": "D:/Skyrim VR Modding/Builds/morphbench-release-088-20261102/"
   },
   "contentUpdate": {
     "status": "published and verified through public file cards, per-version changelog popups and public requirements",
@@ -282,7 +270,7 @@
     }
   },
   "preparedRelease": {
-    "status": "prepared; publication requires verified upload receipts",
+    "status": "published; see currentPublication for exact receipts",
     "applicationVersion": "0.8.8",
     "launcherVersion": "v3",
     "runtimeId": "runtime-3-win64",
@@ -297,7 +285,10 @@
         "filename": "morphbench-application-0.8.8.zip",
         "allowModManagerDownload": true,
         "description": "The Morphbench workbench: mesh viewing, morphs, colliders and plugins.",
-        "nativeBinaries": false
+        "nativeBinaries": false,
+        "nexusFileId": 831063,
+        "bytes": 613205,
+        "sha256": "a2ea63d0dec24558182b846b208ba6ffcd96ed0fd9e4d2d85ad1c4e9a7bf8ebc"
       },
       {
         "name": "Morphbench Launcher",
@@ -307,7 +298,8 @@
         "filename": "morphbench-runtime-3-win64.zip",
         "allowModManagerDownload": true,
         "description": "Starts Morphbench. Includes Python and the libraries needed to run it.",
-        "reusePublishedFile": true
+        "reusePublishedFile": true,
+        "githubFilename": "morphbench-launcher-v3-win64.zip"
       }
     ],
     "changelogs": [
@@ -331,18 +323,20 @@
         {
           "name": "Morphbench Launcher / Application compatibility",
           "url": "https://github.com/Vhodnoylogin/morphbench/blob/v0.8.8/src/main/docs/install-layout.md",
-          "notes": "Install both Main files for a first installation. Application 0.8.8 supports Launcher v1, v2 and v3. Launcher v3 needs Application 0.8.7 or a compatible newer App. Existing Launcher v3 does not need replacing for this update. Root Builder is optional."
+          "notes": "First install: both Main files. Application 0.8.8 supports Launcher v1/v2/v3. Existing v3 can be retained. Launcher v3 needs Application 0.8.7 or newer compatible App. Update Application first. Root Builder is optional."
         }
       ]
     },
     "publicationNotes": [
       "Publish corresponding source on main and record exact final archive hashes and source commit.",
-      "GitHub recommended download is morphbench-0.8.8-win64.zip containing both Application and unchanged Launcher v3.",
+      "GitHub publishes morphbench-application-0.8.8.zip under v0.8.8 and unchanged morphbench-runtime-3-win64.zip under launcher-v3; cross-link both separate releases.",
       "Nexus: upload Application as Primary Main; retain existing Launcher v3 Main file without reupload.",
       "Put 0.8.8 changelog into the native Version changelog, keep file descriptions short, and compatibility details in Off-site requirements.",
       "Keep Root Builder optional and preserve historical tags, assets, owner-authored posts and verified publication records.",
       "No quarantine-status download banner in the mod description."
-    ]
+    ],
+    "githubLauncherRelease": "https://github.com/Vhodnoylogin/morphbench/releases/tag/launcher-v3",
+    "githubDistribution": "Separate Application and Launcher releases, cross-linked; first installation requires both packages."
   },
   "publicationHistory": [
     {
@@ -411,6 +405,174 @@
           "method": "documented Nexus v3 API with existing personal key; no native file dialogs"
         }
       }
+    },
+    {
+      "applicationVersion": "0.8.7",
+      "launcherVersion": "v3",
+      "runtimeId": "runtime-3-win64",
+      "sourceCommit": "e8e0ea7c460948e68fb84139dfb4d98289b26dcf",
+      "nativeLauncherSourceCommit": "ac15b242dbe1013d2c46a521fb6fad1f03161b52",
+      "githubRelease": "https://github.com/Vhodnoylogin/morphbench/releases/tag/v0.8.7",
+      "applicationFileId": 830284,
+      "githubCombinedArchive": {
+        "name": "morphbench-0.8.7-win64.zip",
+        "bytes": 30179461,
+        "sha256": "3b95233f73e1588e1e9639c160ed4f051f7df951625a5231bd9118bc01fdc2bb",
+        "packagingCommit": "7bf060f",
+        "files": 1157,
+        "payloadBytesUnchanged": true,
+        "githubDigestVerified": true,
+        "componentAssetsPreserved": true,
+        "nexusFilesUnchanged": true,
+        "evidence": "D:/Skyrim VR Modding/Builds/morphbench-github-combined-20261101/publication.json"
+      },
+      "launcherFileId": 830285,
+      "applicationVersionId": "7318625102668",
+      "launcherVersionId": "7318625102669",
+      "mainFiles": [
+        {
+          "name": "Morphbench Application",
+          "version": "0.8.7",
+          "primary": true,
+          "filename": "morphbench-application-0.8.7.zip",
+          "allowModManagerDownload": true,
+          "description": "The Morphbench workbench: morph previews, collider editing and add-ons."
+        },
+        {
+          "name": "Morphbench Launcher",
+          "version": "v3",
+          "primary": false,
+          "filename": "morphbench-runtime-3-win64.zip",
+          "allowModManagerDownload": true,
+          "description": "Starts Morphbench. Includes Python and the libraries needed to run it."
+        }
+      ],
+      "changelogs": [
+        {
+          "version": "0.8.7",
+          "entries": [
+            "Moved the launcher window, settings, discovery and server control into the updateable Application.",
+            "Improved session recovery and preserved fitted capsule geometry in saved recipes and skeleton exports.",
+            "Kept repeated edits within the recovery action limit.",
+            "Improved validation of capsule radii, add-on metadata and update destinations.",
+            "Refactored editing sessions and settings ownership. Settings and installed add-ons are preserved.",
+            "Restored Morphbench window and taskbar icons. Incomplete launcher arguments now produce a diagnostic instead of silently exiting."
+          ]
+        },
+        {
+          "version": "v3",
+          "entries": [
+            "Reduced the native launcher to starting bundled Python and forwarding arguments and the exit code.",
+            "Moved the window and startup behavior into Application so routine fixes can reuse the same EXE.",
+            "Install Application 0.8.7 or a newer compatible Application before replacing Launcher."
+          ]
+        }
+      ],
+      "requirements": {
+        "method": "legacy",
+        "rootBuilderOptional": true,
+        "offSiteRequirements": [
+          {
+            "name": "Morphbench Launcher / Application compatibility",
+            "url": "https://github.com/Vhodnoylogin/morphbench/blob/v0.8.7/src/main/docs/install-layout.md",
+            "notes": "Install both Main files. Launcher v3 needs Application 0.8.7 or a compatible newer App. Update Application before replacing Launcher. Application 0.8.7 supports Launcher v1, v2 and v3. Root Builder is optional."
+          }
+        ]
+      },
+      "verification": {
+        "modId": 194795,
+        "applicationFileId": 830284,
+        "launcherFileId": 830285,
+        "applicationVersionId": "7318625102668",
+        "launcherVersionId": "7318625102669",
+        "descriptionUpdated": true,
+        "nativeVersionChangelogs": [
+          "0.8.7",
+          "v3"
+        ],
+        "status": "published Main files; Launcher scanning",
+        "applicationStatus": "available; public SHA256 link matches final App archive",
+        "launcherStatus": "quarantined; confirmed on public file830285 after owner review",
+        "requirementsUpdated": true,
+        "requirementsMethod": "legacy",
+        "rootBuilderOptional": true,
+        "versionFreeFileNames": true,
+        "fileDescriptionsShort": true,
+        "sourceCommitOnMain": true,
+        "proof": "nexus-files-proof.png"
+      },
+      "archives": {
+        "morphbench-application-0.8.7.zip": {
+          "bytes": 602664,
+          "sha256": "fca08bcd797837ee9acfb3c4f58e5d27296ec211b62ee842ffc925299c24a80f"
+        },
+        "morphbench-nifly-corresponding-source.zip": {
+          "bytes": 3035127,
+          "sha256": "eac96bd45bc26a5bb0031d73d3e52695340cd417506ee1b51a26454b7fe7daff"
+        },
+        "morphbench-runtime-3-win64.zip": {
+          "bytes": 29584284,
+          "sha256": "529514b50d752b0dbfea7dfb23fc8dbfcc37c42e58cbfa85d435853417627960"
+        }
+      },
+      "moderation": {
+        "emailSent": true,
+        "reviewRequested": true,
+        "fileId": 830285,
+        "lastLauncherObservation": "quarantined; review requested after owner checked release",
+        "clearanceGranted": false
+      }
+    },
+    {
+      "legacyTopLevelVersion": "0.8.5",
+      "metadata": {
+        "version": "0.8.5",
+        "launcherVersion": "v1",
+        "runtimeId": "runtime-1-win64",
+        "sourceTag": "https://github.com/Vhodnoylogin/morphbench/tree/v0.8.5",
+        "githubRelease": "https://github.com/Vhodnoylogin/morphbench/releases/tag/v0.8.5",
+        "mainFiles": [
+          {
+            "nexusFileId": 829572,
+            "name": "Morphbench Application 0.8.5",
+            "version": "0.8.5",
+            "primary": true,
+            "filename": "morphbench-application-0.8.5.zip",
+            "bytes": 617678,
+            "sha256": "c24ab0f44431b4bff0d3ed5f708ede4a30523f724bed96c5d42e894383b10f19",
+            "nativeBinaries": false,
+            "filesIncludingManifest": 153,
+            "allowModManagerDownload": true,
+            "requiresLauncher": "v1"
+          },
+          {
+            "nexusFileId": 829573,
+            "name": "Morphbench Launcher v1",
+            "version": "v1",
+            "primary": false,
+            "filename": "morphbench-runtime-1-win64.zip",
+            "bytes": 29809251,
+            "sha256": "bb0dd7ac499aa2764fb7c954780b01fb26c503402b7999216da810df061b5624",
+            "inventoriedRuntimeFilesUnchanged": 1018,
+            "filesIncludingManifestAndOverlay": 1022,
+            "allowModManagerDownload": true,
+            "exeSha256": "cda1b18bdc2610a53daffcbbd3df333f1d78baf3a23313b9921efe96fa38b5fa"
+          }
+        ],
+        "installation": {
+          "manual": "Merge Morphbench folders from inside root; run Morphbench/launcher/morphbench.exe.",
+          "mo2": "Separate enabled Launcher/Application mods, Application higher priority, optional Root Builder deployment; register the game-root executable.",
+          "migration": "Retain flat 0.8.0 installation; migrate settings and complete add-on registry into a new structured folder.",
+          "updates": "Close server/launcher; use the new Application updater, preserving settings/plugins and compatible native Runtime."
+        },
+        "media": {
+          "visibleImages": 6,
+          "thumbnail": "Morphbench - conceptual cover (AI-generated illustration)",
+          "screenshots": "Existing authentic 0.8.0 Morphs/Colliders captures remain representative; no game/model assets are bundled."
+        },
+        "optionalRequirementDisclosure": "Root Builder is optional for MO2 root deployment; manual/external installation needs no Root Builder. Launcher v1 is required."
+      }
     }
-  ]
+  ],
+  "githubLauncherRelease": "https://github.com/Vhodnoylogin/morphbench/releases/tag/launcher-v3"
 }

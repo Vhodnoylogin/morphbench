@@ -2,7 +2,7 @@
 
 Русская версия — [updating.ru.md](updating.ru.md).
 
-Download both **Application 0.8.7** (main file) and **Morphbench Launcher v3**.
+Download both **Application 0.8.8** (main file) and **Morphbench Launcher v3**.
 Their versions are independent. Application accepts Runtime API 1 / CPython 3.12 Windows
 x64 compatibility and verifies each Runtime inventory separately. Launcher v3 needs the
 host-protocol-1 adapter introduced in Application 0.8.7. Its minimal EXE starts bundled
@@ -14,8 +14,12 @@ this is not antivirus approval or a review exemption. Manual and Mod manager dow
 
 ## First installation
 
-Download `morphbench-application-0.8.7.zip` and `morphbench-runtime-3-win64.zip`.
-Both archives start at `root/Morphbench/` and merge into:
+On GitHub, download `morphbench-application-0.8.8.zip` from the
+[Application release](https://github.com/Vhodnoylogin/morphbench/releases/tag/v0.8.8)
+and `morphbench-launcher-v3-win64.zip` from the separate
+[Launcher v3 release](https://github.com/Vhodnoylogin/morphbench/releases/tag/launcher-v3).
+On Nexus, download both Main files. If Launcher v3 is already installed, only Application
+needs updating. Both archives start at `root/Morphbench/` and merge into:
 
 ```text
 Morphbench/
@@ -48,7 +52,7 @@ when Launcher is in a physical mod source and App/plugins are deployed in the ga
 
 ## Upgrade an existing Launcher to v3
 
-**Update Application to 0.8.7 before installing Launcher v3.** Application 0.8.6 lacks
+**Update Application to 0.8.8 before installing Launcher v3** (minimum: 0.8.7). Application 0.8.6 lacks
 its host adapter. Stop the server/window, update App using the installed v1/v2 Python,
 then replace only the `launcher` folder with a clean v3 folder, retaining
 `morphbench.launcher.json`. Keep `app/morphbench.json` and the entire `plugins` directory.

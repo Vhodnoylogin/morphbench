@@ -1,15 +1,18 @@
 # Portable installation and Root Builder
 
-Application 0.8.7 uses a structured layout with Morphbench Launcher v3.
+Application 0.8.8 uses a structured layout with Morphbench Launcher v3.
 The versions are independent; Application retains the released v1/v2 adapters.
 Existing flat 0.8.0 installations remain supported; migrate into a fresh folder.
 
-**GitHub:** `morphbench-0.8.7-win64.zip` already contains Launcher and Application.
-Extract it once; there is no second required download. With Root Builder, install it
-as one enabled mod. **Nexus:** install the two Main files as described below.
-The optional Nifly corresponding-source ZIP is for developers and is not installed.
-For an existing installation, use the Application updater and the migration steps
-below; extracting the complete ZIP over an old installation is not a managed update.
+**GitHub:** download `morphbench-application-0.8.8.zip` from
+[Application 0.8.8](https://github.com/Vhodnoylogin/morphbench/releases/tag/v0.8.8)
+and `morphbench-launcher-v3-win64.zip` from
+[Launcher v3](https://github.com/Vhodnoylogin/morphbench/releases/tag/launcher-v3).
+These are separate releases with independent versions. A first installation needs both;
+if Launcher v3 is already installed, only update Application. **Nexus:** install the two
+Main files as described below. The optional Nifly corresponding-source ZIP is for
+developers and is not installed. For an existing installation, use the Application
+updater and migration steps below; extraction over an old installation is not a managed update.
 
 ```text
 Morphbench/
@@ -97,7 +100,7 @@ path to keep an external registry unambiguous. No installation is automatically 
 ## Upgrade from Application 0.8.6 / Launcher v2 to v3
 
 Application 0.8.6 cannot drive the minimal v3 host. Stop the server and close Launcher.
-Update **Application to 0.8.7 first**, using the check/update commands above with the
+Update **Application to 0.8.8 first** (v3 requires at least 0.8.7), using the check/update commands above with the
 installed v2 Python. The new App still works with v2. Keep a rollback copy, replace the
 old `launcher` folder with the clean v3 folder, and copy back only
 `morphbench.launcher.json` if present. Leave `app/morphbench.json` and `plugins` intact;
@@ -117,7 +120,7 @@ ZIP into a temporary folder. Use its **new** updater with the old bundled Python
 
 The old 0.8.5 updater cannot read schema 2. The new updater can read the old installation
 and removes obsolete inventoried App files transactionally while preserving settings/plugins.
-Update App to 0.8.7 first; it retains the v1 adapter. Then replace the `launcher` folder
+Update App to 0.8.8 first; it retains the v1 adapter. Then replace the `launcher` folder
 with clean v3 as described above, retaining only your launcher state
 (`morphbench.launcher.json`) if present. Keep any older custom state filename in the
 rollback copy until verified. Do not merge old native/developer files into v3.

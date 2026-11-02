@@ -2,7 +2,7 @@
 
 English version — [updating.md](updating.md).
 
-Скачайте **Application 0.8.7** (основной файл) и **Morphbench Launcher v3**.
+Скачайте **Application 0.8.8** (основной файл) и **Morphbench Launcher v3**.
 Их версии независимы. Application проверяет совместимость API 1 / CPython 3.12 Windows
 x64 и целостность Runtime отдельно. Launcher v3 требует адаптера протокола хоста 1,
 добавленного в Application 0.8.7. Минимальный EXE запускает комплектный Python; окно
@@ -14,8 +14,12 @@ x64 и целостность Runtime отдельно. Launcher v3 требуе
 
 ## Первая установка
 
-Скачайте `morphbench-application-0.8.7.zip` и `morphbench-runtime-3-win64.zip`.
-Оба архива начинаются с `root/Morphbench/` и объединяются в:
+На GitHub скачайте `morphbench-application-0.8.8.zip` из
+[релиза Application](https://github.com/Vhodnoylogin/morphbench/releases/tag/v0.8.8)
+и `morphbench-launcher-v3-win64.zip` из отдельного
+[релиза Launcher v3](https://github.com/Vhodnoylogin/morphbench/releases/tag/launcher-v3).
+На Nexus скачайте оба Main-файла. Если Launcher v3 уже установлен, достаточно обновить
+Application. Оба архива начинаются с `root/Morphbench/` и объединяются в:
 
 ```text
 Morphbench/
@@ -49,7 +53,7 @@ Morphbench/
 
 ## Обновление прежнего Launcher до v3
 
-**Перед установкой Launcher v3 сначала обновите Application до 0.8.7.** В Application
+**Перед установкой Launcher v3 сначала обновите Application до 0.8.8** (минимум: 0.8.7). В Application
 0.8.6 нет его адаптера. Остановите сервер/окно, обновите App через Python установленного
 v1/v2, затем замените только папку `launcher` чистой папкой v3, сохранив
 `morphbench.launcher.json`. Сохраните `app/morphbench.json` и весь каталог `plugins`.

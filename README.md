@@ -1,11 +1,9 @@
 # Morphbench
 
-This development branch adds generic plugin workspaces over released 0.8.7. Body Slots
-has no built-in tab; its retained implementation awaits a separate plugin. This is not a release.
-
 A Windows workbench for Skyrim NIF/TRI meshes, morphs, bounds and skeleton collision
-capsules. Version 0.8.7 offers Morphs, Colliders, CLI/HTTP automation and browser add-ons;
-Physics remains disabled; Body Slots is absent from browser navigation.
+capsules. Version 0.8.8 offers Morphs, Colliders, CLI/HTTP automation and browser plugins.
+Find meshes by name or path in the left sidebar; manage plugins in their own menu.
+Physics remains disabled; Body Slots has no built-in tab.
 
 [Русская версия](README.ru.md) · [User guide](src/main/README.md) ·
 [Installation](src/main/docs/install-layout.md) · [Quick start](src/main/docs/quickstart.md)
@@ -36,7 +34,7 @@ The source layout does not change installed packages: they retain
 
 Released downloads are [GitHub release assets](https://github.com/Vhodnoylogin/morphbench/releases)
 and [Nexus files](https://www.nexusmods.com/skyrimspecialedition/mods/194795).
-On GitHub, download **morphbench-0.8.7-win64.zip**: it includes Application 0.8.7
+On GitHub, download **morphbench-0.8.8-win64.zip**: it includes Application 0.8.8
 and Launcher v3. Nexus keeps the two components as separate downloads.
 The optional `morphbench-nifly-corresponding-source.zip` is the matching C/C++ source
 of the bundled Nifly/PyNifly dependency, not an installation package. Those third-party

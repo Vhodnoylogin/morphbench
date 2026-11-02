@@ -11,7 +11,7 @@ go in a major release, and nowhere else.
 
 Эта страница на русском: [CHANGELOG.ru.md](CHANGELOG.ru.md).
 
-## Unreleased — generic plugin hosting
+## [0.8.8] — 2026-11-02
 
 - Search meshes by filename/path in the left sidebar, with live filtering and Enter to open a unique match.
 - Distinct workspace tabs and stable per-plugin colours, shared with the inspector and separate Plugins menu.
@@ -21,6 +21,7 @@ go in a major release, and nowhere else.
 - Reopening the active workspace preserves its frame; explicit reload, bounded asset checks and stale-frame guards improve loading recovery.
 - Removed the built-in Body Slots tab and experimental entry branding; its future UI belongs in a plugin.
 - Browser API v1 and preview linkage remain unchanged. No CLAW-specific controls are included.
+- Reuse Launcher v3 unchanged; this release updates the native-free Application package.
 
 ## [0.8.0-slots.1] — experimental, unreleased
 

@@ -1,11 +1,9 @@
 # Morphbench
 
-Эта ветка разработки добавляет рабочие вкладки плагинов поверх выпущенной 0.8.7.
-Встроенной вкладки Body Slots нет; сохранённая реализация ждёт отдельного плагина. Это не релиз.
-
 Верстак для Windows: меши Skyrim NIF/TRI, морфы, шары охвата и капсулы столкновений
-скелета. В версии 0.8.7 доступны Morphs, Colliders, автоматизация CLI/HTTP и браузерные
-аддоны; Physics отключена, а Body Slots отсутствует в навигации браузера.
+скелета. В версии 0.8.8 доступны Морфы, Коллайдеры, автоматизация CLI/HTTP и браузерные
+плагины. Ищите меши по имени или пути слева, управляйте плагинами в отдельном меню.
+Физика отключена; встроенной вкладки Body Slots нет.
 
 [English](README.md) · [Руководство](src/main/README.ru.md) ·
 [Установка](src/main/docs/install-layout.ru.md) · [Первый запуск](src/main/docs/quickstart.ru.md)
@@ -36,7 +34,7 @@ python release.py --list
 
 Готовые выпуски находятся среди [файлов GitHub Releases](https://github.com/Vhodnoylogin/morphbench/releases)
 и [файлов Nexus](https://www.nexusmods.com/skyrimspecialedition/mods/194795).
-На GitHub скачайте **morphbench-0.8.7-win64.zip**: он содержит Application 0.8.7
+На GitHub скачайте **morphbench-0.8.8-win64.zip**: он содержит Application 0.8.8
 и Launcher v3. На Nexus обе части остаются отдельными загрузками.
 Необязательный `morphbench-nifly-corresponding-source.zip` содержит соответствующие
 DLL исходники C/C++ сторонней зависимости Nifly/PyNifly. Для установки он не нужен.

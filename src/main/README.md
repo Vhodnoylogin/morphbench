@@ -25,10 +25,11 @@ The project was extracted from Skyrim-Mods on 2026-10-02. All 42 retained histor
 the module contents and Git LFS were verified on 2026-10-03. The old local and remote
 `Skyrim-Mods/morphbench` branches were deleted after verification; historical checkouts remain.
 
-Version **0.8.7** includes visual capsule editing, bidirectional source-preserving
-[PPB tuning editing](docs/ppb.md), the skeleton-only blank-page fix and browser add-ons with
-API v1. It distinguishes [native file visibility](docs/visibility.md) from the viewer's shape selection.
-The development workspace enables **Morphs** and **Colliders**; Physics is disabled.
+Version **0.8.8** adds mesh search by name/path, a persistent left model sidebar and
+a separate Plugins menu with automatic discovery and enable/disable controls. It retains
+visual capsule editing, source-preserving [PPB tuning editing](docs/ppb.md), browser API v1
+and the distinction between [native file visibility](docs/visibility.md) and viewer selection.
+The workspace enables **Morphs** and **Colliders**; Physics is disabled.
 Body Slots has no built-in tab and is intended for a separate plugin. Its legacy code
 and scripted APIs remain available for that work.
 See the [editing workspace](docs/workspace.md) and [changelog](CHANGELOG.md).
@@ -56,7 +57,7 @@ edited or fitted collision capsules, and edited physics configurations into new 
 ## What it needs
 
 **From a release — no separate Python or Blender installation.** On GitHub, download
-**morphbench-0.8.7-win64.zip**, which includes **Application 0.8.7** and
+**morphbench-0.8.8-win64.zip**, which includes **Application 0.8.8** and
 **Morphbench Launcher v3**. On Nexus, download the two separate Main files.
 Application contains the workbench's Python, browser assets, translations and documentation;
 Launcher contains the separately versioned native Runtime (`runtime-3-win64`). Their versions are independent.
@@ -116,7 +117,7 @@ elsewhere, the `pynifly` key in `morphbench.json` says where. morphbench has no 
 of its own and must not have one: PyNifly's modules are the same ones that write these files, so
 a second reading that could drift away from the first never appears.
 
-Application 0.8.7 retains Launcher v1/v2 adapters and adds minimal host protocol 1 for v3.
+Application 0.8.8 retains Launcher v1/v2 adapters and minimal host protocol 1 for v3.
 Update Application first, then replace the Launcher folder with v3 while preserving its
 settings. Application 0.8.6 cannot run the v3 host. From 0.8.5, use the NEW extracted
 updater; see [transition steps](docs/install-layout.md). Future compatible hosts do not
@@ -245,7 +246,7 @@ in both languages explaining their layer boundary. Generated output is not commi
 authoritative binary source resources require their origin, licence and role.
 
 An installed structured release retains Runtime and the entry shim in `Morphbench/launcher`,
-the workbench and this guide in `Morphbench/app`, and installed add-ons in `Morphbench/plugins`.
+the workbench and this guide in `Morphbench/app`, and installed plugins in `Morphbench/plugins`.
 Its documents remain under `app/docs/`, and browser asset routes remain `/web/*`.
 `launcher/runtime-manifest.json` identifies Runtime files; `application-manifest.json`
 identifies App ownership and its required Runtime. Application updates preserve settings,
@@ -297,7 +298,7 @@ stays in the source repository and is not included in the end-user archive.
 
 ## Editing workspace
 
-The 0.8.7 viewer enables **Morphs** and **Colliders**, with mode tabs above the view, models
+The 0.8.8 viewer enables **Morphs** and **Colliders**, with mode tabs above the view, models
 on the left and an inspector on the right. Edit supported collision capsules, save a
 replayable workspace and export new files. **Physics** remains disabled; **Body Slots**
 is intended for a separate plugin. Experimental FSMP XML/CBPC TXT editing remains accessible through `mb.py workspace`
@@ -309,20 +310,19 @@ See [the workspace workflow](docs/workspace.md) for controls, automation and off
 Local preview variants add independent author → definition → variant inheritance. Session recipes preserve variants and edit targets; `mb.py slots --editor` recovers unfinished projects and exports unbound placement presets. Authored JSON and `.bslots` remain authored-only. See [the Slots workflow](docs/slots.md).
 
 Experimental Slots authoring remains available through `mb.py slots` and the local HTTP API;
-the browser tab is disabled in 0.8.7. The backend supports named skeleton-node placements,
+there is no built-in browser tab in 0.8.8. The backend supports named skeleton-node placements,
 local transforms/access spheres, author defaults and temporary effective overrides, session
 recipes, Body Slots schema-v1 JSON and `.bslots` exports. It does not edit game saves,
 equipment or inventories. See [docs/slots.md](docs/slots.md) for the offline workflow and limits.
 
 ## Browser plugins
 
-Application 0.8.7 includes a versioned local browser add-on host.
-Install a ZIP, enable its inspector tab, and use API v1 to select models, read geometry,
-set existing morphs, control the view and save add-on state for the current browser tab.
-Installed add-ons can be explicitly updated while disabled. [Contract and workflow](docs/addons.md);
+Application 0.8.8 includes a versioned local browser plugin host. Use API v1 to select
+models, read geometry, set existing morphs, control the view and save plugin state for
+the current browser tab. Installed plugins can be explicitly updated while disabled. [Contract and workflow](docs/addons.md);
 [neutral source example](https://github.com/Vhodnoylogin/morphbench/tree/main/src/main/examples/scene-inspector).
 
-The development workspace keeps model selection on the left, including during plugin
-previews. Plugins have distinct coloured tabs and a separate **Plugins** menu with
+Model selection stays on the left, including during plugin previews. Search by part of
+a filename or path; Enter opens the only matching mesh. Plugins have distinct coloured tabs and a separate **Plugins** menu with
 folder/ZIP path loading and enable/disable controls. New compatible packages placed in
 `Morphbench/plugins` are discovered and enabled automatically; a manual disable persists.

@@ -1,9 +1,8 @@
 # Building and releasing Morphbench
 
-This development branch contains generic plugin-host changes over released Application
-0.8.7 and Launcher v3. Body Slots has no core tab; its legacy implementation awaits
-a separate plugin. Keep development packages distinct from the published Nexus release.
-Published Runtime inventories remain immutable. No reference meshes or skeletons belong
+Application 0.8.8 includes generic plugin workspaces and mesh search and reuses
+Launcher v3 unchanged. Body Slots has no core tab; its legacy implementation awaits
+a separate plugin. Published Runtime inventories remain immutable. No reference meshes or skeletons belong
 in a user archive; report browser checks separately from package validation.
 
 Run commands from the repository root. Maintained production code lives in `src/main/`,
@@ -35,7 +34,7 @@ extract `root/Morphbench/launcher`. Do not modify its inventoried files. Package
 
 ```text
 python release.py --package runtime --runtime-from <extracted-launcher> --runtime-version 3 --out <output>
-python release.py --package application --runtime <extracted-launcher>/runtime-manifest.json --version 0.8.7 --out <output>
+python release.py --package application --runtime <extracted-launcher>/runtime-manifest.json --version 0.8.8 --out <output>
 ```
 
 The builder checks Runtime ID, content hash and Python version against the source pin.
@@ -134,8 +133,8 @@ codes without showing windows. Python session/hidden Win32 tests cover ownership
 close races, parent death/PID reuse and controls without desktop interaction. Also verify the
 assembled archives using their bundled interpreter: imports, CLI/HTTP, native window,
 NIF/TRI/PNG, legacy v1/v2 adapters, App-first migration to v3, repeated updates and
-preserved settings/plugins. Keep Morphs and Colliders active; Physics and Body Slots
-remain disabled. Record actual final archive hashes and source commits before publication.
+preserved settings/plugins. Keep Morphs and Colliders active; Physics remains disabled
+and Body Slots has no built-in tab. Record actual final archive hashes and source commits before publication.
 Actual MO2/usvfs qualification is a separate observation; synthetic discovery is not it.
 
 Publish corresponding source on `main` and output as GitHub/Nexus downloads. Preserve

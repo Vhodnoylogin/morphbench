@@ -632,8 +632,14 @@ def cmd_workspace(args) -> int:
     if args.respect_file_visibility or args.show_file_hidden:
         actions.append({"method": "respect_file_visibility", "args": [True, args.show_file_hidden]})
     bench.workspace_replay(actions)
+    # A saved session is a complete preview, unlike an incremental action patch.
+    # Explicitly retain the observed final weight, including the neutral zero.
+    saved_actions = [row for row in actions if row["method"] != "physics_weight"]
+    saved_actions.append({"method": "physics_weight", "args": [bench.physics_state()["previewWeight"]]})
+    if args.session_out and len(saved_actions) > int(bench.cfg["workspaceActionLimit"]):
+        raise ValueError(t("workspace.invalid", field="actions"))
     recipe = {"format": "morphbench-workspace", "version": 1,
-              "source": bench.workspace_source(), "actions": actions}
+              "source": bench.workspace_source(), "actions": saved_actions}
     documents = []
     if args.config_out:
         if bench.physics_state()["document"] is None:

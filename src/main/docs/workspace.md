@@ -2,13 +2,13 @@
 
 Russian: [workspace.ru.md](workspace.ru.md).
 
-This workspace enables **Morphs** and **Colliders**. **Physics** remains visible but
-disabled; keyboard navigation skips it. **Body Slots** has no built-in tab: its future
-interface will be a plugin. Old links to unavailable modes open Morphs.
+This development workspace enables **Morphs**, **Colliders** and **Physics**, including
+keyboard navigation. **Body Slots** has no built-in tab: its future interface will be a
+plugin. Old links to unavailable modes open Morphs.
 A second row holds the current mode's tabs. Models and parts stay on the left, the 3D view
 in the centre, and the current inspector on the right. Ragdoll capsules are shown in Colliders
-mode. Experimental physics and [placement](slots.md) code, documents and scripted APIs are
-retained for further development; they are not offered as release UI features.
+mode. Physics shows source settings, configured ranges and contact geometry separately;
+it does not execute a provider solver. [Placement](slots.md) scripted APIs remain available.
 
 Enabled plugins are full workspace tabs in the same top navigation, marked **Plugin**.
 Their persistent colours also identify their inspector and their entry in the separate
@@ -121,8 +121,16 @@ limit means an unconstrained axis; equal limits mean a locked axis. Missing limi
 defaults/inheritance and unsupported frame or constraint semantics warn and withhold the
 affected preview. A suitable skeleton node frame is required for world geometry.
 
-CBPC stays a raw parameter inspector. Its offset clamps are neither final displacement nor
-direct angle limits. Weight interpolation, linear/rotation factors, forces, collision response
+CBPC collision sections show spheres and capsules in the skeleton **node** frame, including
+full names such as `NPC L Hand [LHnd]`. `&` joins endpoints; `|` separates weight-0 and
+weight-100 geometry. **Contact preview weight (0–100)** interpolates those endpoints and radii;
+it does not change the displayed body's geometry. Exported workspace recipes retain this
+weight explicitly, including zero. Unequal radii use the two-sphere convex hull. Missing
+nodes, unsupported frames and malformed geometry withhold the affected shape. Choose a group
+to isolate its wireframe and numbers. Contact lines are pink; configured limits remain separate.
+
+CBPC dynamic parameters remain raw settings. Offset clamps are neither final displacement nor
+direct angle limits. Linear/rotation factors, forces, actor selection, collision response
 and provider integration are not evaluated. Neither mode runs a solver or predicts actual
 motion amplitude, contact or stability. There is no posed-skin preview or manual animation
 scrubbing in this iteration.

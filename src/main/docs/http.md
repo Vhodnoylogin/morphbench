@@ -86,7 +86,11 @@ Parsing does not install the document: replay `physics_replace` with the returne
 then `physics_set` with an imported field ID and a finite number. Saved physics state retains
 the original normalized `document` and an `edits` map for replay.
 
-Allowed action methods are `workspace_mode`, `workspace_tab`, `physics_replace`, `physics_set`,
+`physics_weight(value)` selects the contact-preview weight in 0–100; it changes neither the
+body nor the exported provider configuration. `physics.previewWeight` records it in state.
+Saved browser recipes explicitly retain zero so importing them resets a previous weight.
+
+Allowed action methods are `workspace_mode`, `workspace_tab`, `physics_replace`, `physics_set`, `physics_weight`,
 `collider_select`, `collider_set`, `collider_translate`, `collider_add`, `collider_remove` and
 `collider_reset`. Every action has exactly `method` and an `args` array. A rejected batch leaves
 the previous editable state intact. Mode names are `morphs`, `colliders`, `physics` and `slots`;

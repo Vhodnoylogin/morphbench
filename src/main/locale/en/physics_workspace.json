@@ -20,5 +20,11 @@
   "physicsw.unsupportedConstraint": "This constraint type or XML namespace is unsupported; its numeric settings are preserved without a range preview.",
   "physicsw.file": "File settings",
   "physicsw.component": "Component %(index)s",
-  "physicsw.cbpcRaw": "Raw CBPC settings only. Offset clamps are not final displacement or direct angles. Weight interpolation, linear/rotation factors, forces, collision response and provider behavior are not evaluated."
+  "physicsw.cbpcRaw": "Dynamic CBPC parameters are raw settings only. Offset clamps are not final displacement or direct angles. Contact geometry is separate; forces, collision response and provider behavior are not simulated.",
+  "physicsw.contactWeight": "Contact preview weight must be between 0 and 100.",
+  "physicsw.contactNominal": "Configured CBPC contact geometry at the selected weight and rest node frames; no actor filtering or contact solver is evaluated.",
+  "physicsw.invalidContact": "Invalid contact geometry; no shape was inferred.",
+  "physicsw.contactRadius": "Contact radius cannot be negative.",
+  "physicsw.unresolvedContact": "The contact node %(name)s is unavailable; geometry is withheld.",
+  "physicsw.unsupportedContact": "This collision line is outside supported sphere/capsule syntax; geometry is withheld."
 }

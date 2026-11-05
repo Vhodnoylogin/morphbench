@@ -21,7 +21,7 @@ WORKSPACE_TABS = {
 
 # Release navigation is deliberately narrower than the scripted workspace API.
 # Keep experimental owners and old recipes usable without offering their pages.
-WORKSPACE_ENABLED_MODES = ("morphs", "colliders")
+WORKSPACE_ENABLED_MODES = ("morphs", "colliders", "physics")
 
 
 def recipe_actions(recipe, source, *, require_source=False):
@@ -115,7 +115,7 @@ class WorkspaceMixin:
 
     def _workspace_recipe_size(self):
         """Count recovery actions without taking expensive public document snapshots."""
-        count = 3 + (len(self.rig.edit_actions) + 2 if self.rig is not None else 0)
+        count = 4 + (len(self.rig.edit_actions) + 2 if self.rig is not None else 0)
         for name in ("_physics_workspace", "_ppb_workspace"):
             owner = getattr(self, name, None)
             if owner is not None:
@@ -180,13 +180,23 @@ class WorkspaceMixin:
         return self._physics_owner().set(field_id, value)
 
     def physics_state(self):
-        return self._physics_owner().state()
+        return dict(self._physics_owner().state(), previewWeight=getattr(self, "_physics_weight", 0.0))
+
+    @workspace_edit
+    def physics_weight(self, value):
+        """Select a static contact-preview weight; never mutate a mesh or provider config."""
+        from .physics_workspace import _finite
+        value = _finite(value)
+        if not 0 <= value <= 100:
+            raise ValueError(t("physicsw.contactWeight"))
+        self._physics_weight = value
+        return value
 
     def physics_export(self):
         return self._physics_owner().export_text()
 
     def physics_envelopes(self):
-        return self._physics_owner().envelopes(self.slots_anchors())
+        return self._physics_owner().envelopes(self.slots_anchors(), weight=getattr(self, "_physics_weight", 0.0))
 
     def _ppb_owner(self):
         """Separate source document; it is never applied to a skeleton implicitly."""
@@ -405,7 +415,7 @@ class WorkspaceMixin:
         allowed = {
             "workspace_mode": (1, 1), "workspace_tab": (1, 1),
             "respect_file_visibility": (1, 2),
-            "physics_replace": (1, 1), "physics_set": (2, 2),
+            "physics_replace": (1, 1), "physics_set": (2, 2), "physics_weight": (1, 1),
             "ppb_replace": (1, 1), "ppb_set": (2, 2),
             "ppb_to_collider": (3, 3), "ppb_from_collider": (3, 3),
             "ppb_link": (3, 3), "ppb_unlink": (0, 0),

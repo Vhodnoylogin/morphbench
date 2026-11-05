@@ -208,19 +208,68 @@ def _xml(text, result, group, field):
 def _cbpc(text, result, group, field):
     owner = group(t("physicsw.file"), section="")
     section, group_ids, records, cursor = "", {}, {}, 0
+    non_geometry = {"configmap", "affectednodes", "collidernodes", "playernodes", "options", "extraoptions"}
+    sphere = r"\s*" + r"\s*,\s*".join([_DECIMAL] * 4) + r"\s*"
+    contact = re.compile(sphere + r"(?:&" + sphere + r")?(?:\|" + sphere + r"(?:&" + sphere + r")?)?\Z", re.ASCII)
     for number, raw in enumerate(text.splitlines(keepends=True), 1):
         # CBPC uses # comments. Semicolon-only lines are also preserved as comments.
         line = raw.split("#", 1)[0]
         if line.lstrip().startswith(";"):
             cursor += len(raw)
             continue
-        head = re.match(r"\s*\[([^\]]+)\]", line)
+        # A node name commonly contains its own [Tag]. Match the final outer bracket.
+        header_line = line[1:] if cursor == 0 and line.startswith("\ufeff") else line
+        head = re.fullmatch(r"\s*\[(.+)\]\s*", header_line)
         if head:
-            section = head.group(1)
+            depth = 0
+            for character in head.group(1):
+                depth += 1 if character == "[" else -1 if character == "]" else 0
+                if depth < 0:
+                    break
+            if depth != 0:
+                head = None
+        if head:
+            section = head.group(1).strip()
             owner = group(section, section=section)
             group_ids = {}
             cursor += len(raw)
             continue
+        if header_line.lstrip().startswith("["):
+            # A malformed header must not attach following shapes to the preceding node.
+            section = ""
+            cursor += len(raw)
+            continue
+        if section and section.lower() not in non_geometry and contact.fullmatch(line):
+            parts = line.split("|")
+            counts = [part.count("&") + 1 for part in parts]
+            # Endpoint topology must match at both actor weights.
+            if len(set(counts)) == 1:
+                geometry, offset = [], 0
+                for weight_index, part in enumerate(parts):
+                    ends, end_offset = [], 0
+                    for endpoint, chunk in enumerate(part.split("&")):
+                        ids = []
+                        for component, token in enumerate(_NUMBERS.finditer(chunk)):
+                            extra = {"component": component, "endpoint": endpoint,
+                                     "weight_endpoint": weight_index * 100}
+                            if component == 3:
+                                extra["minimum"] = 0
+                            ids.append(field(cursor + offset + end_offset + token.start(),
+                                             cursor + offset + end_offset + token.end(), owner,
+                                             "%s[%d]" % (("x", "y", "z", "r")[component], endpoint + 1), **extra))
+                        ends.append(ids)
+                        end_offset += len(chunk) + 1
+                    geometry.append(ends)
+                    offset += len(part) + 1
+                result["records"].append({"id": "r%d" % len(result["records"]), "type": "contact",
+                                          "group": owner, "label": section, "node": section, "line": number,
+                                          "shape": "sphere" if counts[0] == 1 else "capsule",
+                                          "frame": {"body": section, "source": "node"},
+                                          "weighted": len(geometry) == 2,
+                                          "geometry": {"low": geometry[0], "high": geometry[-1]},
+                                          "interpretation": t("physicsw.contactNominal")})
+                cursor += len(raw)
+                continue
         entry = re.match(r"\s*([^\s=]+)\s*(?:=\s*|\s+)(.+?)\s*$", line)
         if entry and section.lower() not in ("configmap", "affectednodes", "collidernodes", "playernodes"):
             key, value_text = entry.group(1), entry.group(2)
@@ -253,6 +302,12 @@ def _cbpc(text, result, group, field):
                 continue
         stripped = line.strip()
         tokens = list(_NUMBERS.finditer(line))
+        if section and section.lower() not in non_geometry and stripped and stripped[0] in "+-.0123456789":
+            result["records"].append({"id": "r%d" % len(result["records"]), "type": "raw",
+                                      "group": owner, "label": section, "line": number,
+                                      "range_supported": False, "interpretation": t("physicsw.unsupportedContact")})
+            result["warnings"].append({"code": "unsupported_contact", "message": t("physicsw.unsupportedContact"),
+                                       "group": owner, "line": number})
         if tokens and stripped and not _NUMBERS.sub("", line).strip(" \t\r\n,&|:"):
             for index, token in enumerate(tokens):
                 field(cursor + token.start(), cursor + token.end(), owner,

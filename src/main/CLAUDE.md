@@ -11,7 +11,8 @@ explicitly qualified. Tests and reusable fixtures are in the checkout's `src/tes
 checkout's [AGENTS.md](../../AGENTS.md) for source/release ownership and branch rules.
 Generated files belong in ignored `target/`, with EXE and icon output in `target/launcher/`.
 The release installation remains `root/Morphbench/{launcher,app,plugins}`; source-tree
-changes must preserve CLI/SDK/HTTP contracts and disabled Physics/Slots navigation.
+changes must preserve CLI/SDK/HTTP contracts. The owner-authorized development Physics
+workspace exposes static source/contact inspection; built-in Slots navigation stays hidden.
 
 For automation of a running instance, prefer the documented HTTP API and the local MO2 bridge
 for launching under MO2. Use the UI for an operation absent from the API or to inspect the picture.

@@ -80,7 +80,7 @@ console.log(JSON.stringify({recipe,recovered:fresh.collider_edit_state(),direct:
         self.assertEqual(fresh.collider_edit_state(), expected)
 
     def test_final_budget_rejects_python_and_browser_topology_atomically(self):
-        self.cfg._values["workspaceActionLimit"] = 9
+        self.cfg._values["workspaceActionLimit"] = 10
         initial = WebPage(self.bench).payload()
         actions = [action("collider_set", "B", 0, {"radius": 7})]
         actions += [action("collider_add", "A", [index, 0, 0], [index, 0, 1], 2)
@@ -108,7 +108,7 @@ console.log(JSON.stringify({rejected,atomic,recipe:bench.workspace_recipe()}));
         self.assertTrue(browser["rejected"])
         self.assertTrue(browser["atomic"])
         self.bench.collider_set("B", 0, {"radius": 8})
-        self.assertEqual(len(browser["recipe"]["actions"]), 9)
+        self.assertEqual(len(browser["recipe"]["actions"]), 10)
         fresh = make_bench(self.cfg)
         fresh.workspace_replay(browser["recipe"]["actions"])
         self.assertEqual(fresh.collider_edit_state(), self.bench.collider_edit_state())

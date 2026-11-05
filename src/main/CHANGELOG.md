@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- Enable Physics configuration/range inspection in the development workspace.
+- Preview source-preserving CBPC spheres/capsules at an explicit weight, using node frames
+  and unequal-radius geometry; retain raw dynamic settings without simulating a solver.
+- Preserve full nested bone names, reject invalid radius edits, retain zero-weight recipes,
+  and batch dense contact overlays without recomputing mesh bounds per segment.
+
 All notable changes to morphbench. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the numbering follows
 [Semantic Versioning](https://semver.org/).

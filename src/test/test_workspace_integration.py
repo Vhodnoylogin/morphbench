@@ -99,6 +99,21 @@ class TestWorkspaceCli(unittest.TestCase):
             code = mb.main(["workspace", *map(str, args)])
         return code, stdout.getvalue(), stderr.getvalue()
 
+    def test_cli_saved_neutral_weight_resets_an_existing_browser_session(self):
+        source, session = self.root / "contacts.txt", self.root / "contacts-session.json"
+        source.write_text("[A]\n0,0,0,1 | 1,0,0,2\n", encoding="utf-8")
+        code, _, error = self.run_cli(["--physics-config", source, "--kind", "cbpc", "--session-out", session])
+        self.assertEqual((code, error), (0, ""))
+        recipe = json.loads(session.read_text(encoding="utf-8"))
+        self.assertEqual([row for row in recipe["actions"] if row["method"] == "physics_weight"],
+                         [action("physics_weight", 0)])
+        payload = WebPage(MorphBench(self.cfg)).payload()
+        restored = run_browser(self, self.tmp.name, payload, """
+const bench=new BenchMirror(DATA);bench.physics_weight(90);bench.workspace_replay(input.recipe.actions);
+console.log(JSON.stringify({weight:bench.physics_state().previewWeight}));
+""", recipe=recipe)
+        self.assertEqual(restored["weight"], 0)
+
     def test_bom_crlf_one_field_export_and_recipe_reopen(self):
         for kind, text, token in (("fsmp", XML, "1.250e+0"), ("cbpc", "\ufeff" + CBPC, "0.35")):
             with self.subTest(kind=kind):

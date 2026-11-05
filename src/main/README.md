@@ -29,7 +29,7 @@ Version **0.8.8** adds mesh search by name/path, a persistent left model sidebar
 a separate Plugins menu with automatic discovery and enable/disable controls. It retains
 visual capsule editing, source-preserving [PPB tuning editing](docs/ppb.md), browser API v1
 and the distinction between [native file visibility](docs/visibility.md) and viewer selection.
-The workspace enables **Morphs** and **Colliders**; Physics is disabled.
+Released 0.8.8 enables **Morphs** and **Colliders**. This development branch also enables **Physics** for source editing and static contact placement.
 Body Slots has no built-in tab and is intended for a separate plugin. Its legacy code
 and scripted APIs remain available for that work.
 See the [editing workspace](docs/workspace.md) and [changelog](CHANGELOG.md).
@@ -302,9 +302,11 @@ stays in the source repository and is not included in the end-user archive.
 
 The 0.8.8 viewer enables **Morphs** and **Colliders**, with mode tabs above the view, models
 on the left and an inspector on the right. Edit supported collision capsules, save a
-replayable workspace and export new files. **Physics** remains disabled; **Body Slots**
+replayable workspace and export new files. This development branch enables **Physics**;
+**Body Slots**
 is intended for a separate plugin. Experimental FSMP XML/CBPC TXT editing remains accessible through `mb.py workspace`
-and the local HTTP API; FSMP overlays represent nominal configured limits, not simulation.
+and the local HTTP API. Physics shows static CBPC contact placement and nominal FSMP
+limits, not a simulation.
 See [the workspace workflow](docs/workspace.md) for controls, automation and offline limits.
 
 ## Offline Slots mode

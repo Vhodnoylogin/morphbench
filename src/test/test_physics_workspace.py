@@ -119,8 +119,9 @@ class TestLosslessDocuments(unittest.TestCase):
         owner.set(clamp["id"], 0.4)
         self.assertEqual(owner.export_text(), CBPC[:clamp["start"]] + "0.4" + CBPC[clamp["end"]:])
         envelope = owner.envelopes({"NPC Ear1": FRAME})
-        self.assertFalse(envelope["lines"])
-        self.assertTrue(all(row["type"] == "raw" for row in envelope["records"]))
+        self.assertTrue(envelope["lines"])
+        self.assertEqual(len([row for row in envelope["records"] if row["type"] == "contact"]), 2)
+        self.assertTrue(any(row["type"] == "raw" for row in envelope["records"]))
         self.assertTrue(any(row["code"] == "cbpc_raw" for row in envelope["warnings"]))
         groups = [group["id"] for group in document["groups"] if group["label"] == "NPC Ear1"]
         self.assertEqual(len(groups), 2)

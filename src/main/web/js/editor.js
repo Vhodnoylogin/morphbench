@@ -53,6 +53,7 @@ class EditorState {
     this.original.selected=null;this.original.changed=[];
     for(const body of this.original.bodies){body.changed=false;body.count=this.original.capsules.filter((cap)=>cap.bone===body.bone).length;}
     this.physics=new PhysicsWorkspaceMirror(null,data.physicsTexts||{},{max_chars:this.bench.settings.physicsMaxChars,max_fields:this.bench.settings.physicsMaxFields});
+    this.physicsWeight=(data.physics||{}).previewWeight||0;
     if(data.physics&&data.physics.document) {
       this.physics.replace(data.physics.document);
       for(const [id,value] of Object.entries(data.physics.edits||{})) this.physics.set(id,value);
@@ -69,7 +70,7 @@ class EditorState {
     // those actions before accepting an edit, otherwise the page can create a session
     // that its own replay API (and the NIF download endpoint) must reject.
     if(this.replaying)return;
-    const count=3+(this.state.available?actionCount+2:0)
+    const count=4+(this.state.available?actionCount+2:0)
       +(physics.document?1+Object.keys(physics.edits||{}).length:0)
       +(ppb.document?1+Object.keys(ppb.edits||{}).length:0)+(binding?1:0);
     if(count>this.bench.settings.workspaceActionLimit)editorError("actions");
@@ -119,6 +120,7 @@ class EditorState {
       for(const [id,value] of Object.entries(physics.edits||{})) actions.push({method:"physics_set",args:[id,value]});
     }
     const ppb=this.ppb.state();
+    actions.push({method:"physics_weight",args:[this.physicsWeight]});
     if(ppb.document) {
       actions.push({method:"ppb_replace",args:[ppb.document]});
       for(const [id,value] of Object.entries(ppb.edits||{}))actions.push({method:"ppb_set",args:[id,value]});
@@ -181,9 +183,14 @@ Object.assign(BenchMirror.prototype,{
     if(state.document){candidate.replace(state.document);for(const [ident,edit] of Object.entries(state.edits||{}))candidate.set(ident,edit);}
     const result=candidate.set(id,value);owner.checkRecipeSize({physics:result});owner.physics=candidate;return result;
   },
-  physics_state() {return editorOwner(this).physics.state();},
+  physics_state() {const owner=editorOwner(this);return {...owner.physics.state(),previewWeight:owner.physicsWeight};},
+  physics_weight(value) {
+    if(typeof value!=="number"||!Number.isFinite(value)||value<0||value>100)editorError("weight");
+    const owner=editorOwner(this),before=owner.physicsWeight;owner.physicsWeight=value;
+    try{owner.checkRecipeSize();}catch(error){owner.physicsWeight=before;throw error;}return value;
+  },
   physics_export() {return editorOwner(this).physics.export_text();},
-  physics_envelopes() {return editorOwner(this).physics.envelopes(this.slots_anchors());},
+  physics_envelopes() {const owner=editorOwner(this);return owner.physics.envelopes(this.slots_anchors(),{weight:owner.physicsWeight});},
   ppb_replace(document) {
     if(!document||document.kind!=="ppb")editorError("document");
     const candidate=new PhysicsWorkspaceMirror(null,this._payload.physicsTexts||{},{max_chars:this.settings.physicsMaxChars,max_fields:this.settings.physicsMaxFields});
@@ -269,13 +276,13 @@ Object.assign(BenchMirror.prototype,{
   },
   workspace_recipe() {return editorOwner(this).recipe();},
   workspace_replay(actions) {
-    const allowed={workspace_mode:[1,1],workspace_tab:[1,1],respect_file_visibility:[1,2],physics_replace:[1,1],physics_set:[2,2],ppb_replace:[1,1],ppb_set:[2,2],ppb_link:[3,3],ppb_unlink:[0,0],ppb_to_collider:[3,3],ppb_from_collider:[3,3],collider_select:[1,2],collider_set:[3,3],collider_translate:[3,3],collider_add:[4,4],collider_remove:[1,2],collider_reset:[0,0]};
+    const allowed={workspace_mode:[1,1],workspace_tab:[1,1],respect_file_visibility:[1,2],physics_replace:[1,1],physics_set:[2,2],physics_weight:[1,1],ppb_replace:[1,1],ppb_set:[2,2],ppb_link:[3,3],ppb_unlink:[0,0],ppb_to_collider:[3,3],ppb_from_collider:[3,3],collider_select:[1,2],collider_set:[3,3],collider_translate:[3,3],collider_add:[4,4],collider_remove:[1,2],collider_reset:[0,0]};
     if(!Array.isArray(actions)||actions.length>this.settings.workspaceActionLimit) editorError("actions");
     for(const action of actions) {
       if(!action||Object.keys(action).sort().join()!=="args,method"||!Object.hasOwn(allowed,action.method)||!Array.isArray(action.args)) editorError("action");
       const range=allowed[action.method];if(action.args.length<range[0]||action.args.length>range[1]) editorError("arguments");
     }
-    const owner=editorOwner(this),before={state:editorClone(owner.state),actions:editorClone(owner.actions),mode:owner.mode,tabs:editorClone(owner.tabs),physics:owner.physics.state(),ppb:owner.ppb.state(),binding:editorClone(owner.binding),placementMode:this.placements.mode,colliders:this.view.colliders,bumper:this.view.bumper,respectFileVisibility:this.view.respectFileVisibility,showFileHidden:this.view.showFileHidden};
+    const owner=editorOwner(this),before={state:editorClone(owner.state),actions:editorClone(owner.actions),mode:owner.mode,tabs:editorClone(owner.tabs),physics:owner.physics.state(),physicsWeight:owner.physicsWeight,ppb:owner.ppb.state(),binding:editorClone(owner.binding),placementMode:this.placements.mode,colliders:this.view.colliders,bumper:this.view.bumper,respectFileVisibility:this.view.respectFileVisibility,showFileHidden:this.view.showFileHidden};
     const replaying=owner.replaying;owner.replaying=true;
     try {
       // A saved recipe can replace old source documents after restoring geometry.
@@ -285,7 +292,7 @@ Object.assign(BenchMirror.prototype,{
     }
     catch(error) {
       owner.replaying=replaying;
-      Object.assign(owner,{state:before.state,actions:before.actions,mode:before.mode,tabs:before.tabs,binding:before.binding});
+      Object.assign(owner,{state:before.state,actions:before.actions,mode:before.mode,tabs:before.tabs,binding:before.binding,physicsWeight:before.physicsWeight});
       const limits={max_chars:this.settings.physicsMaxChars,max_fields:this.settings.physicsMaxFields};
       owner.physics=new PhysicsWorkspaceMirror(null,this._payload.physicsTexts||{},limits);if(before.physics.document) {owner.physics.replace(before.physics.document);for(const [id,value] of Object.entries(before.physics.edits||{})) owner.physics.set(id,value);}
       owner.ppb=new PhysicsWorkspaceMirror(null,this._payload.physicsTexts||{},limits);if(before.ppb.document){owner.ppb.replace(before.ppb.document);for(const [id,value] of Object.entries(before.ppb.edits||{}))owner.ppb.set(id,value);}

@@ -337,7 +337,7 @@ console.log(JSON.stringify({visible:bench.collider_edit_state(),recipe:bench.wor
             "A": (0, ((0, 0, 0), (0, 0, 0.1), 0.03)),
             "B": (1, ((0, 0, 0), (0, 0, 0.2), 0.04))})
         self.bench.open_skeleton(source)
-        self.cfg._values["workspaceActionLimit"] = 9
+        self.cfg._values["workspaceActionLimit"] = 10
         source_bytes = source.read_bytes()
         initial = copy.deepcopy(self.bench.collider_edit_state())
         browser = run_browser(self, self.tmp.name, WebPage(self.bench).payload(), """
@@ -346,7 +346,7 @@ bench.collider_set('B',0,{radius:4});
 for(let index=0;index<3;index++)bench.collider_add('A',[index,0,0],[index,0,1],index+4);
 console.log(JSON.stringify({recipe:bench.workspace_recipe(),state:bench.collider_edit_state()}));
 """)
-        self.assertEqual(len(browser["recipe"]["actions"]), 9)
+        self.assertEqual(len(browser["recipe"]["actions"]), 10)
         code, content_type, exported = self.request("/api/workspace/skeleton", browser["recipe"])
         self.assertEqual(code, 200, exported)
         self.assertIn("application/octet-stream", content_type)
@@ -540,7 +540,7 @@ console.log(JSON.stringify({accepted,rejected,recipe,state:bench.collider_edit_s
 
     def test_document_edits_and_ppb_binding_share_recipe_budget_atomically(self):
         from test_ppb_document import block
-        self.cfg._values["workspaceActionLimit"] = 10
+        self.cfg._values["workspaceActionLimit"] = 11
         ppb = parse_document("ppb", block())
         physics = parse_document("fsmp", XML)
         result = self.run_js(WebPage(self.bench).payload(), """
@@ -556,7 +556,7 @@ const recipe=bench.workspace_recipe(),fresh=new BenchMirror(DATA);fresh.workspac
 console.log(JSON.stringify({rejected,recipe,text:bench.ppb_export(),restoredText:fresh.ppb_export(),state:bench.collider_edit_state(),restored:fresh.collider_edit_state()}));
 """, ppb=ppb, physics=physics)
         self.assertEqual(result["rejected"], [True, True, True])
-        self.assertEqual(len(result["recipe"]["actions"]), 10)
+        self.assertEqual(len(result["recipe"]["actions"]), 11)
         self.assertEqual(result["restoredText"], result["text"])
         self.assert_state_equal(result["restored"], result["state"])
         self.bench.workspace_replay(result["recipe"]["actions"])
@@ -565,7 +565,7 @@ console.log(JSON.stringify({rejected,recipe,text:bench.ppb_export(),restoredText
 
     def test_replay_checks_final_budget_and_restores_invalid_batch(self):
         from test_ppb_document import block
-        self.cfg._values["workspaceActionLimit"] = 9
+        self.cfg._values["workspaceActionLimit"] = 10
         ppb = parse_document("ppb", block())
         result = self.run_js(WebPage(self.bench).payload(), """
 const bench=new BenchMirror(DATA);bench.ppb_replace(input.ppb);
@@ -583,7 +583,7 @@ try{fresh.workspace_replay([{method:'collider_add',args:['A',[0,0,0],[1,1,1],2]}
 console.log(JSON.stringify({recipe,restored:fresh.collider_edit_state(),rejected,
  atomic:before===JSON.stringify([fresh.collider_edit_state(),fresh.ppb_state(),fresh.workspace_recipe()])}));
 """, ppb=ppb)
-        self.assertEqual(len(result["recipe"]["actions"]), 9)
+        self.assertEqual(len(result["recipe"]["actions"]), 10)
         self.assertTrue(result["rejected"])
         self.assertTrue(result["atomic"])
         self.bench.workspace_replay(result["recipe"]["actions"])

@@ -92,5 +92,7 @@
   "cli.opt.workspace.sessionout": "New path for workspace recipe JSON.",
   "cli.opt.workspace.recipe": "Workspace recipe JSON to replay.",
   "cli.opt.workspace.action": "One allowlisted facade action as JSON.",
-  "cli.opt.workspace.mode": "Workspace mode."
+  "cli.opt.workspace.mode": "Workspace mode.",
+  "page.edContactWeight": "Contact preview weight (0–100)",
+  "page.edContactHelp": "CBPC spheres and capsules use the selected weight and loaded rest-node frames. The body itself is unchanged. This is static placement, not contact simulation."
 }

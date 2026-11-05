@@ -87,7 +87,11 @@ Data под MO2 — 403.
 затем `physics_set` с идентификатором импортированного поля и конечным числом. Сохранённое
 физическое состояние содержит исходный нормализованный `document` и словарь `edits` для воспроизведения.
 
-Разрешены методы `workspace_mode`, `workspace_tab`, `physics_replace`, `physics_set`,
+`physics_weight(value)` задаёт вес предпросмотра контактов в пределах 0–100; тело и
+экспортируемая конфигурация провайдера не меняются. Значение находится в `physics.previewWeight`.
+Рецепты браузера явно сохраняют ноль, чтобы импорт сбрасывал предыдущий вес.
+
+Разрешены методы `workspace_mode`, `workspace_tab`, `physics_replace`, `physics_set`, `physics_weight`,
 `collider_select`, `collider_set`, `collider_translate`, `collider_add`, `collider_remove` и
 `collider_reset`. У каждого действия ровно два поля: `method` и массив `args`. Отвергнутый
 пакет сохраняет прежнее редактируемое состояние. Имена режимов — `morphs`, `colliders`,

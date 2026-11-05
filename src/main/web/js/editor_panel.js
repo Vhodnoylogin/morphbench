@@ -172,8 +172,12 @@ class EditorPanel {
     this.kind=el("select",{"aria-label":T.edImport},[el("option",{value:"fsmp",text:"FSMP · XML"}),el("option",{value:"cbpc",text:"CBPC · TXT"})]);
     this.configUpload=el("input",{type:"file",accept:".xml,.txt,.json","aria-label":T.edLoad,on:{change:()=>this.importPhysics()}});
     section.appendChild(el("div",{class:"row"},[this.kind,this.configUpload]));
+    const applyWeight=()=>this.app.invoke("physics_weight",this.contactWeight.value.trim()===""?NaN:Number(this.contactWeight.value));
+    this.contactWeight=el("input",{type:"number",min:"0",max:"100",step:"any",value:"0","aria-label":T.edContactWeight,on:{input:applyWeight,change:applyWeight}});
+    section.appendChild(el("label",{class:"physics-field"},[el("span",{text:T.edContactWeight}),this.contactWeight]));
+    section.appendChild(el("p",{class:"muted",text:T.edContactHelp}));
     this.physicsNote=el("p",{class:"muted",text:T.edNoConfig});section.appendChild(this.physicsNote);
-    this.groups=el("select",{"aria-label":T.edGroup,on:{change:()=>{this.fieldSignature="";this.refreshPhysics();}}});
+    this.groups=el("select",{"aria-label":T.edGroup,on:{change:()=>{this.fieldSignature="";this.refreshPhysics();this.app.draw();}}});
     this.filter=el("input",{type:"text",placeholder:T.edFilter,on:{input:()=>{this.fieldSignature="";this.refreshPhysics();}}});
     section.appendChild(el("div",{class:"row editor-actions"},[this.groups,this.filter]));
     this.fields=el("div",{class:"physics-fields"});section.appendChild(this.fields);
@@ -215,11 +219,12 @@ class EditorPanel {
     }catch(error){this.fail(error);}
   }
   refreshPhysics() {
-    const state=this.bench.physics_state(),document=state.document,fields=state.fields||[];
-    if(!document) {this.physicsNote.textContent=T.edNoConfig;this.fields.textContent="";return;}
-    this.kind.value=document.kind;
+    const state=this.bench.physics_state(),config=state.document,fields=state.fields||[];
+    if(this.contactWeight!==document.activeElement)this.contactWeight.value=String(state.previewWeight);
+    if(!config) {this.physicsNote.textContent=T.edNoConfig;this.fields.textContent="";return;}
+    this.kind.value=config.kind;
     this.physicsNote.textContent=say(T.edChanged,{count:fields.filter((field)=>field.changed).length});
-    const groups=state.groups||document.groups||[],signature=JSON.stringify(groups.map((group)=>[group.id,group.label]));
+    const groups=state.groups||config.groups||[],signature=JSON.stringify(groups.map((group)=>[group.id,group.label]));
     if(this.groups.dataset.signature!==signature) {
       this.groups.textContent="";this.groups.appendChild(el("option",{value:"",text:T.edFields}));
       for(const group of groups)this.groups.appendChild(el("option",{value:group.id,text:group.label}));
@@ -230,7 +235,8 @@ class EditorPanel {
     if(fieldSignature!==this.fieldSignature) {
       this.fieldSignature=fieldSignature;this.fields.textContent="";this.physicsInputs=new Map();
       for(const field of wanted) {
-        const input=el("input",{type:"number",step:"any",value:String(field.value),"aria-label":field.label+" · "+field.id,on:{change:()=>this.app.invoke("physics_set",field.id,input.value.trim()===""?NaN:Number(input.value))}});
+        const apply=()=>this.app.invoke("physics_set",field.id,input.value.trim()===""?NaN:Number(input.value));
+        const input=el("input",{type:"number",step:"any",value:String(field.value),"aria-label":field.label+" · "+field.id,on:{input:apply,change:apply}});
         this.physicsInputs.set(field.id,input);
         this.fields.appendChild(el("label",{class:"physics-field"},[el("span",{text:field.label,title:field.id}),input]));
       }
@@ -240,7 +246,7 @@ class EditorPanel {
     const result=this.bench.physics_envelopes();
     const warnings=[...(state.warnings||[]),...(result.warnings||[])];
     this.rangeNotes.textContent=warnings.map((warning)=>warning.message||warning.code||String(warning)).filter((value,index,array)=>array.indexOf(value)===index).join("\n");
-    this.rangeValues.textContent=JSON.stringify(result.records||[],null,2);
+    this.rangeValues.textContent=JSON.stringify((result.records||[]).filter((record)=>!this.groups.value||record.group===this.groups.value),null,2);
   }
   refresh() {
     const state=this.bench.collider_edit_state(),selected=state.selected;
@@ -259,9 +265,13 @@ class EditorPanel {
     this.refreshPPB();
     this.refreshPhysics();
   }
-  project(point) {
+  projection() {
     const framed=this.bench.framing(),basis=this.bench.view.basis(),scale=this.app.scale/(window.devicePixelRatio||1),rect=this.app.canvas.getBoundingClientRect();
-    const delta=point.map((x,i)=>x-framed[0][i]);return [rect.width/2+dot(delta,basis.right)*scale,rect.height/2-dot(delta,basis.up)*scale];
+    return {centre:framed[0],basis,scale,width:rect.width,height:rect.height};
+  }
+  project(point,projection=this.projection()) {
+    const {centre,basis,scale,width,height}=projection;
+    const delta=point.map((x,i)=>x-centre[i]);return [width/2+dot(delta,basis.right)*scale,height/2-dot(delta,basis.up)*scale];
   }
   pick(event) {
     if(!this.bench.view.colliders)return null;
@@ -289,13 +299,15 @@ class EditorPanel {
   drawOverlay() {
     this.overlay.textContent="";
     const mode=this.bench.workspace_state().mode;if(!["colliders","physics"].includes(mode))return;
+    // One frame/mesh-bounds query per redraw, not twice for every contact segment.
     const add=(tag,attrs)=>{const element=document.createElementNS(this.svgNamespace,tag);for(const [key,value] of Object.entries(attrs))element.setAttribute(key,String(value));this.overlay.appendChild(element);};
     try {
+      const projection=this.projection(),project=(point)=>this.project(point,projection);
       if(mode==="colliders") {
         const state=this.bench.collider_edit_state(),cap=this.selected();
         if(!cap||!this.bench.view.colliders||!this.bench.collider_mesh().some((chunk)=>chunk.bone===cap.bone))return;
         const matrix=state.bodyMatrices[cap.bone];
-        const endpoints=[cap.p1,cap.p2].map((point)=>this.project(editorPoint(matrix,point)));
+        const endpoints=[cap.p1,cap.p2].map((point)=>project(editorPoint(matrix,point)));
         add("line",{x1:endpoints[0][0],y1:endpoints[0][1],x2:endpoints[1][0],y2:endpoints[1][1],stroke:"#5ce1ce","stroke-width":2});
         for(const screen of endpoints)add("circle",{cx:screen[0],cy:screen[1],r:5,fill:"#5ce1ce",stroke:"#122725","stroke-width":2});
         if(cap.editable&&this.bench.view.colliders) {
@@ -309,10 +321,15 @@ class EditorPanel {
         }
       }else {
         const result=this.bench.physics_envelopes();
+        const wanted=new Set((result.records||[]).filter((record)=>!this.groups.value||record.group===this.groups.value).map((record)=>record.id));
+        const paths=new Map();
         for(const line of result.lines||[]) {
-          const a=this.project(line.a),b=this.project(line.b);
-          add("line",{x1:a[0],y1:a[1],x2:b[0],y2:b[1],stroke:line.kind==="angular_glyph"?"#d6b47b":"#5ce1ce","stroke-width":1.5,opacity:0.85});
+          if(!wanted.has(line.record))continue;
+          const a=project(line.a),b=project(line.b),colour=line.kind==="angular_glyph"?"#d6b47b":line.kind.startsWith("contact_")?"#ef93db":"#5ce1ce";
+          if(!paths.has(colour))paths.set(colour,[]);
+          paths.get(colour).push(`M${a[0]} ${a[1]}L${b[0]} ${b[1]}`);
         }
+        for(const [colour,path] of paths)add("path",{d:path.join(""),fill:"none",stroke:colour,"stroke-width":1.5,opacity:0.85});
       }
     }catch(_){/* no model/frame: numeric inspection remains available */}
   }

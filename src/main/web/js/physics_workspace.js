@@ -3,7 +3,7 @@
 // Static configured geometry only. Keep the generic math in sync with PhysicsWorkspace.
 class PhysicsWorkspaceMirror {
   constructor(document=null,texts={},limits={}) {
-    this._document=null;this._edits=Object.create(null);this._source=[];this._texts=texts;
+    this._document=null;this._edits=Object.create(null);this._source=[];this._texts=texts;this._contactRadii=new Set();
     this._maxChars=limits.max_chars===undefined?2000000:limits.max_chars;this._maxFields=limits.max_fields===undefined?20000:limits.max_fields;
     if(!Number.isInteger(this._maxChars)||!Number.isInteger(this._maxFields)||this._maxChars<=0||this._maxFields<=0)this._fail("physicsw.size");
     if(document!==null)this.replace(document);
@@ -30,26 +30,39 @@ class PhysicsWorkspaceMirror {
         !Number.isInteger(field.start)||!Number.isInteger(field.end)||field.start<0||field.start>=field.end||field.end>source.length||
         !/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?$/.test(source.slice(field.start,field.end).join("")))this._fail("physicsw.document");
       this._finite(field.value);
+      if(field.minimum!==undefined)this._finite(field.minimum);
       if(field.value!==Number(source.slice(field.start,field.end).join("")))this._fail("physicsw.document");
       ids.add(field.id);spans.push([field.start,field.end]);
     }
     spans.sort((a,b)=>a[0]-b[0]);
     if(spans.some((span,index)=>index>0&&spans[index-1][1]>span[0]))this._fail("physicsw.document");
-    const groupIds=new Set(),recordIds=new Set();
+    const groupIds=new Set(),recordIds=new Set(),contactRadii=new Set(),contactCoordinates=new Set(),fieldsById=new Map(candidate.fields.map((field)=>[field.id,field]));
     for(const group of candidate.groups||[]) {
       if(!group||typeof group!=="object"||typeof group.id!=="string"||groupIds.has(group.id))this._fail("physicsw.document");
       groupIds.add(group.id);
     }
     for(const record of candidate.records||[]) {
-      if(!record||typeof record!=="object"||!["raw","limits"].includes(record.type)||typeof record.id!=="string"||recordIds.has(record.id))this._fail("physicsw.document");
+      if(!record||typeof record!=="object"||!["raw","limits","contact"].includes(record.type)||typeof record.id!=="string"||recordIds.has(record.id))this._fail("physicsw.document");
       recordIds.add(record.id);
       if(record.type==="limits"&&(typeof record.range_supported!=="boolean"||typeof record.frame_supported!=="boolean"||
         !record.frame||Array.isArray(record.frame)||typeof record.frame!=="object"||
         ["linear","angular"].some((key)=>!record[key]||Array.isArray(record[key])||typeof record[key]!=="object")))this._fail("physicsw.document");
+      if(record.type==="contact") {
+        const count=record.shape==="sphere"?1:record.shape==="capsule"?2:null,geometry=record.geometry;
+        if(!count||typeof record.node!=="string"||!record.node||!geometry||typeof geometry!=="object"||Array.isArray(geometry)||typeof record.weighted!=="boolean")this._fail("physicsw.document");
+        for(const side of ["low","high"]) {
+          if(!Array.isArray(geometry[side])||geometry[side].length!==count||geometry[side].some((end)=>!Array.isArray(end)||end.length!==4||end.some((value)=>value!==null&&(typeof value!=="string"||!ids.has(value)))))this._fail("physicsw.document");
+          const bound=geometry[side].flat().filter((id)=>id!==null);
+          if(new Set(bound).size!==bound.length)this._fail("physicsw.document");
+          for(const end of geometry[side]){end.slice(0,3).filter((id)=>id!==null).forEach((id)=>contactCoordinates.add(id));if(end[3]!==null)contactRadii.add(end[3]);}
+        }
+        if(!record.weighted&&JSON.stringify(geometry.low)!==JSON.stringify(geometry.high))this._fail("physicsw.document");
+      }
     }
+    for(const id of contactRadii)if(contactCoordinates.has(id)||(fieldsById.get(id).minimum!==undefined&&fieldsById.get(id).minimum!==0))this._fail("physicsw.document");
     if((candidate.warnings||[]).some((row)=>!row||Array.isArray(row)||typeof row!=="object"))this._fail("physicsw.document");
     candidate.groups=candidate.groups||[];candidate.records=candidate.records||[];candidate.warnings=candidate.warnings||[];
-    this._document=candidate;this._source=source;this._edits=Object.create(null);return this.state();
+    this._document=candidate;this._source=source;this._edits=Object.create(null);this._contactRadii=contactRadii;return this.state();
   }
   set(fieldId,value) {
     this._finite(value);
@@ -57,6 +70,7 @@ class PhysicsWorkspaceMirror {
     const field=this._document.fields.find((row)=>row.id===fieldId);
     if(!field)this._fail("physicsw.field",{field:fieldId});
     if(field.editable===false)this._fail("physicsw.readonly",{field:fieldId});
+    if((this._contactRadii.has(fieldId)&&value<0)||(field.minimum!==undefined&&value<field.minimum))this._fail("physicsw.contactRadius");
     if(value===field.value)delete this._edits[fieldId];else this._edits[fieldId]=value;
     return this.state();
   }
@@ -80,7 +94,7 @@ class PhysicsWorkspaceMirror {
     parts.push(this._source.slice(cursor).join(""));return parts.join("");
   }
   _matrix(frame) {
-    if(frame&&!Array.isArray(frame))frame=frame.matrix;
+    if(frame&&!Array.isArray(frame)){if(["ragdoll","havok","body"].includes(frame.source))return null;frame=frame.matrix;}
     if(!Array.isArray(frame)||frame.length!==4||frame.some((row)=>!Array.isArray(row)||row.length!==4||row.some((value)=>typeof value!=="number"||!Number.isFinite(value))))return null;
     if(frame[3].some((value,index)=>value!==[0,0,0,1][index]))return null;
     const columns=[0,1,2].map((col)=>[0,1,2].map((row)=>frame[row][col]));
@@ -98,11 +112,46 @@ class PhysicsWorkspaceMirror {
       [2*(x*y+z*w),1-2*(x*x+z*z),2*(y*z-x*w)],
       [2*(x*z-y*w),2*(y*z+x*w),1-2*(x*x+y*y)]];
   }
+  _contactWire(endpoints,segments) {
+    const lines=[],curve=(points,axis)=>{for(let index=0;index+1<points.length;index++)lines.push({axis,a:points[index],b:points[index+1]});};
+    const sphere=(endpoint)=>{
+      for(let axis=0;axis<3;axis++) {
+        const points=[];
+        for(let step=0;step<=segments;step++){const angle=2*Math.PI*step/segments,point=endpoint.slice(0,3);point[(axis+1)%3]+=endpoint[3]*Math.cos(angle);point[(axis+2)%3]+=endpoint[3]*Math.sin(angle);points.push(point);}
+        curve(points,["x","y","z"][axis]);
+      }
+    };
+    if(endpoints.length===1){sphere(endpoints[0]);return lines;}
+    const [a,b]=endpoints,delta=[0,1,2].map((index)=>b[index]-a[index]),length=Math.sqrt(delta.reduce((total,value)=>total+value*value,0));
+    if(!Number.isFinite(length))return null;
+    if(length<=Math.abs(a[3]-b[3])){sphere(a[3]>=b[3]?a:b);return lines;}
+    const u=delta.map((value)=>value/length),reference=[0,0,0];let least=0;
+    for(let index=1;index<3;index++)if(Math.abs(u[index])<Math.abs(u[least]))least=index;
+    reference[least]=1;
+    const cross=(left,right)=>[left[1]*right[2]-left[2]*right[1],left[2]*right[0]-left[0]*right[2],left[0]*right[1]-left[1]*right[0]];
+    let v=cross(u,reference);const vlength=Math.sqrt(v.reduce((total,value)=>total+value*value,0));v=v.map((value)=>value/vlength);
+    const w=cross(u,v),cosine=(a[3]-b[3])/length,sine=Math.sqrt(Math.max(0,1-cosine*cosine)),rings=[[],[]];
+    for(let step=0;step<=segments;step++) {
+      const angle=2*Math.PI*step/segments,normal=[0,1,2].map((index)=>cosine*u[index]+sine*(Math.cos(angle)*v[index]+Math.sin(angle)*w[index]));
+      endpoints.forEach((endpoint,index)=>rings[index].push([0,1,2].map((axis)=>endpoint[axis]+endpoint[3]*normal[axis])));
+    }
+    rings.forEach((ring)=>curve(ring,"surface"));
+    for(let index=0;index<segments;index++)lines.push({axis:"surface",a:rings[0][index],b:rings[1][index]});
+    const tangent=Math.acos(Math.max(-1,Math.min(1,cosine)));
+    for(const [endpoint,lower,upper] of [[a,tangent,Math.PI],[b,0,tangent]])for(const direction of [v,w,v.map((value)=>-value),w.map((value)=>-value)]) {
+      const points=[];
+      for(let step=0;step<=segments;step++){const angle=lower+(upper-lower)*step/segments;points.push([0,1,2].map((index)=>endpoint[index]+endpoint[3]*(Math.cos(angle)*u[index]+Math.sin(angle)*direction[index])));}
+      curve(points,"surface");
+    }
+    return lines;
+  }
   envelopes(frames={},options={}) {
     const radius=this._finite(options.angular_radius===undefined?1:options.angular_radius),segments=options.angular_segments===undefined?24:options.angular_segments;
-    if(radius<=0||!Number.isInteger(segments)||segments<1||segments>256)this._fail("physicsw.geometry");
+    const weight=this._finite(options.weight===undefined?0:options.weight),contactSegments=options.contact_segments===undefined?24:options.contact_segments;
+    if(weight<0||weight>100)this._fail("physicsw.contactWeight");
+    if(radius<=0||!Number.isInteger(segments)||segments<1||segments>256||!Number.isInteger(contactSegments)||contactSegments<3||contactSegments>256)this._fail("physicsw.geometry");
     const state=this.state(),values=Object.fromEntries(state.fields.map((field)=>[field.id,field.value]));
-    const result={mode:"configured_limits",records:[],lines:[],warnings:this._clone(state.warnings)};
+    const result={mode:"configured_limits",weight,records:[],lines:[],warnings:this._clone(state.warnings)};
     const vector=(items,size)=>{
       if(!Array.isArray(items)||items.length!==size)return null;
       const out=[];
@@ -114,7 +163,23 @@ class PhysicsWorkspaceMirror {
     };
     const warning=(code,key,record,args={})=>result.warnings.push({code,message:this._message(key,args),record:record.id});
     for(const record of state.records) {
-      const row=this._clone(record);row.linear=null;row.angular=null;result.records.push(row);
+      const row=this._clone(record);result.records.push(row);
+      if(record.type==="contact") {
+        Object.assign(row,{weight,status:"invalid_geometry",local_endpoints:null,world_endpoints:null});
+        const geometry=record.geometry,low=geometry.low.map((end)=>vector(end,4)),high=geometry.high.map((end)=>vector(end,4));
+        if(low.concat(high).some((end)=>!end||end[3]<0)){warning("invalid_contact","physicsw.invalidContact",record);continue;}
+        const mix=weight/100,ends=low.map((a,index)=>a.map((lo,axis)=>(1-mix)*lo+mix*high[index][axis]));row.local_endpoints=ends;
+        if(ends.flat().some((value)=>!Number.isFinite(value))){warning("invalid_contact","physicsw.invalidContact",record);continue;}
+        const name=record.node,node=this._matrix(frames&&frames[name]);
+        if(!node){row.status=frames&&Object.prototype.hasOwnProperty.call(frames,name)?"unsupported_frame":"unresolved_node";warning("missing_frame","physicsw.unresolvedContact",record,{name});continue;}
+        const scale=Math.sqrt([0,1,2].reduce((total,index)=>total+node[index][0]*node[index][0],0));
+        const world=(point)=>[0,1,2].map((rowno)=>node[rowno][3]+[0,1,2].reduce((total,index)=>total+node[rowno][index]*point[index],0));
+        const worldEnds=ends.map((end)=>world(end).concat(end[3]*scale)),localLines=this._contactWire(ends,contactSegments);
+        const worldLines=localLines===null?[]:localLines.map((line)=>({kind:"contact_"+record.shape,record:record.id,axis:line.axis,a:world(line.a),b:world(line.b)}));
+        if(localLines===null||worldEnds.flat().some((value)=>!Number.isFinite(value))||worldLines.some((line)=>line.a.concat(line.b).some((value)=>!Number.isFinite(value)))){warning("invalid_contact","physicsw.invalidContact",record);continue;}
+        Object.assign(row,{status:"resolved",world_endpoints:worldEnds});result.lines.push(...worldLines);continue;
+      }
+      row.linear=null;row.angular=null;
       if(record.type!=="limits"||!record.range_supported)continue;
       for(const kind of ["linear","angular"]) {
         const bounds=record[kind]||{},lower=vector(bounds.lower,3),upper=vector(bounds.upper,3);

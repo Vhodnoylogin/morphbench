@@ -3,7 +3,8 @@
 A Windows workbench for Skyrim NIF/TRI meshes, morphs, bounds and skeleton collision
 capsules. Version 0.8.8 offers Morphs, Colliders, CLI/HTTP automation and browser plugins.
 Find meshes by name or path in the left sidebar; manage plugins in their own menu.
-Physics remains disabled; Body Slots has no built-in tab.
+Released 0.8.8 keeps Physics disabled. This development branch enables the source-preserving
+Physics editor and static CBPC contact preview; Body Slots has no built-in tab.
 
 [Русская версия](README.ru.md) · [User guide](src/main/README.md) ·
 [Installation](src/main/docs/install-layout.md) · [Quick start](src/main/docs/quickstart.md)

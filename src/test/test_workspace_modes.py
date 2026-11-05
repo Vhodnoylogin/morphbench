@@ -78,9 +78,9 @@ class TestWorkspaceModes(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             bench = common.MorphBench(common.config(temporary))
             modes = bench.workspace_modes()
-            self.assertEqual(modes, ["morphs", "colliders"])
-            modes.append("physics")
-            self.assertEqual(WebPage(bench).payload()["workspaceModes"], ["morphs", "colliders"])
+            self.assertEqual(modes, ["morphs", "colliders", "physics"])
+            modes.append("slots")
+            self.assertEqual(WebPage(bench).payload()["workspaceModes"], ["morphs", "colliders", "physics"])
             # Withholding a tab must not remove the numerical owners or old scripts.
             self.assertEqual(bench.workspace_mode("physics")["mode"], "physics")
             self.assertEqual(bench.workspace_mode("slots")["mode"], "slots")
@@ -90,14 +90,18 @@ class TestWorkspaceModes(unittest.TestCase):
             bench = common.MorphBench(common.config(temporary))
             server = WebServer(bench, port=0, journal=Journal())
             self.addCleanup(server.stop)
-            for query in ("mode=physics&tab=ranges", "mode=slots&tab=author"):
+            for query in ("mode=slots&tab=author",):
                 html, status = server.page(Query(query))
                 self.assertEqual(status, 200)
-                self.assertIn('"workspaceModes":["morphs","colliders"]', html)
+                self.assertIn('"workspaceModes":["morphs","colliders","physics"]', html)
                 self.assertEqual(bench.workspace_state()["mode"], "morphs")
                 self.assertEqual(bench.workspace_state()["tab"], "sliders")
                 self.assertFalse(bench.view.colliders)
                 self.assertEqual(bench._placements.mode, "mesh")
+            _, status = server.page(Query("mode=physics&tab=ranges"))
+            self.assertEqual(status, 200)
+            self.assertEqual(bench.workspace_state()["mode"], "physics")
+            self.assertEqual(bench.workspace_state()["tab"], "ranges")
             _, status = server.page(Query("mode=colliders&tab=ppb"))
             self.assertEqual(status, 200)
             self.assertEqual(bench.workspace_state(), {"mode": "colliders", "tab": "edit", "tabs": ["edit", "display"]})
@@ -135,7 +139,7 @@ console.log(JSON.stringify({state:bench.workspace_state(),text:bench.ppb_export(
             self.assertEqual(result["restoredCaps"], result["caps"])
             self.assertEqual(result["recipe"]["actions"][-1], action("workspace_tab", "edit"))
 
-    def test_browser_navigation_blocks_experimental_modes_and_skips_them_on_keyboard(self):
+    def test_browser_navigation_offers_physics_and_skips_only_hidden_slots(self):
         with tempfile.TemporaryDirectory() as temporary:
             bench = common.MorphBench(common.config(temporary))
             result = run_browser(self, temporary, WebPage(bench).payload(), """
@@ -150,18 +154,18 @@ invoke('workspace_mode','physics');const physics=bench.workspace_state().mode,er
 invoke('workspace_mode','slots');const slots=bench.workspace_state().mode;
 invoke('workspace_replay',[{method:'workspace_mode',args:['physics']}]);const replay=bench.workspace_state().mode;
 const called=[],focused=[],buttons=new Map(['morphs','colliders','physics','slots'].map((id)=>
-  [id,{disabled:['physics','slots'].includes(id),focus(){focused.push(id);}}]));
+  [id,{disabled:id==='slots',focus(){focused.push(id);}}]));
 document.activeElement=buttons.get('colliders');
 input.WorkspaceUI.prototype.onNavigate.call({app:{invoke(...args){called.push(args);}}},
   {key:'ArrowRight',preventDefault(){}},buttons,'workspace_mode');
 console.log(JSON.stringify({modes:bench.workspace_modes(),active,physics,slots,replay,error,called,focused}));
 """, appScript=str(common.ROOT / "web/js/app.js"), panelScript=str(common.ROOT / "web/js/panel.js"))
-            self.assertEqual(result["modes"], ["morphs", "colliders"])
-            self.assertEqual([result[key] for key in ("active", "physics", "slots")], ["colliders"] * 3)
-            self.assertEqual(result["replay"], "morphs")
-            self.assertTrue(result["error"])
-            self.assertEqual(result["called"], [["workspace_mode", "morphs"]])
-            self.assertEqual(result["focused"], ["morphs"])
+            self.assertEqual(result["modes"], ["morphs", "colliders", "physics"])
+            self.assertEqual([result[key] for key in ("active", "physics", "slots")], ["colliders", "physics", "physics"])
+            self.assertEqual(result["replay"], "physics")
+            self.assertFalse(result["error"])
+            self.assertEqual(result["called"], [["workspace_mode", "physics"]])
+            self.assertEqual(result["focused"], ["physics"])
 
     def test_switching_modes_separates_capsule_and_slots_layers(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -365,7 +369,24 @@ console.log(JSON.stringify({legacy,display,morphs,calls,modes:[...ui.modeButtons
         self.assertEqual(result["calls"], [["workspace_tab", "display"]])
         self.assertEqual(result["modes"], ["morphs", "colliders", "physics"])
         self.assertEqual(result["controls"], ["panel"] * 3)
-        self.assertEqual(result["disabled"], ["physics"])
+        self.assertEqual(result["disabled"], [])
+
+    def test_dense_physics_overlay_frames_once_and_batches_segments(self):
+        result = self.run_js(r'''
+let framingCalls=0;
+globalThis.window={devicePixelRatio:1};
+const panel=Object.create(EditorPanel.prototype),lines=Array.from({length:33408},()=>({record:'r',kind:'contact_capsule',a:[1,2,3],b:[4,5,6]}));
+panel.overlay=new ControlElement('svg');panel.svgNamespace='svg';panel.groups={value:''};
+panel.app={scale:1,canvas:{getBoundingClientRect:()=>({width:800,height:600})}};
+panel.bench={workspace_state:()=>({mode:'physics'}),framing:()=>{framingCalls++;return [[0,0,0],1];},
+ view:{basis:()=>({right:[1,0,0],up:[0,1,0]})},physics_envelopes:()=>({records:[{id:'r',group:'g'}],lines})};
+panel.drawOverlay();const paths=panel.overlay.children;
+const first={framingCalls,paths:paths.length,segments:(paths[0].attrs.d.match(/M/g)||[]).length};
+panel.bench.framing=()=>{throw Error('all hidden');};panel.drawOverlay();
+console.log(JSON.stringify({first,empty:panel.overlay.children.length}));
+''')
+        self.assertEqual(result["first"], {"framingCalls": 1, "paths": 1, "segments": 33408})
+        self.assertEqual(result["empty"], 0)
 
     def test_plugin_tabs_share_navigation_selection_and_keyboard_order(self):
         result = self.run_js(r'''
@@ -378,19 +399,20 @@ const snapshot=()=>({selected:[...ui.modeButtons,...ui.addonButtons].filter(([,b
   focused:[...ui.modeButtons,...ui.addonButtons].find(([,button])=>button===document.activeElement)?.[0],
   tabsHidden:ui.tabNav.hidden,context:document.getElementById('viewport-mode').textContent,mode:bench.workspace_state().mode});
 app.invoke('workspace_mode','colliders');ui.refresh();ui.modeButtons.get('colliders').focus();
+ui.modeNav.events.keydown({key:'ArrowRight',preventDefault(){}});ui.refresh();
 ui.modeNav.events.keydown({key:'ArrowRight',preventDefault(){}});const pluginState=snapshot();
 ui.modeNav.events.keydown({key:'Home',preventDefault(){}});ui.refresh();const coreState=snapshot();
 console.log(JSON.stringify({pluginState,coreState,roles:[...ui.modeButtons.values(),...ui.addonButtons.values()].map(button=>button.attrs.role),
   count:ui.modeNav.children.length,navRole:ui.modeNav.attrs.role,calls}));
 ''')
         self.assertEqual(result["pluginState"], {"selected": ["inspector"], "focused": "inspector",
-                         "tabsHidden": True, "context": "Inspector", "mode": "colliders"})
+                         "tabsHidden": True, "context": "Inspector", "mode": "physics"})
         self.assertEqual(result["coreState"], {"selected": ["morphs"], "focused": "morphs",
                          "tabsHidden": False, "context": "Morphs", "mode": "morphs"})
         self.assertEqual(result["roles"], ["tab"] * 4)
         self.assertEqual(result["count"], 4)
         self.assertEqual(result["navRole"], "tablist")
-        self.assertEqual(result["calls"], [["workspace_mode", "colliders"], ["workspace_mode", "morphs"]])
+        self.assertEqual(result["calls"], [["workspace_mode", "colliders"], ["workspace_mode", "physics"], ["workspace_mode", "morphs"]])
 
 
 

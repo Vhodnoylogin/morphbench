@@ -127,8 +127,10 @@ full names such as `NPC L Hand [LHnd]`. `&` joins endpoints; `|` separates weigh
 weight-100 geometry. **Contact preview weight (0–100)** interpolates those endpoints and radii;
 it does not change the displayed body's geometry. Exported workspace recipes retain this
 weight explicitly, including zero. Unequal radii use the two-sphere convex hull. Missing
-nodes, unsupported frames and malformed geometry withhold the affected shape. Choose a group
-to isolate its wireframe and numbers. Contact lines are pink; configured limits remain separate.
+nodes, unsupported frames and malformed geometry withhold the affected shape. A Configuration
+group filters that tab's fields and wireframe. Ranges always shows all constraint/contact
+records and geometry, independently of that hidden filter. Contact lines are pink;
+configured limits remain separate.
 
 CBPC dynamic parameters remain raw settings. Offset clamps are neither final displacement nor
 direct angle limits. Linear/rotation factors, forces, actor selection, collision response

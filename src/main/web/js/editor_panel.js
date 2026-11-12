@@ -249,7 +249,8 @@ class EditorPanel {
     const result=this.bench.physics_envelopes();
     const warnings=[...(state.warnings||[]),...(result.warnings||[])];
     this.rangeNotes.textContent=warnings.map((warning)=>warning.message||warning.code||String(warning)).filter((value,index,array)=>array.indexOf(value)===index).join("\n");
-    this.rangeValues.textContent=JSON.stringify((result.records||[]).filter((record)=>!this.groups.value||record.group===this.groups.value),null,2);
+    // Configuration's group selector is hidden on Ranges; it must not hide that tab's data.
+    this.rangeValues.textContent=JSON.stringify(result.records||[],null,2);
   }
   refresh() {
     const state=this.bench.collider_edit_state(),selected=state.selected;
@@ -324,7 +325,8 @@ class EditorPanel {
         }
       }else {
         const result=this.bench.physics_envelopes();
-        const wanted=new Set((result.records||[]).filter((record)=>!this.groups.value||record.group===this.groups.value).map((record)=>record.id));
+        const group=this.bench.workspace_state().tab==="configuration"?this.groups.value:"";
+        const wanted=new Set((result.records||[]).filter((record)=>!group||record.group===group).map((record)=>record.id));
         const paths=new Map();
         for(const line of result.lines||[]) {
           if(!wanted.has(line.record))continue;

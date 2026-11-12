@@ -9,6 +9,30 @@ from test_workspace_integration import action, make_bench, run_browser
 
 
 class TestPhysicsWeight(unittest.TestCase):
+    def test_ranges_ignore_configuration_group_that_has_no_constraint(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            bench = make_bench(common.config(temporary))
+            result = run_browser(self, temporary, WebPage(bench).payload(), """
+eval(require('fs').readFileSync(input.panelScript,'utf8')+'\\n;input.EditorPanel=EditorPanel;');
+const element=()=>({value:'',dataset:{},children:[],appendChild(child){this.children.push(child);},
+  setAttribute(key,value){this[key]=value;},addEventListener(){}});
+document.createElement=element;document.createElementNS=element;
+let tab='configuration';
+const envelopes={records:[{id:'constraint',group:'joint'}],lines:[{record:'constraint',kind:'linear_axis',a:[0,0,0],b:[1,0,0]}]};
+const panel={bench:{physics_state(){return {document:{kind:'fsmp'},fields:[],previewWeight:0,groups:[]};},
+    workspace_state(){return {mode:'physics',tab};},physics_export(){return 'source';},physics_envelopes(){return envelopes;}},
+  app:{invoke(){}},contactWeight:element(),physicsNote:element(),kind:element(),groups:element(),filter:element(),
+  fields:element(),source:element(),rangeNotes:element(),rangeValues:element(),overlay:element(),
+  projection(){return {};},project(point){return point;}};
+panel.groups.value='bone';input.EditorPanel.prototype.drawOverlay.call(panel);
+const configurationPaths=panel.overlay.children.length;
+panel.overlay.children=[];tab='ranges';input.EditorPanel.prototype.refreshPhysics.call(panel);
+input.EditorPanel.prototype.drawOverlay.call(panel);
+console.log(JSON.stringify({configurationPaths,rangesPaths:panel.overlay.children.length,records:JSON.parse(panel.rangeValues.textContent)}));
+""", panelScript=str(common.ROOT / "web/js/editor_panel.js"))
+            self.assertEqual(result, {"configurationPaths": 0, "rangesPaths": 1,
+                                      "records": [{"id": "constraint", "group": "joint"}]})
+
     def test_actual_panel_respects_field_roles_and_rebuilds_after_source_replacement(self):
         with tempfile.TemporaryDirectory() as temporary:
             bench = make_bench(common.config(temporary))

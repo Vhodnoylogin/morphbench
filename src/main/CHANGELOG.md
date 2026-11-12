@@ -7,6 +7,9 @@
   and unequal-radius geometry; retain raw dynamic settings without simulating a solver.
 - Preserve full nested bone names, reject invalid radius edits, retain zero-weight recipes,
   and batch dense contact overlays without recomputing mesh bounds per segment.
+- Keep numeric-looking FSMP identities read-only, withhold unresolved template ranges,
+  and retain field read-only/minimum controls after replacing source documents.
+- Search physics parameters by their readable body/constraint group names.
 
 All notable changes to morphbench. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the numbering follows

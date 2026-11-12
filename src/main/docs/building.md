@@ -136,8 +136,10 @@ codes without showing windows. Python session/hidden Win32 tests cover ownership
 close races, parent death/PID reuse and controls without desktop interaction. Also verify the
 assembled archives using their bundled interpreter: imports, CLI/HTTP, native window,
 NIF/TRI/PNG, legacy v1/v2 adapters, App-first migration to v3, repeated updates and
-preserved settings/plugins. Keep Morphs and Colliders active; Physics remains disabled
-and Body Slots has no built-in tab. Record actual final archive hashes and source commits before publication.
+preserved settings/plugins. Qualify Morphs, Colliders and the development Physics editor,
+including source import, numeric edits, ranges, exports and recipe recovery; Body Slots has
+no built-in tab. Keep published 0.8.8 behavior separate from the unreleased candidate.
+Record actual final archive hashes and source commits before publication.
 Actual MO2/usvfs qualification is a separate observation; synthetic discovery is not it.
 
 Publish corresponding source on `main` and output as GitHub/Nexus downloads. Preserve

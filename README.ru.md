@@ -1,10 +1,10 @@
 # Morphbench
 
 Верстак для Windows: меши Skyrim NIF/TRI, морфы, шары охвата и капсулы столкновений
-скелета. В версии 0.8.8 доступны Морфы, Коллайдеры, автоматизация CLI/HTTP и браузерные
+скелета. В версии 0.8.9 доступны Морфы, Коллайдеры, Физика, автоматизация CLI/HTTP и браузерные
 плагины. Ищите меши по имени или пути слева, управляйте плагинами в отдельном меню.
-В выпущенной 0.8.8 Физика отключена. В этой ветке разработки доступны редактор параметров
-физики и статический просмотр коллизий CBPC; встроенной вкладки Body Slots нет.
+Физика редактирует существующие настройки FSMP/CBPC и показывает заданные пределы и
+статическую геометрию коллизий без решателя провайдера. Встроенной вкладки Body Slots нет.
 
 [English](README.md) · [Руководство](src/main/README.ru.md) ·
 [Установка](src/main/docs/install-layout.ru.md) · [Первый запуск](src/main/docs/quickstart.ru.md)
@@ -35,7 +35,7 @@ python release.py --list
 
 Готовые выпуски находятся среди [файлов GitHub Releases](https://github.com/Vhodnoylogin/morphbench/releases)
 и [файлов Nexus](https://www.nexusmods.com/skyrimspecialedition/mods/194795).
-На GitHub есть отдельные релизы [Application 0.8.8](https://github.com/Vhodnoylogin/morphbench/releases/tag/v0.8.8)
+На GitHub есть отдельные релизы [Application 0.8.9](https://github.com/Vhodnoylogin/morphbench/releases/tag/v0.8.9)
 и [Launcher v3](https://github.com/Vhodnoylogin/morphbench/releases/tag/launcher-v3).
 Для первой установки скачайте оба пакета; если Launcher v3 уже установлен, достаточно
 обновить Application. На Nexus обе части тоже остаются отдельными загрузками.

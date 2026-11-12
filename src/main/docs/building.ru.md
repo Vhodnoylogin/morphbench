@@ -1,6 +1,6 @@
 # Сборка и выпуск Morphbench
 
-Application 0.8.8 включает рабочие вкладки плагинов и поиск мешей и использует
+Application 0.8.9 включает редактор Физики, рабочие вкладки плагинов и поиск мешей и использует
 Launcher v3 без изменений. Вкладки Body Slots нет; сохранённая реализация ждёт
 отдельного плагина. Перечни выпущенных Runtime неизменяемы. Опорные меши и скелеты не входят в пользовательский архив; проверку браузера
 описывайте отдельно от проверки комплекта.
@@ -33,7 +33,7 @@ Application схемы 2 проверяет API/ABI: совместимый бу
 
 ```text
 python release.py --package runtime --runtime-from <распакованный-launcher> --runtime-version 3 --out <результат>
-python release.py --package application --runtime <распакованный-launcher>/runtime-manifest.json --version 0.8.8 --out <результат>
+python release.py --package application --runtime <распакованный-launcher>/runtime-manifest.json --version 0.8.9 --out <результат>
 ```
 
 Сборщик сравнивает ID, contentHash и Python с закреплением исходников. Оба архива имеют
@@ -43,8 +43,8 @@ python release.py --package application --runtime <распакованный-la
 
 На GitHub публикуйте проверенные структурированные компоненты отдельными релизами:
 
-- [Application 0.8.8](https://github.com/Vhodnoylogin/morphbench/releases/tag/v0.8.8)
-  содержит `morphbench-application-0.8.8.zip` из точного коммита исходников Application.
+- [Application 0.8.9](https://github.com/Vhodnoylogin/morphbench/releases/tag/v0.8.9)
+  содержит `morphbench-application-0.8.9.zip` из точного коммита исходников Application.
 - [Launcher v3](https://github.com/Vhodnoylogin/morphbench/releases/tag/launcher-v3)
   содержит неизменённый нативный пакет как `morphbench-launcher-v3-win64.zip`; тег указывает точный коммит
   нативных исходников `ac15b242dbe1013d2c46a521fb6fad1f03161b52`.
@@ -133,9 +133,9 @@ python src/main/build-nifly.py --out <нативная-сборка>
 Проверьте собранную установку
 встроенным Python: импорты, CLI/HTTP, окно, NIF/TRI/PNG, адаптеры прежних v1/v2, переход
 на v3 после обновления App, повторные обновления и сохранность настроек/плагинов.
-Проверьте Морфы, Коллайдеры и редактор Физики в ветке разработки, включая импорт исходника,
+Проверьте Морфы, Коллайдеры и редактор Физики, включая импорт исходника,
 числовые правки, диапазоны, экспорт и восстановление рецепта; встроенной вкладки Body Slots нет.
-Отделяйте поведение выпущенной 0.8.8 от невыпущенного кандидата. Перед публикацией
+Редактор и статическая геометрия не подтверждают поведение провайдера в игре. Перед публикацией
 зафиксируйте хеши окончательных архивов и соответствующие коммиты. Фактическая работа MO2/usvfs проверяется отдельно;
 синтетический поиск её не доказывает.
 

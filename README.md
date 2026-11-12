@@ -1,10 +1,10 @@
 # Morphbench
 
 A Windows workbench for Skyrim NIF/TRI meshes, morphs, bounds and skeleton collision
-capsules. Version 0.8.8 offers Morphs, Colliders, CLI/HTTP automation and browser plugins.
+capsules. Version 0.8.9 offers Morphs, Colliders, Physics, CLI/HTTP automation and browser plugins.
 Find meshes by name or path in the left sidebar; manage plugins in their own menu.
-Released 0.8.8 keeps Physics disabled. This development branch enables the source-preserving
-Physics editor and static CBPC contact preview; Body Slots has no built-in tab.
+Physics edits existing FSMP/CBPC settings and previews nominal limits and static contact
+geometry. It does not simulate a provider. Body Slots has no built-in tab.
 
 [Русская версия](README.ru.md) · [User guide](src/main/README.md) ·
 [Installation](src/main/docs/install-layout.md) · [Quick start](src/main/docs/quickstart.md)
@@ -35,7 +35,7 @@ The source layout does not change installed packages: they retain
 
 Released downloads are [GitHub release assets](https://github.com/Vhodnoylogin/morphbench/releases)
 and [Nexus files](https://www.nexusmods.com/skyrimspecialedition/mods/194795).
-GitHub has separate releases for [Application 0.8.8](https://github.com/Vhodnoylogin/morphbench/releases/tag/v0.8.8)
+GitHub has separate releases for [Application 0.8.9](https://github.com/Vhodnoylogin/morphbench/releases/tag/v0.8.9)
 and [Launcher v3](https://github.com/Vhodnoylogin/morphbench/releases/tag/launcher-v3).
 Download both for a first installation; existing Launcher v3 users only need the Application
 update. Nexus also keeps the two components as separate downloads.

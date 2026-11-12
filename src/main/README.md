@@ -25,11 +25,11 @@ The project was extracted from Skyrim-Mods on 2026-10-02. All 42 retained histor
 the module contents and Git LFS were verified on 2026-10-03. The old local and remote
 `Skyrim-Mods/morphbench` branches were deleted after verification; historical checkouts remain.
 
-Version **0.8.8** adds mesh search by name/path, a persistent left model sidebar and
-a separate Plugins menu with automatic discovery and enable/disable controls. It retains
+Version **0.8.9** enables the Physics editor for existing FSMP/CBPC settings, nominal limits
+and static contact geometry. It retains mesh search, the model sidebar, the Plugins menu,
 visual capsule editing, source-preserving [PPB tuning editing](docs/ppb.md), browser API v1
 and the distinction between [native file visibility](docs/visibility.md) and viewer selection.
-Released 0.8.8 enables **Morphs** and **Colliders**. This development branch also enables **Physics** for source editing and static contact placement.
+The workspace enables **Morphs**, **Colliders** and **Physics**. No provider solver runs.
 Body Slots has no built-in tab and is intended for a separate plugin. Its legacy code
 and scripted APIs remain available for that work.
 See the [editing workspace](docs/workspace.md) and [changelog](CHANGELOG.md).
@@ -57,7 +57,7 @@ edited or fitted collision capsules, and edited physics configurations into new 
 ## What it needs
 
 **From a release — no separate Python or Blender installation.** On GitHub, download
-**morphbench-application-0.8.8.zip** from [Application 0.8.8](https://github.com/Vhodnoylogin/morphbench/releases/tag/v0.8.8)
+**morphbench-application-0.8.9.zip** from [Application 0.8.9](https://github.com/Vhodnoylogin/morphbench/releases/tag/v0.8.9)
 and **morphbench-launcher-v3-win64.zip** from [Launcher v3](https://github.com/Vhodnoylogin/morphbench/releases/tag/launcher-v3).
 These are separate releases with independent versions. On Nexus, download the two Main files.
 If Launcher v3 is already installed, this update only needs Application.
@@ -119,7 +119,7 @@ elsewhere, the `pynifly` key in `morphbench.json` says where. morphbench has no 
 of its own and must not have one: PyNifly's modules are the same ones that write these files, so
 a second reading that could drift away from the first never appears.
 
-Application 0.8.8 retains Launcher v1/v2 adapters and minimal host protocol 1 for v3.
+Application 0.8.9 retains Launcher v1/v2 adapters and minimal host protocol 1 for v3.
 Update Application first, then replace the Launcher folder with v3 while preserving its
 settings. Application 0.8.6 cannot run the v3 host. From 0.8.5, use the NEW extracted
 updater; see [transition steps](docs/install-layout.md). Future compatible hosts do not
@@ -300,11 +300,10 @@ stays in the source repository and is not included in the end-user archive.
 
 ## Editing workspace
 
-The 0.8.8 viewer enables **Morphs** and **Colliders**, with mode tabs above the view, models
+The 0.8.9 viewer enables **Morphs**, **Colliders** and **Physics**, with mode tabs above the view, models
 on the left and an inspector on the right. Edit supported collision capsules, save a
-replayable workspace and export new files. This development branch enables **Physics**;
-**Body Slots**
-is intended for a separate plugin. Experimental FSMP XML/CBPC TXT editing remains accessible through `mb.py workspace`
+replayable workspace and export new files. The Physics editor preserves source text;
+**Body Slots** is intended for a separate plugin. FSMP XML/CBPC TXT editing is also available through `mb.py workspace`
 and the local HTTP API. Physics shows static CBPC contact placement and nominal FSMP
 limits, not a simulation.
 See [the workspace workflow](docs/workspace.md) for controls, automation and offline limits.
@@ -314,14 +313,14 @@ See [the workspace workflow](docs/workspace.md) for controls, automation and off
 Local preview variants add independent author → definition → variant inheritance. Session recipes preserve variants and edit targets; `mb.py slots --editor` recovers unfinished projects and exports unbound placement presets. Authored JSON and `.bslots` remain authored-only. See [the Slots workflow](docs/slots.md).
 
 Experimental Slots authoring remains available through `mb.py slots` and the local HTTP API;
-there is no built-in browser tab in 0.8.8. The backend supports named skeleton-node placements,
+there is no built-in browser tab in 0.8.9. The backend supports named skeleton-node placements,
 local transforms/access spheres, author defaults and temporary effective overrides, session
 recipes, Body Slots schema-v1 JSON and `.bslots` exports. It does not edit game saves,
 equipment or inventories. See [docs/slots.md](docs/slots.md) for the offline workflow and limits.
 
 ## Browser plugins
 
-Application 0.8.8 includes a versioned local browser plugin host. Use API v1 to select
+Application 0.8.9 includes a versioned local browser plugin host. Use API v1 to select
 models, read geometry, set existing morphs, control the view and save plugin state for
 the current browser tab. Installed plugins can be explicitly updated while disabled. [Contract and workflow](docs/addons.md);
 [neutral source example](https://github.com/Vhodnoylogin/morphbench/tree/main/src/main/examples/scene-inspector).

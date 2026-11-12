@@ -230,13 +230,16 @@ class EditorPanel {
       for(const group of groups)this.groups.appendChild(el("option",{value:group.id,text:group.label}));
       this.groups.dataset.signature=signature;
     }
-    const filter=this.filter.value.toLowerCase(),wanted=fields.filter((field)=>(!this.groups.value||field.group===this.groups.value)&&(!filter||((field.label||"")+" "+(field.group||"")).toLowerCase().includes(filter)));
-    const fieldSignature=JSON.stringify(wanted.map((field)=>[field.id,field.label]));
+    const groupNames=new Map(groups.map((group)=>[group.id,group.label]));
+    const filter=this.filter.value.toLowerCase(),wanted=fields.filter((field)=>(!this.groups.value||field.group===this.groups.value)&&(!filter||((field.label||"")+" "+(groupNames.get(field.group)||field.group||"")).toLowerCase().includes(filter)));
+    const fieldSignature=JSON.stringify(wanted.map((field)=>[field.id,field.label,field.editable,field.minimum]));
     if(fieldSignature!==this.fieldSignature) {
       this.fieldSignature=fieldSignature;this.fields.textContent="";this.physicsInputs=new Map();
       for(const field of wanted) {
         const apply=()=>this.app.invoke("physics_set",field.id,input.value.trim()===""?NaN:Number(input.value));
         const input=el("input",{type:"number",step:"any",value:String(field.value),"aria-label":field.label+" · "+field.id,on:{input:apply,change:apply}});
+        input.disabled=field.editable===false;
+        if(field.minimum!==undefined)input.min=String(field.minimum);
         this.physicsInputs.set(field.id,input);
         this.fields.appendChild(el("label",{class:"physics-field"},[el("span",{text:field.label,title:field.id}),input]));
       }

@@ -107,7 +107,8 @@ Numeric edits replace only the original number spans. UTF-8 input, including a B
 endings, comments, ordering and unknown blocks, is retained. Names and conditions stay opaque;
 duplicate display names have separate source IDs. DTD/entity declarations, malformed XML and
 oversized inputs are rejected. Nonfinite source numbers are preserved with a warning and are
-excluded from evaluation.
+excluded from evaluation. Numeric-looking provider names, collision tags and frame-reference
+flags remain read-only; use the Source panel for a deliberate structural edit.
 
 The **Source** panel lets you deliberately change the text. Validation and application replace
 the document baseline, including any structural changes you made. Download the edited XML/TXT
@@ -118,7 +119,7 @@ In **Physics → Ranges**, supported FSMP generic constraints show nominal confi
 the supplied rest node frames. Linear axes/boxes are in the provider's configured units;
 angular arcs are visual glyphs in radians, with a visual radius. A lower limit above its upper
 limit means an unconstrained axis; equal limits mean a locked axis. Missing limits, unresolved
-defaults/inheritance and unsupported frame or constraint semantics warn and withhold the
+defaults/inheritance (including external `template` references) and unsupported frame or constraint semantics warn and withhold the
 affected preview. A suitable skeleton node frame is required for world geometry.
 
 CBPC collision sections show spheres and capsules in the skeleton **node** frame, including
@@ -162,7 +163,8 @@ axis while the body remains still. Mass and damping changes have no animated pre
 
 Download the changed configuration, reopen it, and check that the intended parameter changed
 while comments and unrelated settings remain intact. A real CBPC TXT can be checked the same
-way for source editing, but its spatial ranges are not displayed. These checks verify the
+way for source editing. Supported collision shapes are displayed at the selected weight;
+dynamic parameter ranges are not inferred. These checks verify the
 editor and configured limits. To evaluate actual motion, damping and contacts, test the
 exported configuration with its provider in the game.
 

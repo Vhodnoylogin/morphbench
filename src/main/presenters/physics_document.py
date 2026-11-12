@@ -21,6 +21,12 @@ _TOKEN = re.compile(r"<!--[\s\S]*?-->|<!\[CDATA\[[\s\S]*?\]\]>|<\?[\s\S]*?\?>|<[
 _ATTR = re.compile(r"([^\s=/>]+)\s*=\s*([\"'])(.*?)\2", re.DOTALL)
 _GROUP_TAGS = {"bone", "generic-constraint", "per-vertex-shape", "per-triangle-shape", "collision"}
 _VECTOR_TAGS = ("linearLowerLimit", "linearUpperLimit", "angularLowerLimit", "angularUpperLimit")
+# These provider values are identities/flags even when their source happens to be decimal.
+# Keep their source spans visible for inspection without offering numeric rewriting.
+_SYMBOLIC_TAGS = {"useLinearReferenceFrameA", "tag", "can-collide-with-tag", "no-collide-with-tag",
+                  "can-collide-with-bone", "no-collide-with-bone", "disable-tag"}
+_SYMBOLIC_ATTRIBUTES = {"name", "bodyA", "bodyB", "extends", "template", "file", "shape",
+                        "a", "b", "bone", "frameRef"}
 
 
 def parse_document(kind, text, *, max_chars=2_000_000, max_fields=20_000):
@@ -111,7 +117,7 @@ def _xml(text, result, group, field):
                 parent["children"].append(node)
             nodes.append(node)
             for attr in _ATTR.finditer(token):
-                if attr.group(1) in ("name", "bodyA", "bodyB", "extends", "file", "shape", "a", "b", "frameRef"):
+                if attr.group(1) in _SYMBOLIC_ATTRIBUTES:
                     continue
                 start, end = match.start() + attr.start(3), match.start() + attr.end(3)
                 ident = field(start, end, owner, "%s.%s" % (element.tag, attr.group(1)))
@@ -135,10 +141,11 @@ def _xml(text, result, group, field):
                                   stack[-1]["group"], label)
                     if ident is not None:
                         stack[-1]["text"].append(ident)
-                        if tag in ("useLinearReferenceFrameA", "tag", "no-collide-with-tag"):
+                        if tag in _SYMBOLIC_TAGS:
                             result["fields"][-1]["editable"] = False
 
     inheritance = any("default" in str(element.tag).lower() or element.get("extends") is not None
+                      or element.get("template") is not None
                       for element in elements)
     if inheritance:
         result["warnings"].append({"code": "inheritance", "message": t("physicsw.inheritance")})

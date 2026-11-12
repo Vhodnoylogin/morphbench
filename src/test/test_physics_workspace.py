@@ -169,6 +169,21 @@ class TestLosslessDocuments(unittest.TestCase):
             owner.set(tag["id"], 2)
         self.assertEqual(owner.export_text(), source)
 
+    def test_numeric_provider_identities_and_template_names_are_not_editable(self):
+        source = ('<system><bone name="123" template="456"><mass>1</mass>'
+                  '<can-collide-with-bone>789</can-collide-with-bone>'
+                  '<no-collide-with-bone>12</no-collide-with-bone>'
+                  '<can-collide-with-tag>34</can-collide-with-tag>'
+                  '<disable-tag>56</disable-tag></bone></system>')
+        document = parse_document("fsmp", source)
+        owner = PhysicsWorkspace(document)
+        self.assertFalse(any(field["label"] in ("bone.name", "bone.template") for field in document["fields"]))
+        for field in document["fields"]:
+            if field["label"] != "mass":
+                with self.subTest(label=field["label"]), self.assertRaises(ValueError):
+                    owner.set(field["id"], 999)
+        self.assertEqual(owner.export_text(), source)
+
     def test_resource_limits_are_explicit(self):
         with self.assertRaises(ValueError):
             parse_document("fsmp", XML, max_chars=len(XML) - 1)
@@ -210,6 +225,26 @@ class TestConfiguredGeometry(unittest.TestCase):
         xline = next(line for line in result["lines"] if line["kind"] == "linear_axis" and line["axis"] == "x")
         self.assertEqual(xline["b"], [6, 30, 36])
 
+    def test_last_authored_joint_frame_defines_one_rest_frame_for_either_reference(self):
+        # FSMP readGenericConstraintTemplate replaces the frame; calcFrame derives the
+        # other body's frame from the same world transform, before any solver motion.
+        frame_a = '<frameInA><origin x="4" y="5" z="6"/></frameInA>'
+        source = XML.replace('<frameInB>', frame_a + '<frameInB>')
+        frames = {"Anchor": FRAME, "Tip": [[1, 0, 0, 100], [0, 1, 0, 200], [0, 0, 1, 300], [0, 0, 0, 1]]}
+        for reference in ("false", "true"):
+            with self.subTest(reference=reference):
+                document = parse_document("fsmp", source.replace('</generic-constraint>',
+                    '<useLinearReferenceFrameA>' + reference + '</useLinearReferenceFrameA></generic-constraint>'))
+                result = PhysicsWorkspace(document).envelopes(frames)
+                self.assertEqual(result["records"][0]["world_origin"], [6, 22, 36])
+                self.assertEqual(result["records"][0]["frame"]["source"], "frameInB")
+                self.assertTrue(any(row["code"] == "last_wins" for row in result["warnings"]))
+                self.assertTrue(result["lines"])
+        source = XML.replace('</frameInB>', '</frameInB>' + frame_a)
+        result = PhysicsWorkspace(parse_document("fsmp", source)).envelopes(frames)
+        self.assertEqual(result["records"][0]["world_origin"], [104, 205, 306])
+        self.assertEqual(result["records"][0]["frame"]["source"], "frameInA")
+
     def test_default_frame_and_missing_range_are_not_invented(self):
         source = '<system><generic-constraint bodyA="A" bodyB="B"><linearLowerLimit x="0" y="0" z="0"/></generic-constraint></system>'
         result = PhysicsWorkspace(parse_document("fsmp", source)).envelopes({"B": FRAME})
@@ -220,6 +255,8 @@ class TestConfiguredGeometry(unittest.TestCase):
 
     def test_inheritance_and_unsupported_frame_semantics_withhold_geometry(self):
         sources = (XML.replace('<bone name="Anchor">', '<bone name="Anchor" extends="base">'),
+                   XML.replace('<bone name="Anchor">', '<bone name="Anchor" template="external">'),
+                   XML.replace('bodyA="Tip"', 'template="external" bodyA="Tip"'),
                    XML.replace("frameInB", "frameInLerp"), XML.replace("<frameInB>", '<frameInB frameRef="A">'))
         for source in sources:
             with self.subTest(source=source[:50]):

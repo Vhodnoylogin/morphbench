@@ -2,7 +2,7 @@
 
 Russian: [workspace.ru.md](workspace.ru.md).
 
-This development workspace enables **Morphs**, **Colliders** and **Physics**, including
+This workspace enables **Morphs**, **Colliders** and **Physics**, including
 keyboard navigation. **Body Slots** has no built-in tab: its future interface will be a
 plugin. Old links to unavailable modes open Morphs.
 A second row holds the current mode's tabs. Models and parts stay on the left, the 3D view
@@ -140,7 +140,7 @@ scrubbing in this iteration.
 
 ### Check the editor without running the game
 
-In a development build that offers the Physics editor, save this diagnostic example as
+Save this diagnostic example as
 `physics-ranges.xml` outside the installation, then open it in
 **Physics → Configuration → Open configuration**, with a human skeleton containing
 `NPC Spine1 [Spn1]` and `NPC Spine2 [Spn2]`. This is a diagnostic example, not a game preset.

@@ -1,8 +1,8 @@
 # Changelog
 
-## Unreleased
+## [0.8.9] — 2026-11-12
 
-- Enable Physics configuration/range inspection in the development workspace.
+- Enable Physics configuration/range inspection in the workspace.
 - Preview source-preserving CBPC spheres/capsules at an explicit weight, using node frames
   and unequal-radius geometry; retain raw dynamic settings without simulating a solver.
 - Preserve full nested bone names, reject invalid radius edits, retain zero-weight recipes,
@@ -10,6 +10,7 @@
 - Keep numeric-looking FSMP identities read-only, withhold unresolved template ranges,
   and retain field read-only/minimum controls after replacing source documents.
 - Search physics parameters by their readable body/constraint group names.
+- Keep all Ranges records and overlays visible after filtering a body in Configuration.
 
 All notable changes to morphbench. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the numbering follows

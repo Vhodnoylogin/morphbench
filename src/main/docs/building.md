@@ -1,6 +1,6 @@
 # Building and releasing Morphbench
 
-Application 0.8.8 includes generic plugin workspaces and mesh search and reuses
+Application 0.8.9 includes the Physics editor, generic plugin workspaces and mesh search and reuses
 Launcher v3 unchanged. Body Slots has no core tab; its legacy implementation awaits
 a separate plugin. Published Runtime inventories remain immutable. No reference meshes or skeletons belong
 in a user archive; report browser checks separately from package validation.
@@ -34,7 +34,7 @@ extract `root/Morphbench/launcher`. Do not modify its inventoried files. Package
 
 ```text
 python release.py --package runtime --runtime-from <extracted-launcher> --runtime-version 3 --out <output>
-python release.py --package application --runtime <extracted-launcher>/runtime-manifest.json --version 0.8.8 --out <output>
+python release.py --package application --runtime <extracted-launcher>/runtime-manifest.json --version 0.8.9 --out <output>
 ```
 
 The builder checks Runtime ID, content hash and Python version against the source pin.
@@ -45,8 +45,8 @@ format is structured. Do not perform in-place cross-layout updates.
 
 On GitHub, publish the verified structured components in separate releases:
 
-- [Application 0.8.8](https://github.com/Vhodnoylogin/morphbench/releases/tag/v0.8.8)
-  supplies `morphbench-application-0.8.8.zip` from its exact Application source commit.
+- [Application 0.8.9](https://github.com/Vhodnoylogin/morphbench/releases/tag/v0.8.9)
+  supplies `morphbench-application-0.8.9.zip` from its exact Application source commit.
 - [Launcher v3](https://github.com/Vhodnoylogin/morphbench/releases/tag/launcher-v3)
   supplies the unchanged native package as `morphbench-launcher-v3-win64.zip`, tagged at the exact native
   source commit `ac15b242dbe1013d2c46a521fb6fad1f03161b52`.
@@ -136,9 +136,9 @@ codes without showing windows. Python session/hidden Win32 tests cover ownership
 close races, parent death/PID reuse and controls without desktop interaction. Also verify the
 assembled archives using their bundled interpreter: imports, CLI/HTTP, native window,
 NIF/TRI/PNG, legacy v1/v2 adapters, App-first migration to v3, repeated updates and
-preserved settings/plugins. Qualify Morphs, Colliders and the development Physics editor,
+preserved settings/plugins. Qualify Morphs, Colliders and the Physics editor,
 including source import, numeric edits, ranges, exports and recipe recovery; Body Slots has
-no built-in tab. Keep published 0.8.8 behavior separate from the unreleased candidate.
+no built-in tab. Configuration editing and static geometry do not qualify provider runtime behavior.
 Record actual final archive hashes and source commits before publication.
 Actual MO2/usvfs qualification is a separate observation; synthetic discovery is not it.
 

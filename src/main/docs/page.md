@@ -24,8 +24,8 @@ python mb.py web body.nif --tri body.tri --out page.html
 python mb.py serve --root "D:\SteamLibrary\steamapps\common\SkyrimVR\Data"
 ```
 
-The development workspace offers **Morphs**, **Colliders** and **Physics**. Released 0.8.8
-keeps Physics disabled. Body Slots has no built-in tab.
+The workspace offers **Morphs**, **Colliders** and **Physics**.
+Body Slots has no built-in tab.
 Use [the workspace guide](workspace.md#physics-configuration) for configuration editing,
 nominal limits and static CBPC contact geometry. These views do not simulate a provider.
 The common collider inspector supports visual capsule movement, settings sources including PPB,
